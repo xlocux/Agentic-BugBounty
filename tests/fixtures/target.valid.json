@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.0",
+  "target_name": "DuckDuckGo Privacy Essentials",
+  "asset_type": "chromeext",
+  "default_mode": "whitebox",
+  "allowed_modes": ["whitebox"],
+  "program_url": "https://hackerone.com/duckduckgo",
+  "source_path": "./src",
+  "findings_dir": "./findings",
+  "h1_reports_dir": "./findings/h1_submission_ready",
+  "logs_dir": "./logs",
+  "intelligence_dir": "./intelligence",
+  "target_version_hint": "Read src/package.json after cloning",
+  "hackerone": {
+    "program_handle": "duckduckgo",
+    "sync_enabled": true
+  },
+  "scope": {
+    "in_scope": [
+      "Chrome/Firefox/Edge extension",
+      "duckduckgo.com web properties"
+    ],
+    "out_of_scope": [
+      "Open proxy SSRF",
+      "Clickjacking on non-sensitive pages",
+      "Self-XSS",
+      "DoS"
+    ]
+  },
+  "rules": [
+    "Never modify files in ./src",
+    "Load extension unpacked in an isolated Chrome profile",
+    "Confirm uXSS with alert(document.domain) showing the victim domain"
+  ],
+  "setup": [
+    "git clone https://github.com/duckduckgo/duckduckgo-privacy-extension ./src"
+  ]
+}

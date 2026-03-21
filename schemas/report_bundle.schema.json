@@ -1,0 +1,248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-bugbounty.local/schemas/report_bundle.schema.json",
+  "title": "REPORT_BUNDLE",
+  "type": "object",
+  "required": [
+    "meta",
+    "findings",
+    "unconfirmed_candidates",
+    "analysis_summary"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "generated_at",
+        "asset_type",
+        "analysis_mode",
+        "target_name",
+        "target_version",
+        "program_url",
+        "researcher_agent"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "type": "string",
+          "const": "2.0"
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "asset_type": {
+          "type": "string",
+          "enum": ["webapp", "mobileapp", "chromeext", "executable"]
+        },
+        "analysis_mode": {
+          "type": "string",
+          "enum": ["whitebox", "blackbox"]
+        },
+        "target_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "program_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "researcher_agent": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "unconfirmed_candidates": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    },
+    "analysis_summary": {
+      "type": "object",
+      "required": [
+        "files_analyzed",
+        "grep_hits_total",
+        "candidates_found",
+        "confirmed_findings",
+        "time_spent_minutes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "files_analyzed": {
+          "type": "number",
+          "minimum": 0
+        },
+        "grep_hits_total": {
+          "type": "number",
+          "minimum": 0
+        },
+        "candidates_found": {
+          "type": "number",
+          "minimum": 0
+        },
+        "confirmed_findings": {
+          "type": "number",
+          "minimum": 0
+        },
+        "time_spent_minutes": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  },
+  "$defs": {
+    "findingBase": {
+      "type": "object",
+      "required": [
+        "report_id",
+        "finding_title",
+        "severity_claimed",
+        "cvss_vector_claimed",
+        "cvss_score_claimed",
+        "cwe_claimed",
+        "vulnerability_class",
+        "affected_component",
+        "summary",
+        "steps_to_reproduce",
+        "poc_code",
+        "poc_type",
+        "observed_result",
+        "impact_claimed",
+        "remediation_suggested",
+        "researcher_notes",
+        "confirmation_status",
+        "reason_not_confirmed",
+        "attachments"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "report_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "finding_title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity_claimed": {
+          "type": "string",
+          "enum": ["Critical", "High", "Medium", "Low", "Informative"]
+        },
+        "cvss_vector_claimed": {
+          "type": "string",
+          "pattern": "^CVSS:3\\.1/AV:[NALP]/AC:[LH]/PR:[NLH]/UI:[NR]/S:[UC]/C:[NLH]/I:[NLH]/A:[NLH]$"
+        },
+        "cvss_score_claimed": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "cwe_claimed": {
+          "type": "string",
+          "pattern": "^CWE-[0-9]+: .+$"
+        },
+        "vulnerability_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "affected_component": {
+          "type": "string",
+          "minLength": 1
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "steps_to_reproduce": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "poc_code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "poc_type": {
+          "type": "string",
+          "enum": ["html", "curl", "python", "js_console", "burp_request", "gdb", "other"]
+        },
+        "observed_result": {
+          "type": "string",
+          "minLength": 1
+        },
+        "impact_claimed": {
+          "type": "string",
+          "minLength": 1
+        },
+        "remediation_suggested": {
+          "type": "string",
+          "minLength": 1
+        },
+        "researcher_notes": {
+          "type": "string"
+        },
+        "confirmation_status": {
+          "type": "string",
+          "enum": ["confirmed", "unconfirmed"]
+        },
+        "reason_not_confirmed": {
+          "type": ["string", "null"]
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "finding": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/findingBase"
+        },
+        {
+          "properties": {
+            "confirmation_status": {
+              "const": "confirmed"
+            },
+            "reason_not_confirmed": {
+              "type": "null"
+            }
+          }
+        }
+      ]
+    },
+    "candidate": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/findingBase"
+        },
+        {
+          "properties": {
+            "confirmation_status": {
+              "const": "unconfirmed"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

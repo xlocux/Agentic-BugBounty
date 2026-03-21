@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "target_name": "",
+  "asset_type": "desktop",
+  "default_mode": "whitebox",
+  "allowed_modes": ["blackbox"],
+  "program_url": "mailto:test@example.com",
+  "source_path": "",
+  "findings_dir": "",
+  "h1_reports_dir": "",
+  "logs_dir": "",
+  "intelligence_dir": "",
+  "hackerone": {
+    "program_handle": "",
+    "sync_enabled": "yes"
+  },
+  "scope": {
+    "in_scope": "wrong",
+    "out_of_scope": []
+  },
+  "rules": []
+}

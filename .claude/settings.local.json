@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -E \"\\\\.\\(js|json|md\\)$\")",
+      "Bash(git rev-list:*)",
+      "Bash(sort -k3 -n -r)",
+      "Bash(git-filter-repo:*)"
+    ]
+  }
+}

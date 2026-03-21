@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-bugbounty.local/schemas/triage_result.schema.json",
+  "title": "TRIAGE_RESULT",
+  "type": "object",
+  "required": ["meta", "results"],
+  "additionalProperties": false,
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": [
+        "triaged_at",
+        "asset_type",
+        "calibration_module",
+        "total_findings_received",
+        "triaged",
+        "not_applicable",
+        "needs_more_info",
+        "duplicate",
+        "informative",
+        "ready_to_submit"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "triaged_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "asset_type": {
+          "type": "string",
+          "enum": ["webapp", "mobileapp", "chromeext", "executable"]
+        },
+        "calibration_module": {
+          "type": "string",
+          "minLength": 1
+        },
+        "total_findings_received": {
+          "type": "number",
+          "minimum": 0
+        },
+        "triaged": {
+          "type": "number",
+          "minimum": 0
+        },
+        "not_applicable": {
+          "type": "number",
+          "minimum": 0
+        },
+        "needs_more_info": {
+          "type": "number",
+          "minimum": 0
+        },
+        "duplicate": {
+          "type": "number",
+          "minimum": 0
+        },
+        "informative": {
+          "type": "number",
+          "minimum": 0
+        },
+        "ready_to_submit": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "report_id",
+          "triage_verdict",
+          "analyst_severity",
+          "analyst_cvss_score",
+          "analyst_cvss_vector",
+          "cwe_confirmed",
+          "scope_check",
+          "completeness_check",
+          "validity_check",
+          "duplicate_reference",
+          "severity_delta",
+          "nmi_questions",
+          "key_discrepancies",
+          "ready_to_submit",
+          "triage_summary",
+          "response_to_researcher"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "report_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "triage_verdict": {
+            "type": "string",
+            "enum": ["TRIAGED", "NOT_APPLICABLE", "NEEDS_MORE_INFO", "DUPLICATE", "INFORMATIVE"]
+          },
+          "analyst_severity": {
+            "type": "string",
+            "enum": ["Critical", "High", "Medium", "Low", "Informative", "N/A"]
+          },
+          "analyst_cvss_score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10
+          },
+          "analyst_cvss_vector": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cwe_confirmed": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scope_check": {
+            "type": "string",
+            "enum": ["PASS", "FAIL"]
+          },
+          "completeness_check": {
+            "type": "string",
+            "enum": ["PASS", "NEEDS_MORE_INFO"]
+          },
+          "validity_check": {
+            "type": "string",
+            "enum": ["VALID", "INFORMATIVE", "NOT_APPLICABLE", "DUPLICATE"]
+          },
+          "duplicate_reference": {
+            "type": ["string", "null"]
+          },
+          "severity_delta": {
+            "type": "number"
+          },
+          "nmi_questions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "key_discrepancies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ready_to_submit": {
+            "type": "boolean"
+          },
+          "triage_summary": {
+            "type": "string"
+          },
+          "response_to_researcher": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

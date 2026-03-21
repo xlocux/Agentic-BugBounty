@@ -1,0 +1,72 @@
+{
+  "meta": {
+    "schema_version": "2.0",
+    "generated_at": "2026-03-18T10:00:00Z",
+    "asset_type": "webapp",
+    "analysis_mode": "whitebox",
+    "target_name": "example-target",
+    "target_version": "1.0.0",
+    "program_url": "https://hackerone.com/example",
+    "researcher_agent": "researcher-wb-webapp"
+  },
+  "findings": [
+    {
+      "report_id": "WEB-001",
+      "finding_title": "SQL Injection in /api/users endpoint allows full database dump via id parameter",
+      "severity_claimed": "High",
+      "cvss_vector_claimed": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:N",
+      "cvss_score_claimed": 8.1,
+      "cwe_claimed": "CWE-89: Improper Neutralization of Special Elements used in an SQL Command",
+      "vulnerability_class": "SQLi",
+      "affected_component": "src/controllers/UserController.php:142",
+      "summary": "The endpoint interpolates the id parameter directly into a SQL query and leaks data to low-privilege users.",
+      "steps_to_reproduce": [
+        "1. Authenticate as a low-privilege user.",
+        "2. Send a UNION payload to /api/users?id=1.",
+        "3. Observe database rows in the HTTP response."
+      ],
+      "poc_code": "curl -s 'http://localhost:8080/api/users?id=1%20UNION%20SELECT%201,username,password,4%20FROM%20users--+-'",
+      "poc_type": "curl",
+      "observed_result": "The response body includes usernames and password hashes from the users table.",
+      "impact_claimed": "Any authenticated user can dump the users table and target administrative accounts.",
+      "remediation_suggested": "Replace string concatenation with a prepared statement in UserController.php line 142.",
+      "researcher_notes": "Confirmed against the local whitebox environment.",
+      "confirmation_status": "confirmed",
+      "reason_not_confirmed": null,
+      "attachments": []
+    }
+  ],
+  "unconfirmed_candidates": [
+    {
+      "report_id": "WEB-002-CANDIDATE",
+      "finding_title": "Potential SSRF in /api/fetch-url endpoint",
+      "severity_claimed": "High",
+      "cvss_vector_claimed": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:C/C:H/I:N/A:N",
+      "cvss_score_claimed": 7.7,
+      "cwe_claimed": "CWE-918: Server-Side Request Forgery",
+      "vulnerability_class": "SSRF",
+      "affected_component": "src/controllers/FetchController.php:55",
+      "summary": "The endpoint performs arbitrary server-side fetches without allowlist validation.",
+      "steps_to_reproduce": [
+        "1. POST a URL parameter that targets cloud metadata.",
+        "2. Observe that the current environment cannot reach metadata endpoints."
+      ],
+      "poc_code": "curl -X POST -d 'url=http://169.254.169.254/latest/meta-data/' http://localhost:8080/api/fetch-url",
+      "poc_type": "curl",
+      "observed_result": "The current test environment is not on AWS so the impact could not be confirmed.",
+      "impact_claimed": "A cloud deployment could expose metadata and short-lived credentials.",
+      "remediation_suggested": "Allowlist trusted destinations before issuing server-side requests.",
+      "researcher_notes": "Code path is reachable but the local environment is not representative.",
+      "confirmation_status": "unconfirmed",
+      "reason_not_confirmed": "Local environment has no cloud metadata endpoint to validate impact.",
+      "attachments": []
+    }
+  ],
+  "analysis_summary": {
+    "files_analyzed": 47,
+    "grep_hits_total": 23,
+    "candidates_found": 2,
+    "confirmed_findings": 1,
+    "time_spent_minutes": 45
+  }
+}

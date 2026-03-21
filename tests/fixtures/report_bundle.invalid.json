@@ -1,0 +1,43 @@
+{
+  "meta": {
+    "schema_version": "2.0",
+    "generated_at": "not-a-date",
+    "asset_type": "webapp",
+    "analysis_mode": "whitebox",
+    "target_name": "broken-target",
+    "target_version": "",
+    "program_url": "ftp://invalid.example",
+    "researcher_agent": ""
+  },
+  "findings": [
+    {
+      "report_id": "BAD-1",
+      "finding_title": "",
+      "severity_claimed": "Severe",
+      "cvss_vector_claimed": "CVSS:3.1/INVALID",
+      "cvss_score_claimed": 20,
+      "cwe_claimed": "CWE-89",
+      "vulnerability_class": "",
+      "affected_component": "",
+      "summary": "",
+      "steps_to_reproduce": ["1. Do a thing"],
+      "poc_code": "",
+      "poc_type": "binary",
+      "observed_result": "",
+      "impact_claimed": "",
+      "remediation_suggested": "",
+      "researcher_notes": "",
+      "confirmation_status": "confirmed",
+      "reason_not_confirmed": "should be null",
+      "attachments": []
+    }
+  ],
+  "unconfirmed_candidates": [],
+  "analysis_summary": {
+    "files_analyzed": 1,
+    "grep_hits_total": 1,
+    "candidates_found": 0,
+    "confirmed_findings": 99,
+    "time_spent_minutes": 5
+  }
+}

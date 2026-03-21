@@ -1,0 +1,31 @@
+{
+  "name": "agentic-bugbounty-framework",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Validation, runtime, and regression tooling for the Bug Bounty Agent Framework.",
+  "scripts": {
+    "test": "node --test --test-isolation=none tests/contracts.test.js",
+    "pipeline": "node scripts/run-pipeline.js --target duckduckgo",
+    "target:new": "node scripts/new-target.js",
+    "target:setup": "node scripts/setup-target.js duckduckgo",
+    "validate:bundle": "node scripts/validate-bundle.js findings/confirmed/report_bundle.json",
+    "validate:triage": "node scripts/validate-triage-result.js findings/triage_result.json",
+    "validate:target": "node scripts/validate-target-config.js targets/duckduckgo/target.json",
+    "triage:local": "node scripts/triage-bundle.js findings/confirmed/report_bundle.json findings/triage_result.json",
+    "reports:render": "node scripts/render-h1-reports.js findings/confirmed/report_bundle.json findings/triage_result.json findings/h1_submission_ready",
+    "poc:render": "node scripts/render-poc-artifacts.js findings/confirmed/report_bundle.json --poc-dir poc",
+    "h1:sync": "node scripts/sync-hackerone-intel.js --target duckduckgo",
+    "h1:doctor": "node scripts/h1-doctor.js",
+    "bbscope:doctor": "node scripts/bbscope-doctor.js",
+    "bbscope:sync": "node scripts/sync-bbscope-intel.js --target duckduckgo",
+    "h1:disclosed": "node scripts/sync-hackerone-disclosed.js",
+    "h1:bootstrap": "node scripts/sync-hackerone-disclosed.js --full-history",
+    "target:profile": "node scripts/build-target-profile.js --target duckduckgo",
+    "research:brief": "node scripts/build-research-brief.js --target duckduckgo",
+    "research:focus": "node scripts/recommend-research-focus.js --target duckduckgo",
+    "ui:intel": "node scripts/serve-intel-ui.js --target duckduckgo --port 31337 --open",
+    "agent:prompt:researcher": "node scripts/compose-agent-prompt.js researcher --asset webapp --mode whitebox --target duckduckgo",
+    "agent:prompt:triager": "node scripts/compose-agent-prompt.js triager --asset webapp --target duckduckgo",
+    "apk:decompile": "node scripts/decompile-apk.js"
+  }
+}

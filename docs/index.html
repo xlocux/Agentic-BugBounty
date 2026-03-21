@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agentic Bug Bounty Framework — Diagrams</title>
+<style>
+/* ── Tokens ──────────────────────────────────────────────────────────────── */
+:root {
+  --bg:       #f4f0e8;
+  --surface:  #fffaf1;
+  --ink:      #1c1917;
+  --muted:    #6c655e;
+  --line:     #d8cdbd;
+  --font:     Georgia, "Segoe UI", serif;
+
+  --purple:   #5b4fcf;
+  --purple-bg:#f1efff;
+  --purple-bd:#cfc7ff;
+  --purple-lt:#ede9ff;
+
+  --green:    #14795b;
+  --green-bg: #e7f7ef;
+  --green-bd: #c7e8da;
+  --green-lt: #eef9f3;
+
+  --amber:    #a76212;
+  --amber-bg: #fff8ea;
+  --amber-bd: #ead7aa;
+  --amber-lt: #fff6e8;
+
+  --slate:    #5f5e5a;
+  --slate-bg: #f2f1ef;
+  --slate-bd: #ddd8d1;
+
+  --rose:     #a23f2f;
+  --blue:     #2569a3;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: radial-gradient(circle at top, #fffaf1 0, #f4f0e8 60%, #ece5d8 100%);
+  color: var(--ink);
+  font-family: var(--font);
+  min-height: 100vh;
+}
+
+/* ── Nav ─────────────────────────────────────────────────────────────────── */
+nav {
+  position: sticky; top: 0; z-index: 20;
+  background: rgba(255,250,241,.97);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(6px);
+  display: flex; align-items: center; gap: 4px;
+  padding: 0 28px; height: 50px;
+}
+nav .brand { font-size: 14px; font-weight: 700; color: var(--ink); text-decoration: none; margin-right: 20px; white-space: nowrap; }
+nav a.tab { font-size: 13px; color: var(--muted); text-decoration: none; padding: 5px 12px; border-radius: 8px; transition: background .15s, color .15s; white-space: nowrap; }
+nav a.tab:hover { background: rgba(91,79,207,.08); color: var(--purple); }
+nav a.tab.active { background: rgba(91,79,207,.12); color: var(--purple); font-weight: 600; }
+
+/* ── Page layout ─────────────────────────────────────────────────────────── */
+.page { max-width: 1100px; margin: 0 auto; padding: 48px 24px 80px; }
+
+.sec-hd { margin-bottom: 28px; }
+.sec-hd h2 { font-size: 28px; font-weight: 700; letter-spacing: .01em; }
+.sec-hd p  { margin-top: 8px; color: var(--muted); font-size: 15px; line-height: 1.6; max-width: 760px; }
+
+hr.divider { border: none; border-top: 1px solid var(--line); margin: 60px 0 52px; }
+
+/* ── Shared card primitives ──────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px 20px;
+}
+.card-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+.card-desc  { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+/* Pill tags (vuln names) */
+.pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.pill {
+  font-size: 12px; padding: 4px 10px; border-radius: 8px;
+  background: var(--bg); border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+/* Chip buttons inside flow nodes */
+.chip {
+  display: inline-block; font-size: 12px; padding: 3px 10px;
+  border-radius: 7px; white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SECTION 1 — PIPELINE FLOW
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* Overall two-column body */
+.pipeline { display: flex; flex-direction: column; gap: 0; }
+
+/* Full-width band */
+.band {
+  background: #f7f0e2; border: 1px solid var(--line); border-radius: 16px;
+  padding: 16px 22px;
+}
+.band-title { font-size: 19px; font-weight: 700; margin-bottom: 6px; }
+.band-desc  { font-size: 13px; color: var(--muted); line-height: 1.5; max-width: 680px; }
+.band-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+/* Connector arrow line */
+.vline {
+  width: 2px; background: var(--line); height: 28px;
+  margin: 0 auto;
+}
+.vline-sm { height: 16px; }
+
+/* Main two-col layout for researcher + pipeline stages */
+.flow-body {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 720px) {
+  .flow-body { grid-template-columns: 1fr; }
+}
+
+/* Left: Researcher panel */
+.researcher-panel {
+  background: var(--purple-bg);
+  border: 1px solid var(--purple-bd);
+  border-radius: 18px;
+  padding: 18px 18px 14px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.researcher-panel .panel-title { font-size: 22px; font-weight: 700; color: #352f7b; }
+.researcher-panel .panel-desc  { font-size: 13px; color: #5d56ab; line-height: 1.5; }
+
+.cmd-box {
+  background: var(--purple); color: #fffaff;
+  border-radius: 12px; padding: 12px 14px; text-align: center;
+}
+.cmd-box .cmd-name { font-size: 17px; font-weight: 700; }
+.cmd-box .cmd-sub  { font-size: 12px; color: #dcd7ff; margin-top: 3px; }
+
+.module-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.module-chip {
+  background: var(--purple-lt); border: 1px solid #b9aff7;
+  color: var(--purple); font-size: 12px; padding: 4px 10px; border-radius: 8px;
+}
+
+.output-box {
+  background: var(--surface); border: 1px solid #b9aff7;
+  border-radius: 12px; padding: 10px 14px; text-align: center;
+}
+.output-box .out-name { font-size: 15px; font-weight: 700; color: #352f7b; }
+.output-box .out-sub  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* Arrow between researcher output and pipeline */
+.handoff-row {
+  display: flex; align-items: center; gap: 10px;
+  margin: 8px 0 0;
+  color: var(--muted); font-size: 12px;
+}
+.handoff-line {
+  flex: 1; height: 2px; background: #8d84df;
+  position: relative;
+}
+.handoff-line::after {
+  content: '';
+  position: absolute; right: -1px; top: -4px;
+  border: 5px solid transparent;
+  border-left-color: #8d84df;
+}
+
+/* Right: Pipeline stages stacked vertically */
+.pipeline-stages { display: flex; flex-direction: column; gap: 0; }
+
+.stage {
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  padding: 14px 18px;
+}
+.stage.neutral { background: #fffdf8; }
+.stage.green   { background: var(--green-lt); border-color: var(--green-bd); }
+.stage.amber   { background: var(--amber-bg); border-color: var(--amber-bd); }
+
+.stage-title { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+.stage-desc  { font-size: 12px; color: var(--muted); line-height: 1.45; margin-bottom: 10px; }
+
+.stage-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.chip-green  { background: var(--green);   color: #f5fffb; }
+.chip-amber  { background: var(--amber);   color: #fff6e8; }
+.chip-slate  { background: var(--slate);   color: #fffaf1; }
+.chip-purple { background: var(--purple);  color: #fffaff; }
+
+.chip .chip-sub { font-size: 11px; display: block; opacity: .75; margin-top: 2px; }
+
+/* Triager + post-triage side by side */
+.triage-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 580px) { .triage-row { grid-template-columns: 1fr; } }
+
+/* NMI loop label */
+.nmi-label {
+  display: inline-block; font-size: 12px; font-weight: 700;
+  color: var(--rose); background: rgba(162,63,47,.07);
+  border: 1px dashed var(--rose); border-radius: 8px;
+  padding: 3px 10px; margin-top: 8px;
+}
+
+/* Regression footer band */
+.regression-band {
+  background: #f7f0e2; border: 1px solid var(--line); border-radius: 14px;
+  padding: 12px 20px; font-size: 13px; color: var(--muted); line-height: 1.5;
+}
+.regression-band strong { color: var(--ink); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SECTION 2 — VULNERABILITY MAP
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* Top overview band + legend */
+.vuln-overview {
+  background: #f7f0e2; border: 1px solid var(--line); border-radius: 18px;
+  padding: 18px 22px;
+}
+.vuln-overview-title { font-size: 19px; font-weight: 700; margin-bottom: 6px; }
+.vuln-overview-desc  { font-size: 13px; color: var(--muted); line-height: 1.5; max-width: 720px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.legend-chip {
+  font-size: 12px; padding: 4px 12px; border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--line);
+}
+
+/* 2-column grid of family cards */
+.vuln-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 640px) { .vuln-grid { grid-template-columns: 1fr; } }
+
+.vcard {
+  border-radius: 16px; border: 1px solid var(--line);
+  padding: 16px 18px;
+}
+.vcard.injection  { background: #fff7f3; border-color: #ecd1c8; }
+.vcard.server     { background: #fff6f5; border-color: #ead0cb; }
+.vcard.auth       { background: #f4f1ff; border-color: #dad1ff; }
+.vcard.access     { background: var(--green-lt); border-color: var(--green-bd); }
+.vcard.client     { background: var(--amber-bg); border-color: var(--amber-bd); }
+.vcard.protocol   { background: #edf5fc; border-color: #c9ddee; }
+.vcard.mobile     { background: var(--green-lt); border-color: var(--green-bd); }
+.vcard.bypass     { background: var(--slate-bg); border-color: var(--slate-bd); }
+
+.vcard-title { font-size: 16px; font-weight: 700; margin-bottom: 5px; }
+.vcard-desc  { font-size: 12px; color: var(--muted); line-height: 1.45; margin-bottom: 10px; }
+
+/* Vuln pills colored by family */
+.vcard.injection .pill  { background: #f4e1db; border-color: #d2a08e; color: #8d3f26; }
+.vcard.server .pill     { background: #f6ddda; border-color: #d4a39b; color: #8e3527; }
+.vcard.auth .pill       { background: #e8e4ff; border-color: #c6bbff; color: #4e44b0; }
+.vcard.access .pill     { background: #ddf4ea; border-color: #a9dbc5; color: #13684f; }
+.vcard.client .pill     { background: #f7e7c7; border-color: #dfc086; color: #8a5311; }
+.vcard.protocol .pill   { background: #ddebf8; border-color: #a7c7e7; color: #1c5f96; }
+.vcard.mobile .pill     { background: #ddf4ea; border-color: #a9dbc5; color: #13684f; }
+.vcard.mobile .pill.bin { background: #f4e1db; border-color: #d2a08e; color: #8d3f26; }
+.vcard.bypass .pill     { background: #ece8e2; border-color: #cbc3b8; color: #5f5e5a; }
+
+/* Operational layer */
+.ops-band {
+  background: #f7f0e2; border: 1px solid var(--line); border-radius: 18px;
+  padding: 18px 22px;
+}
+.ops-title { font-size: 17px; font-weight: 700; margin-bottom: 5px; }
+.ops-desc  { font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 16px; }
+
+.ops-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+@media (max-width: 760px) { .ops-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 420px) { .ops-grid { grid-template-columns: 1fr; } }
+
+.ops-card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 13px; padding: 13px 14px;
+}
+.ops-card-title { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+.ops-card-desc  { font-size: 11px; color: var(--muted); line-height: 1.45; margin-bottom: 8px; }
+.ops-card-ref   { font-size: 11px; color: var(--ink); }
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+footer { text-align: center; color: var(--muted); font-size: 13px; margin-top: 48px; padding-bottom: 32px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="#" class="brand">Agentic Bug Bounty</a>
+  <a href="#flow" class="tab">Pipeline Flow</a>
+  <a href="#vuln-map" class="tab">Vulnerability Map</a>
+</nav>
+
+<div class="page">
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     SECTION 1 — PIPELINE FLOW
+════════════════════════════════════════════════════════════════════════ -->
+<section id="flow">
+  <div class="sec-hd">
+    <h2>Researcher to Triager Flow</h2>
+    <p>Updated pipeline with machine-readable target config, contract validation, deterministic local fallback, rendered H1 reports, per-run logs, and regression tests.</p>
+  </div>
+
+  <div class="pipeline">
+
+    <!-- Entry band -->
+    <div class="band">
+      <div class="band-title">Execution entry</div>
+      <div class="band-desc">The pipeline can start from explicit flags or from a target workspace that carries its own config, paths, and scope metadata.</div>
+      <div class="band-chips">
+        <div class="chip chip-slate" style="padding:8px 16px;border-radius:10px;">
+          <span style="font-size:15px;font-weight:700;">run_pipeline.sh</span>
+          <span class="chip-sub">--asset / --mode or --target</span>
+        </div>
+        <div class="chip chip-green" style="padding:8px 16px;border-radius:10px;">
+          <span style="font-size:15px;font-weight:700;">target.json</span>
+          <span class="chip-sub">asset, mode, paths, scope, rules</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="vline"></div>
+
+    <!-- Two-column body -->
+    <div class="flow-body">
+
+      <!-- Left: Researcher -->
+      <div class="researcher-panel">
+        <div>
+          <div class="panel-title">Researcher</div>
+          <div class="panel-desc">Claude slash command loads <em>core</em> plus asset modules and optional vuln/bypass modules.</div>
+        </div>
+
+        <div class="cmd-box">
+          <div class="cmd-name">/researcher</div>
+          <div class="cmd-sub">recon · code reading · dynamic confirmation</div>
+        </div>
+
+        <div class="module-row">
+          <span class="module-chip">asset modules</span>
+          <span class="module-chip">vuln focus</span>
+          <span class="module-chip">bypass packs</span>
+        </div>
+
+        <div class="output-box">
+          <div class="out-name">REPORT_BUNDLE</div>
+          <div class="out-sub">findings/confirmed/report_bundle.json</div>
+          <div class="out-sub">+ unconfirmed candidates</div>
+        </div>
+
+        <div class="handoff-row">
+          <span>JSON handoff</span>
+          <div class="handoff-line"></div>
+        </div>
+
+        <div style="text-align:center;margin-top:4px;">
+          <span class="nmi-label">↩ NEEDS_MORE_INFO loop</span>
+        </div>
+      </div>
+
+      <!-- Right: Pipeline stages -->
+      <div class="pipeline-stages">
+
+        <!-- Runtime validation -->
+        <div class="stage neutral">
+          <div class="stage-title">Runtime validation and setup</div>
+          <div class="stage-desc">Validates target config, prepares findings and logs directories, and records a run log before the first agent call.</div>
+          <div class="stage-chips">
+            <div class="chip chip-amber" style="padding:6px 14px;border-radius:9px;">
+              <span style="font-size:13px;font-weight:700;">validate-target</span>
+              <span class="chip-sub">paths + allowed modes</span>
+            </div>
+            <div class="chip chip-slate" style="padding:6px 14px;border-radius:9px;">
+              <span style="font-size:13px;font-weight:700;">logs/</span>
+              <span class="chip-sub">pipeline-*.log</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="vline vline-sm"></div>
+
+        <!-- Validation gate -->
+        <div class="stage green">
+          <div class="stage-title" style="color:#114c3d;">Validation gate</div>
+          <div class="stage-desc">Before triage, the bundle is checked against the canonical contract and semantic rules so malformed or incomplete outputs stop early.</div>
+          <div class="stage-chips">
+            <div class="chip chip-green" style="padding:6px 14px;border-radius:9px;">
+              <span style="font-size:13px;font-weight:700;">report_bundle schema</span>
+              <span class="chip-sub">schemas/report_bundle.schema.json</span>
+            </div>
+            <div class="chip chip-amber" style="padding:6px 14px;border-radius:9px;">
+              <span style="font-size:13px;font-weight:700;">validate-bundle</span>
+              <span class="chip-sub">hard fail on drift</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="vline vline-sm"></div>
+
+        <!-- Triager + Post-triage -->
+        <div class="triage-row">
+
+          <div class="stage green" style="border-radius:16px;">
+            <div class="stage-title" style="color:#114c3d;">Triager</div>
+            <div class="stage-desc">Runs scope, completeness, validity, CVSS, and duplicate checks — then writes structured verdicts.</div>
+            <div class="cmd-box" style="background:var(--green);margin-bottom:10px;">
+              <div class="cmd-name">/triager</div>
+              <div class="cmd-sub">triager_base + asset calibration + verdict rules</div>
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--green-bd);border-radius:9px;padding:7px 12px;font-size:12px;color:#114c3d;text-align:center;">
+              writes findings/triage_result.json
+            </div>
+          </div>
+
+          <div class="stage amber" style="border-radius:16px;">
+            <div class="stage-title" style="color:#7a4a10;">Post-triage gates</div>
+            <div class="stage-desc">Every triage artifact is validated again and can be rendered locally into report-ready Markdown, with a deterministic fallback.</div>
+            <div class="stage-chips" style="flex-direction:column;gap:8px;">
+              <div class="chip chip-amber" style="padding:6px 14px;border-radius:9px;">
+                <span style="font-size:13px;font-weight:700;">validate-triage</span>
+                <span class="chip-sub">bundle-aware checks</span>
+              </div>
+              <div class="chip chip-slate" style="padding:6px 14px;border-radius:9px;">
+                <span style="font-size:13px;font-weight:700;">render reports</span>
+                <span class="chip-sub">H1 markdown output · --min-severity flag</span>
+              </div>
+            </div>
+            <div style="background:var(--surface);border:1px solid var(--amber-bd);border-radius:9px;padding:7px 12px;font-size:12px;color:#7a4a10;text-align:center;margin-top:10px;">
+              h1_submission_ready + logs
+            </div>
+          </div>
+
+        </div><!-- /triage-row -->
+
+        <div class="vline vline-sm"></div>
+
+        <!-- Regression -->
+        <div class="regression-band">
+          Regression safety net: <strong>tests/contracts.test.js</strong> — verifies bundle validation, target config validation, H1 universal rules (self-XSS, DoS), local triage generation, and H1 report rendering.
+        </div>
+
+      </div><!-- /pipeline-stages -->
+
+    </div><!-- /flow-body -->
+
+  </div><!-- /pipeline -->
+</section>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     SECTION 2 — VULNERABILITY MAP
+════════════════════════════════════════════════════════════════════════ -->
+<section id="vuln-map">
+  <div class="sec-hd">
+    <h2>Bug Bounty Vulnerability Map</h2>
+    <p>Core vulnerability families across all asset types, with the operational layer that turns the framework from a prompt collection into a validated pipeline.</p>
+  </div>
+
+  <!-- Overview band -->
+  <div class="vuln-overview" style="margin-bottom:16px;">
+    <div class="vuln-overview-title">Framework overview</div>
+    <div class="vuln-overview-desc">The map organizes vulnerabilities by family inside a stronger workflow: machine-readable target setup, bundle validation, triage validation, local rendering, logs, and regression tests.</div>
+    <div class="legend">
+      <span class="legend-chip" style="background:#f4e1db;border-color:#d2a08e;color:#8d3f26;">Injection</span>
+      <span class="legend-chip" style="background:#f6ddda;border-color:#d4a39b;color:#8e3527;">Server-side</span>
+      <span class="legend-chip" style="background:#e8e4ff;border-color:#c6bbff;color:#4e44b0;">Auth</span>
+      <span class="legend-chip" style="background:#ddf4ea;border-color:#a9dbc5;color:#13684f;">Access control</span>
+      <span class="legend-chip" style="background:#f7e7c7;border-color:#dfc086;color:#8a5311;">Client-side</span>
+      <span class="legend-chip" style="background:#ddebf8;border-color:#a7c7e7;color:#1c5f96;">Protocol / infra</span>
+    </div>
+  </div>
+
+  <!-- Vulnerability grid -->
+  <div class="vuln-grid" style="margin-bottom:16px;">
+
+    <div class="vcard injection">
+      <div class="vcard-title">Injection and parser abuse</div>
+      <div class="vcard-desc">Classic input-to-interpreter bugs remain first-class targets in whitebox and blackbox workflows.</div>
+      <div class="pills">
+        <span class="pill">SQLi</span>
+        <span class="pill">XSS and DOM XSS</span>
+        <span class="pill">NoSQL and command injection</span>
+        <span class="pill">SSTI / CSTI</span>
+        <span class="pill">XXE / SSRF</span>
+        <span class="pill">Deserialization / prototype pollution</span>
+      </div>
+    </div>
+
+    <div class="vcard server">
+      <div class="vcard-title">Server-side logic and architecture</div>
+      <div class="vcard-desc">Business logic, upload abuse, file parsing, and cloud-facing mistakes often need deeper proof than the first candidate suggests.</div>
+      <div class="pills">
+        <span class="pill">File upload bypass</span>
+        <span class="pill">Traversal / LFI / RFI</span>
+        <span class="pill">Race conditions / response abuse</span>
+        <span class="pill">Business logic flaws</span>
+        <span class="pill">Mass assignment</span>
+        <span class="pill">Cloud misconfig / exposed debug</span>
+      </div>
+    </div>
+
+    <div class="vcard auth">
+      <div class="vcard-title">Authentication and session</div>
+      <div class="vcard-desc">Severity is often overclaimed here, so the triage layer explicitly recalculates evidence-backed impact and CVSS.</div>
+      <div class="pills">
+        <span class="pill">Broken auth / JWT</span>
+        <span class="pill">2FA / reset bypass</span>
+        <span class="pill">Session fixation / hijack</span>
+        <span class="pill">OAuth / SSO flaws</span>
+        <span class="pill">CSRF / login CSRF</span>
+        <span class="pill">Enumeration / brute force gaps</span>
+      </div>
+    </div>
+
+    <div class="vcard access">
+      <div class="vcard-title">Access control</div>
+      <div class="vcard-desc">IDOR, forced browsing, and privilege escalation stay central because they are reproducible and benefit from precise target scope metadata.</div>
+      <div class="pills">
+        <span class="pill">IDOR</span>
+        <span class="pill">Horizontal privesc</span>
+        <span class="pill">Vertical privesc</span>
+        <span class="pill">Forced browsing</span>
+        <span class="pill">Verb tampering</span>
+        <span class="pill">Open redirect chains</span>
+      </div>
+    </div>
+
+    <div class="vcard client">
+      <div class="vcard-title">Client-side and browser surfaces</div>
+      <div class="vcard-desc">Web and extension-facing bugs grouped together because the framework spans browsers, message passing, and extension privilege boundaries.</div>
+      <div class="pills">
+        <span class="pill">Clickjacking</span>
+        <span class="pill">postMessage</span>
+        <span class="pill">Dangling markup / JSONP</span>
+        <span class="pill">Manifest permissions</span>
+        <span class="pill">uXSS / web_accessible</span>
+        <span class="pill">Remote config / data exfil</span>
+      </div>
+    </div>
+
+    <div class="vcard protocol">
+      <div class="vcard-title">Protocol, infra, and supply chain</div>
+      <div class="vcard-desc">These modules often need stronger correlation between target context, runtime evidence, and external environment assumptions.</div>
+      <div class="pills">
+        <span class="pill">HTTP smuggling</span>
+        <span class="pill">Cache poisoning</span>
+        <span class="pill">CORS / GraphQL / WebSocket</span>
+        <span class="pill">Subdomain takeover</span>
+        <span class="pill">Dependency confusion</span>
+        <span class="pill">CI/CD injection / repo secrets</span>
+      </div>
+    </div>
+
+    <div class="vcard mobile">
+      <div class="vcard-title">Mobile and binary focus areas</div>
+      <div class="vcard-desc">APK/IPA and executable workflows share the same contract and output system as all other asset types.</div>
+      <div class="pills">
+        <span class="pill">Hardcoded secrets</span>
+        <span class="pill">Insecure storage</span>
+        <span class="pill">Deep links / exported components</span>
+        <span class="pill bin">Buffer / heap overflow</span>
+        <span class="pill bin">Format string / UAF</span>
+        <span class="pill bin">TOCTOU / integer overflow</span>
+      </div>
+    </div>
+
+    <div class="vcard bypass">
+      <div class="vcard-title">Bypass and evasion support</div>
+      <div class="vcard-desc">Bypass packs are loaded on-demand when payloads are blocked. The workflow shows exactly where they attach and how output is validated.</div>
+      <div class="pills">
+        <span class="pill">Encoding chains</span>
+        <span class="pill">XSS / SQLi evasion</span>
+        <span class="pill">SSRF / auth / WAF bypass</span>
+        <span class="pill">Null byte tricks</span>
+        <span class="pill">Unicode confusion</span>
+        <span class="pill">Magic bytes / double encoding</span>
+      </div>
+    </div>
+
+  </div><!-- /vuln-grid -->
+
+  <!-- Operational layer -->
+  <div class="ops-band">
+    <div class="ops-title">Operational layer</div>
+    <div class="ops-desc">These are the pieces that turn the repository from a prompt collection into a reliable, testable framework.</div>
+    <div class="ops-grid">
+      <div class="ops-card">
+        <div class="ops-card-title" style="color:var(--green);">Canonical contracts</div>
+        <div class="ops-card-desc">Schemas describe REPORT_BUNDLE, TRIAGE_RESULT, and target config explicitly, with report_id format enforcement against path traversal.</div>
+        <div class="ops-card-ref">schemas/*.json</div>
+      </div>
+      <div class="ops-card">
+        <div class="ops-card-title" style="color:var(--amber);">Validation gates</div>
+        <div class="ops-card-desc">Bundle and triage validation run locally and stop drift before the next pipeline phase.</div>
+        <div class="ops-card-ref">scripts/validate-*.js</div>
+      </div>
+      <div class="ops-card">
+        <div class="ops-card-title" style="color:var(--purple);">Machine target setup</div>
+        <div class="ops-card-desc">Each target carries its own config for asset type, paths, scope, and runtime rules.</div>
+        <div class="ops-card-ref">targets/*/target.json</div>
+      </div>
+      <div class="ops-card">
+        <div class="ops-card-title" style="color:var(--blue);">Deterministic fallback</div>
+        <div class="ops-card-desc">Local triage and H1 markdown rendering (with --min-severity filter) make the workflow testable outside live agent runs.</div>
+        <div class="ops-card-ref">triage-bundle + render-h1</div>
+      </div>
+      <div class="ops-card">
+        <div class="ops-card-title" style="color:var(--rose);">Traceability</div>
+        <div class="ops-card-desc">Per-run logs and 11 regression tests covering H1 universal rules, path traversal, and schema validation.</div>
+        <div class="ops-card-ref">logs/ + tests/fixtures</div>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<footer>Agentic Bug Bounty Framework — researcher + triager + validators + target config + tests</footer>
+
+</div><!-- /page -->
+
+<script>
+const sections = document.querySelectorAll("section[id]");
+const tabs = document.querySelectorAll("nav a.tab");
+function setActive() {
+  let cur = "";
+  sections.forEach(s => { if (window.scrollY + 70 >= s.offsetTop) cur = s.id; });
+  tabs.forEach(a => a.classList.toggle("active", a.getAttribute("href") === `#${cur}`));
+}
+window.addEventListener("scroll", setActive, { passive: true });
+setActive();
+</script>
+</body>
+</html>

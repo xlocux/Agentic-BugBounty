@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-bugbounty.local/schemas/target_config.schema.json",
+  "title": "Target Config",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "target_name",
+    "asset_type",
+    "default_mode",
+    "allowed_modes",
+    "program_url",
+    "source_path",
+    "findings_dir",
+    "h1_reports_dir",
+    "logs_dir",
+    "scope",
+    "rules"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "target_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "asset_type": {
+      "type": "string",
+      "enum": ["webapp", "mobileapp", "chromeext", "executable"]
+    },
+    "default_mode": {
+      "type": "string",
+      "enum": ["whitebox", "blackbox"]
+    },
+    "allowed_modes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "enum": ["whitebox", "blackbox"]
+      }
+    },
+    "program_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "source_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "findings_dir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "h1_reports_dir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "logs_dir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "intelligence_dir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_version_hint": {
+      "type": "string"
+    },
+    "hackerone": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "program_handle": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sync_enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "required": ["in_scope", "out_of_scope"],
+      "additionalProperties": false,
+      "properties": {
+        "in_scope": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "out_of_scope": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "setup": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
