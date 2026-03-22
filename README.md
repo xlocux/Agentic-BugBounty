@@ -1,18 +1,14 @@
 # Agentic BugBounty
 
-Experimental AI-driven research framework for bug bounty work.
+Experimental AI-driven security research framework for bug bounty work.
 
 Two agents. One pipeline. No amnesia.
 
 - **Researcher** — hunts the target, validates candidates, writes evidence
 - **Triager** — challenges every finding, checks scope and plausibility, decides what survives
+- **Dual Researcher** — a second AI model cross-checks the first pass for anything missed
 
-A single pipeline command runs **both agents in sequence** — researcher first, then triager automatically. No second command needed.
-
-Each target gets persistent intelligence (local SQLite + HackerOne sync). Each run starts from where the last one left off.
-
-→ [Blog post](https://www.locu.uk/gui.html#/blog/2026/2026-03-agentic-bugbounty)
-→ [Full documentation](docs/GUIDE.md)
+→ [Full documentation](docs/GUIDE.md) · [Blog post](https://www.locu.uk/gui.html#/blog/2026/2026-03-agentic-bugbounty)
 
 ---
 
@@ -20,44 +16,92 @@ Each target gets persistent intelligence (local SQLite + HackerOne sync). Each r
 
 - Node.js 24+
 - Claude Code CLI (`claude`)
+- OpenRouter API key(s) — optional, enables dual researcher + CVE LLM analysis
 
 ---
 
-## Quickstart
+## Setup
 
 ```bash
 git clone https://github.com/xlocux/Agentic-BugBounty.git
 cd Agentic-BugBounty
-npm test
+cp .env.example .env        # fill in credentials
+npm test                    # 18 contract tests — should all pass
 ```
 
-### Run against a target
+---
+
+## Common commands
+
+### Start a new target
 
 ```bash
 node scripts/run-pipeline.js --target <name> --cli claude
 ```
 
-This runs the **full pipeline**: Researcher → (optional manual review) → Triager → H1-ready reports.
+First run launches a setup wizard — creates workspace, detects assets, starts the pipeline.
 
-If `<name>` does not exist yet, the pipeline runs a setup wizard — asks for the program details, creates the workspace, waits for you to place the source files, auto-detects every asset in `src/` with type and framework info, asks you to confirm or correct each one, then starts.
-
-### Run with manual finding review
+### Reset a target (wipe findings, keep source)
 
 ```bash
-node scripts/run-pipeline.js --target <name> --cli claude --interactive
+node scripts/reset-target.js --target <name>
 ```
 
-After the Researcher finishes, the pipeline pauses and walks you through each finding before handing off to the Triager.
-
-### Session resume (Claude Pro)
-
-If a Claude Pro usage cap hits mid-run, the pipeline saves a checkpoint and prints the exact command to resume:
+### Resume after a Claude Pro session limit
 
 ```bash
 node scripts/run-pipeline.js --target <name> --cli claude --resume
 ```
 
-The pipeline picks up from the exact phase and asset index where it stopped. No work lost.
+### Manual finding review before triage
+
+```bash
+node scripts/run-pipeline.js --target <name> --cli claude --interactive
+```
+
+### Re-run triage only (existing bundle)
+
+```bash
+/triager --asset <type>
+```
+
+### Render reports from existing bundle
+
+```bash
+npm run reports:render
+npm run poc:render
+```
+
+---
+
+## Intelligence setup (optional but recommended)
+
+```bash
+# H1 credentials → sync scope + history for target
+npm run h1:doctor
+npm run h1:sync
+
+# Bootstrap global disclosed dataset (12k+ reports, run once)
+npm run h1:bootstrap
+npm run calibration:sync
+
+# CVE intel for a specific target
+node scripts/sync-cve-intel.js --target <name>
+
+# Extract hacker skill patterns from disclosed reports (needs LLM backend)
+npm run calibration:extract-skills
+```
+
+### OpenRouter keys (free tier — enables dual researcher + CVE analysis)
+
+```bash
+# In .env:
+OPENROUTER_API_KEY=your_key
+OPENROUTER_API_KEY_1=key1     # up to 5 keys — auto-rotated on 401/429
+OPENROUTER_API_KEY_2=key2
+```
+
+Models and fallback order configured in `config/openrouter.json`.
 
 ---
 
@@ -66,39 +110,14 @@ The pipeline picks up from the exact phase and asset index where it stopped. No 
 ```
 targets/<name>/
   findings/
-    confirmed/report_bundle.json     — confirmed findings (JSON contract)
-    triage_result.json               — triager verdicts
-    h1_submission_ready/*.md         — HackerOne-ready reports
+    confirmed/report_bundle.json   confirmed findings (JSON)
+    triage_result.json             triager verdicts
+    h1_submission_ready/*.md       HackerOne-ready reports
   poc/
-    <ID>_<slug>.<ext>                — extracted PoC files per finding
-    summary.md                       — vulnerability summary in Markdown
-  intelligence/
-    research_brief.json              — pre-run intel brief
-    h1_scope_snapshot.json           — in-scope assets
-    h1_vulnerability_history.json    — target history
+    EXT-001_slug.html              extracted PoC per finding
+    summary.md                     full vulnerability summary
 ```
 
 ---
 
-## HackerOne credentials (optional)
-
-Only needed for scope/history sync. Set either:
-
-```bash
-export H1_API_USERNAME="..."
-export H1_API_TOKEN="..."
-```
-
-Verify with:
-
-```bash
-npm run h1:doctor
-```
-
----
-
-## Full documentation
-
-All commands, config options, schemas, and architecture details:
-
-→ **[docs/GUIDE.md](docs/GUIDE.md)**
+→ **[docs/GUIDE.md](docs/GUIDE.md)** — all commands, config, schemas, architecture

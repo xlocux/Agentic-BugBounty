@@ -21,12 +21,16 @@
 11. [HackerOne intelligence](#hackerone-intelligence)
     - [Global disclosed dataset](#global-disclosed-dataset)
     - [Calibration dataset](#calibration-dataset)
-12. [Intel UI](#intel-ui)
-13. [Direct agent invocation](#direct-agent-invocation)
-14. [JSON contracts](#json-contracts)
-15. [Validation](#validation)
-16. [Package scripts reference](#package-scripts-reference)
-17. [Environment variables](#environment-variables)
+12. [Skill library](#skill-library)
+13. [CVE intel](#cve-intel)
+14. [Dual researcher (second AI pass)](#dual-researcher-second-ai-pass)
+15. [OpenRouter — free models + key rotation](#openrouter--free-models--key-rotation)
+16. [Intel UI](#intel-ui)
+17. [Direct agent invocation](#direct-agent-invocation)
+18. [JSON contracts](#json-contracts)
+19. [Validation](#validation)
+20. [Package scripts reference](#package-scripts-reference)
+21. [Environment variables](#environment-variables)
 
 ---
 
@@ -606,6 +610,182 @@ npm run research:focus
 
 ---
 
+## Skill library
+
+The skill library stores reusable attack techniques distilled from H1 disclosed reports by LLM analysis. Each skill captures how a real researcher exploited a vuln — specific enough to replicate.
+
+### Extract skills from disclosed reports
+
+Requires a working LLM backend (Gemini CLI or OpenRouter key):
+
+```bash
+npm run calibration:extract-skills
+```
+
+Processes all disclosed reports in batches of 30. Skips already-processed reports (incremental). Each skill is stored with: `title`, `technique`, `chain_steps`, `insight`, `bypass_of`, `severity_achieved`.
+
+### Query skills
+
+```bash
+# All skills for an asset type
+node scripts/query-skills.js --asset chromeext --limit 15
+
+# Program-specific first, then global
+node scripts/query-skills.js --asset webapp --program hackerone --limit 10
+
+# Filter by vuln class
+node scripts/query-skills.js --asset webapp --vuln xss
+
+# JSON output
+node scripts/query-skills.js --asset webapp --json
+```
+
+### How the Researcher uses skills
+
+Phase 0, step 0.5 — before touching any source file, the Researcher queries the skill library for the current asset type. It prioritizes:
+- Skills with `bypass_of` set — patch bypass techniques to try immediately
+- Skills with 3+ `chain_steps` — complex chains automated scanners miss
+- Skills with `insight` — the non-obvious part to use as a first hypothesis
+
+If the Researcher discovers a new technique during analysis, it documents it in the finding as an `extracted_skill` field, which the pipeline auto-persists to the skill library after the session.
+
+---
+
+## CVE intel
+
+Per-target CVE database enriched with patch analysis and variant hunting hints. Fetched from NVD, enriched with Exploit-DB PoC links, analyzed by LLM.
+
+### Sync CVEs for a target
+
+```bash
+node scripts/sync-cve-intel.js --target <name>
+# or via pipeline (auto-runs on every fresh start)
+```
+
+Options:
+
+```bash
+--no-analysis          skip LLM patch analysis (faster, saves API calls)
+--max-age-days 0       force refresh even if recently synced (default: skip if < 1 day old)
+```
+
+Keywords are auto-detected from `target.json`: `target_name`, Chrome extension `manifest.json` name, `package.json` name, APK filename.
+
+If no LLM backend is available, CVEs are saved without variant hints. A single clear message is printed instead of spamming per-CVE failures.
+
+### Query CVEs
+
+```bash
+node scripts/query-cve-intel.js --target <name>
+node scripts/query-cve-intel.js --target <name> --min-cvss 6.0
+node scripts/query-cve-intel.js --target <name> --json
+```
+
+### How the Researcher uses CVEs
+
+Phase 0, step 0.6 — after the skill library query, the Researcher checks CVEs for the target. For each CVE:
+- Verifies if the target version is in `affected_versions`
+- Reads `variant_hints` — specific functions/patterns to grep in the source
+- Flags CVEs with `High bypass_likelihood` for immediate attention
+
+---
+
+## Dual researcher (second AI pass)
+
+After the primary Claude researcher completes, the pipeline optionally runs a **second researcher pass** using a different AI model via OpenRouter. This cross-validates findings and hunts for anything the first pass missed.
+
+### How it works
+
+1. Primary Claude researcher runs, produces `report_bundle.json`
+2. Dual researcher is called with context of what Claude already found (component + vuln class per finding)
+3. It looks for additional vulnerabilities on **different components** or **different attack surfaces**
+4. New findings are merged into the bundle — deduplication by `affected_component + vulnerability_class`
+5. If all findings already overlap → nothing merged, logged as "no additional findings"
+
+### Enable
+
+Set any `OPENROUTER_API_KEY*` env var. The dual pass activates automatically — no flag needed.
+
+If no key is set, the dual pass is silently skipped. The pre-run banner shows its status:
+
+```
+    3. Dual pass     — enabled (3 api key(s) in rotation)
+    3. Dual pass     — disabled (no OPENROUTER_API_KEY set)
+```
+
+### Configure the model
+
+Edit `config/openrouter.json`:
+
+```json
+{
+  "researcher_model": "openai/gpt-oss-120b:free"
+}
+```
+
+Falls back to the free model chain if the primary model fails on all keys.
+
+---
+
+## OpenRouter — free models + key rotation
+
+The framework uses OpenRouter for two purposes:
+1. **LLM batch work** — skill extraction, CVE patch analysis (free models)
+2. **Dual researcher pass** — second opinion after Claude (configurable model)
+
+### Free model list
+
+Defined in `config/openrouter.json` → `free_models`. Models are tried in order; the framework switches to the next on any `401 / 429 / 503 / 502` error.
+
+Current list (edit the file to change priority):
+
+```
+openai/gpt-oss-120b:free         ← researcher_model default
+openai/gpt-oss-20b:free
+meta-llama/llama-3.3-70b-instruct:free
+qwen/qwen3-next-80b-a3b-instruct:free
+qwen/qwen3-coder:free
+nvidia/nemotron-3-super-120b-a12b:free
+minimax/minimax-m2.5:free
+nousresearch/hermes-3-llama-3.1-405b:free
+arcee-ai/trinity-large-preview:free
+... (22 models total)
+```
+
+### API key rotation
+
+Up to 5 keys can be set — all are pooled and rotated automatically:
+
+```bash
+OPENROUTER_API_KEY=key1          # single-key shorthand
+OPENROUTER_API_KEY_1=key1        # pooled rotation
+OPENROUTER_API_KEY_2=key2
+OPENROUTER_API_KEY_3=key3
+OPENROUTER_API_KEY_4=key4
+OPENROUTER_API_KEY_5=key5
+```
+
+On failure, the framework tries all keys for the current model before moving to the next model. Log output shows which key (last 4 chars) and model failed:
+
+```
+  [llm] rotating away from openai/gpt-oss-120b:free: HTTP 429: rate limited.
+  [llm] switching api key (…ab12 failed on openai/gpt-oss-120b:free).
+  [llm] trying openai/gpt-oss-120b:free (key …cd34)
+  [llm] got a response from openai/gpt-oss-120b:free.
+```
+
+### LLM backend priority
+
+Every LLM call follows this chain:
+
+```
+1. Gemini via ccw CLI (synchronous, free if ccw is installed)
+2. OpenRouter model × key matrix (all combos, in config order)
+3. Error — clear message, operation skipped gracefully
+```
+
+---
+
 ## Intel UI
 
 ```bash
@@ -757,35 +937,79 @@ All validation runs automatically during the pipeline. Failures abort the run.
 
 ## Package scripts reference
 
+### Pipeline
+
 | Command | Description |
 |---------|-------------|
-| `npm test` | Run contract regression tests (18 tests) |
-| `npm run pipeline` | Run pipeline for the default target |
-| `npm run poc:render` | Extract PoC files + summary.md from bundle |
-| `npm run reports:render` | Render H1-ready markdown from bundle + triage |
-| `npm run h1:doctor` | Check H1 API credentials |
-| `npm run h1:sync` | Sync target-local intel from H1 |
-| `npm run h1:disclosed` | Incremental sync of global disclosed reports |
-| `npm run h1:bootstrap` | Full history backfill of global disclosed reports |
-| `npm run calibration:sync` | Classify disclosed reports into calibration patterns + behavior examples |
-| `npm run calibration:query` | Query the calibration dataset (human table output) |
+| `npm run pipeline` | Run full pipeline for the default target (duckduckgo) |
+| `npm test` | Contract regression tests (18 tests) |
+
+### Target management
+
+| Command | Description |
+|---------|-------------|
 | `npm run target:new` | Create a new target workspace scaffold |
+| `npm run target:reset` | Wipe findings, logs, intel, poc — preserves src/ and target.json |
 | `npm run target:setup` | Detect and configure assets in existing workspace |
 | `npm run target:profile` | Build target profile JSON |
+
+### Output
+
+| Command | Description |
+|---------|-------------|
+| `npm run poc:render` | Extract PoC files + summary.md from bundle |
+| `npm run reports:render` | Render H1-ready markdown from bundle + triage result |
+| `npm run triage:local` | Run deterministic local triage (no agent) |
+
+### Intelligence — HackerOne
+
+| Command | Description |
+|---------|-------------|
+| `npm run h1:doctor` | Check H1 API credentials and connectivity |
+| `npm run h1:sync` | Sync target-local scope + history from H1 |
+| `npm run h1:disclosed` | Incremental sync of global disclosed reports |
+| `npm run h1:bootstrap` | Full history backfill of global disclosed reports |
+
+### Intelligence — calibration + skills + CVE
+
+| Command | Description |
+|---------|-------------|
+| `npm run calibration:sync` | Classify disclosed reports into calibration patterns + behavior examples |
+| `npm run calibration:query` | Query calibration dataset (human table output) |
+| `npm run calibration:extract-skills` | Extract hacker skill patterns from disclosed reports (LLM batch) |
+| `npm run skills:query` | Query the skill library |
+| `npm run cve:sync` | Sync CVE intel for the default target |
+| `npm run cve:query` | Query CVE intel for the default target |
+
+### Research brief + scope
+
+| Command | Description |
+|---------|-------------|
 | `npm run research:brief` | Build researcher intel brief |
 | `npm run research:focus` | Get prioritized research focus suggestions |
-| `npm run ui:intel` | Serve local intel UI on port 31337 |
+| `npm run bbscope:doctor` | Check bbscope connectivity |
+| `npm run bbscope:sync` | Sync scope from bbscope.com (no credentials) |
+
+### Validation + UI
+
+| Command | Description |
+|---------|-------------|
 | `npm run validate:bundle` | Validate report_bundle.json against schema |
 | `npm run validate:triage` | Validate triage_result.json against schema |
 | `npm run validate:target` | Validate target.json against schema |
+| `npm run ui:intel` | Serve local intel UI on port 31337 |
 
 ---
 
 ## Environment variables
 
-| Variable | Description |
-|----------|-------------|
-| `H1_API_USERNAME` or `HACKERONE_API_USERNAME` | HackerOne API username |
-| `H1_API_TOKEN` or `HACKERONE_API_TOKEN` | HackerOne API token |
-| `AGENTIC_CLI` | Default CLI backend (`claude` or `codex`) |
-| `AGENTIC_MODEL` | Default model override |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `H1_API_USERNAME` / `HACKERONE_API_USERNAME` | For H1 sync | HackerOne API username |
+| `H1_API_TOKEN` / `HACKERONE_API_TOKEN` | For H1 sync | HackerOne API token |
+| `OPENROUTER_API_KEY` | For dual researcher + CVE analysis | Single key shorthand |
+| `OPENROUTER_API_KEY_1` … `_5` | For key rotation | Additional keys — all pooled automatically |
+| `AGENTIC_CLI` | No | Default CLI backend (`claude` or `codex`) |
+| `AGENTIC_MODEL` | No | Default model override |
+
+Copy `.env.example` to `.env` and fill in the values. See `config/openrouter.json` to configure model priority and fallback order.
