@@ -159,6 +159,43 @@ function initDatabase(db) {
       disclosed_at TEXT,
       updated_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS skill_library (
+      skill_id TEXT PRIMARY KEY,
+      asset_type TEXT NOT NULL,
+      vuln_class TEXT NOT NULL,
+      program_handle TEXT,
+      title TEXT NOT NULL,
+      technique TEXT NOT NULL,
+      chain_steps_json TEXT NOT NULL DEFAULT '[]',
+      insight TEXT,
+      bypass_of TEXT,
+      source_reports_json TEXT NOT NULL DEFAULT '[]',
+      severity_achieved TEXT,
+      confirmed_programs_json TEXT NOT NULL DEFAULT '[]',
+      manual INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS cve_intel (
+      cve_id TEXT NOT NULL,
+      target_ref TEXT NOT NULL,
+      description TEXT,
+      cvss_score REAL,
+      cvss_vector TEXT,
+      affected_versions_json TEXT NOT NULL DEFAULT '[]',
+      cwe_id TEXT,
+      exploitdb_id TEXT,
+      poc_urls_json TEXT NOT NULL DEFAULT '[]',
+      patch_commit TEXT,
+      patch_diff_url TEXT,
+      patch_analysis TEXT,
+      variant_hints TEXT,
+      published_date TEXT,
+      synced_at TEXT NOT NULL,
+      PRIMARY KEY (cve_id, target_ref)
+    );
   `);
 }
 
@@ -671,16 +708,144 @@ function deriveTypicalSeverity(row) {
   return ranked[0].label;
 }
 
+function replaceSkills(db, skills) {
+  const upsert = db.prepare(`
+    INSERT INTO skill_library (
+      skill_id, asset_type, vuln_class, program_handle, title, technique,
+      chain_steps_json, insight, bypass_of, source_reports_json,
+      severity_achieved, confirmed_programs_json, manual, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(skill_id) DO UPDATE SET
+      title = excluded.title,
+      technique = excluded.technique,
+      chain_steps_json = excluded.chain_steps_json,
+      insight = excluded.insight,
+      bypass_of = excluded.bypass_of,
+      source_reports_json = excluded.source_reports_json,
+      severity_achieved = excluded.severity_achieved,
+      confirmed_programs_json = excluded.confirmed_programs_json,
+      updated_at = excluded.updated_at
+  `);
+  const now = new Date().toISOString();
+  db.exec("BEGIN");
+  try {
+    for (const s of skills) {
+      upsert.run(
+        s.skill_id, s.asset_type, s.vuln_class, s.program_handle || null,
+        s.title, s.technique,
+        JSON.stringify(s.chain_steps || []),
+        s.insight || null, s.bypass_of || null,
+        JSON.stringify(s.source_reports || []),
+        s.severity_achieved || null,
+        JSON.stringify(s.confirmed_programs || []),
+        s.manual ? 1 : 0,
+        s.created_at || now, now
+      );
+    }
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
+}
+
+function querySkills(db, { asset_type, program_handle, vuln_class, limit = 20 } = {}) {
+  const conditions = [];
+  const params = [];
+  if (asset_type) { conditions.push("asset_type = ?"); params.push(asset_type); }
+  if (program_handle) {
+    conditions.push("(program_handle = ? OR program_handle IS NULL)");
+    params.push(program_handle);
+  }
+  if (vuln_class) { conditions.push("vuln_class = ?"); params.push(vuln_class); }
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const rows = db.prepare(`
+    SELECT * FROM skill_library ${where}
+    ORDER BY CASE WHEN program_handle IS NOT NULL THEN 0 ELSE 1 END,
+             manual DESC, created_at DESC
+    LIMIT ?
+  `).all(...params, limit);
+  return rows.map((r) => ({
+    ...r,
+    chain_steps: JSON.parse(r.chain_steps_json || "[]"),
+    source_reports: JSON.parse(r.source_reports_json || "[]"),
+    confirmed_programs: JSON.parse(r.confirmed_programs_json || "[]")
+  }));
+}
+
+function replaceCveIntel(db, targetRef, cves) {
+  const upsert = db.prepare(`
+    INSERT INTO cve_intel (
+      cve_id, target_ref, description, cvss_score, cvss_vector,
+      affected_versions_json, cwe_id, exploitdb_id, poc_urls_json,
+      patch_commit, patch_diff_url, patch_analysis, variant_hints,
+      published_date, synced_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(cve_id, target_ref) DO UPDATE SET
+      description = excluded.description,
+      cvss_score = excluded.cvss_score,
+      cvss_vector = excluded.cvss_vector,
+      affected_versions_json = excluded.affected_versions_json,
+      cwe_id = excluded.cwe_id,
+      exploitdb_id = excluded.exploitdb_id,
+      poc_urls_json = excluded.poc_urls_json,
+      patch_commit = excluded.patch_commit,
+      patch_diff_url = excluded.patch_diff_url,
+      patch_analysis = excluded.patch_analysis,
+      variant_hints = excluded.variant_hints,
+      published_date = excluded.published_date,
+      synced_at = excluded.synced_at
+  `);
+  const now = new Date().toISOString();
+  db.exec("BEGIN");
+  try {
+    for (const cve of cves) {
+      upsert.run(
+        cve.cve_id, targetRef,
+        cve.description || null, cve.cvss_score || null, cve.cvss_vector || null,
+        JSON.stringify(cve.affected_versions || []),
+        cve.cwe_id || null, cve.exploitdb_id || null,
+        JSON.stringify(cve.poc_urls || []),
+        cve.patch_commit || null, cve.patch_diff_url || null,
+        cve.patch_analysis || null, cve.variant_hints || null,
+        cve.published_date || null, now
+      );
+    }
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
+}
+
+function queryCveIntel(db, targetRef, { limit = 50 } = {}) {
+  const rows = db.prepare(`
+    SELECT * FROM cve_intel
+    WHERE target_ref = ?
+    ORDER BY cvss_score DESC NULLS LAST, published_date DESC
+    LIMIT ?
+  `).all(targetRef, limit);
+  return rows.map((r) => ({
+    ...r,
+    affected_versions: JSON.parse(r.affected_versions_json || "[]"),
+    poc_urls: JSON.parse(r.poc_urls_json || "[]")
+  }));
+}
+
 module.exports = {
   initDatabase,
   openDatabase,
+  queryCveIntel,
   queryCalibrationDataset,
   queryReportBehaviors,
+  querySkills,
   readDisclosedDatasetFromDb,
   readProgramIntelFromDb,
+  replaceCveIntel,
   replaceCalibrationPatterns,
   replaceDisclosedReports,
   replaceReportBehaviors,
+  replaceSkills,
   replaceProgramIntel,
   resolveDatabasePath,
   resolveGlobalDatabasePath
