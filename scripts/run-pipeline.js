@@ -522,6 +522,30 @@ const FLAVOUR = {
   ],
 };
 
+// ─── ANSI color helpers ────────────────────────────────────────────────────────
+
+const C = {
+  reset:   "\x1b[0m",
+  bold:    "\x1b[1m",
+  dim:     "\x1b[2m",
+  // foreground
+  red:     "\x1b[31m",
+  green:   "\x1b[32m",
+  yellow:  "\x1b[33m",
+  blue:    "\x1b[34m",
+  magenta: "\x1b[35m",
+  cyan:    "\x1b[36m",
+  white:   "\x1b[37m",
+  gray:    "\x1b[90m",
+  // bright
+  bred:    "\x1b[91m",
+  bgreen:  "\x1b[92m",
+  byellow: "\x1b[93m",
+  bblue:   "\x1b[94m",
+  bmagenta:"\x1b[95m",
+  bcyan:   "\x1b[96m",
+};
+
 function flavour(category) {
   const lines = FLAVOUR[category];
   if (!lines || lines.length === 0) return "";
@@ -530,7 +554,7 @@ function flavour(category) {
 
 function printFlavour(category) {
   const line = flavour(category);
-  if (line) process.stdout.write(`\x1b[2m  » ${line}\x1b[0m\n`);
+  if (line) process.stdout.write(`${C.dim}${C.magenta}  » ${line}${C.reset}\n`);
 }
 
 // ─── Checkpoint helpers ────────────────────────────────────────────────────────
@@ -591,10 +615,15 @@ function timestampUtc() {
   return new Date().toISOString();
 }
 
-function logEvent(logPath, message) {
+function logEvent(logPath, message, level = "info") {
   const line = `[${timestampUtc()}] ${message}\n`;
   fs.appendFileSync(logPath, line, "utf8");
-  process.stdout.write(line);
+  let colored;
+  if (level === "error")   colored = `${C.bred}[${timestampUtc()}] ${message}${C.reset}\n`;
+  else if (level === "warn") colored = `${C.yellow}[${timestampUtc()}] ${message}${C.reset}\n`;
+  else if (level === "ok")   colored = `${C.bgreen}[${timestampUtc()}] ${message}${C.reset}\n`;
+  else                       colored = `${C.cyan}[${timestampUtc()}]${C.reset} ${message}\n`;
+  process.stdout.write(colored);
 }
 
 function ensureDir(dirPath) {
@@ -661,7 +690,7 @@ function handleStreamEvent(event, logPath, t0, toolCount) {
       else if (name === "Grep")  detail = `${inp.pattern || ""} ${inp.path || ""}`.trim().substring(0, 90);
       else                       detail = JSON.stringify(inp).substring(0, 90);
       const elapsed = Math.round((Date.now() - t0) / 1000);
-      process.stdout.write(`  [${String(elapsed).padStart(4)}s] ${name.padEnd(10)} ${detail}\n`);
+      process.stdout.write(`  ${C.gray}[${String(elapsed).padStart(4)}s]${C.reset} ${C.bcyan}${name.padEnd(10)}${C.reset} ${C.dim}${detail}${C.reset}\n`);
       toolCount += 1;
     }
   }
@@ -675,7 +704,7 @@ function handleStreamEvent(event, logPath, t0, toolCount) {
     const cacheWrite = u.cache_creation_input_tokens || 0;
     const totalTok   = inTok + outTok + cacheRead + cacheWrite;
     const summary = `tokens: ${fmtK(totalTok)} (in: ${fmtK(inTok)} | out: ${fmtK(outTok)} | cache_read: ${fmtK(cacheRead)} | cache_write: ${fmtK(cacheWrite)})`;
-    process.stdout.write(`\n  [done] ${elapsed}s | ${toolCount} tool call(s) | ${summary}\n\n`);
+    process.stdout.write(`\n  ${C.bgreen}[done]${C.reset} ${C.bold}${elapsed}s${C.reset} | ${C.yellow}${toolCount} tool call(s)${C.reset} | ${C.dim}${summary}${C.reset}\n\n`);
     if (logPath) fs.appendFileSync(logPath, `[${new Date().toISOString()}] [usage] ${summary}\n`, "utf8");
   }
 
@@ -744,7 +773,7 @@ async function spawnClaude(prompt, model, logPath) {
         process.stdout.write(`\r` + " ".repeat(60) + `\r`);
         printFlavour("heartbeat");
       }
-      process.stdout.write(`\r  ⏱  ${elapsed}s | ${toolCount} tool call(s)...          `);
+      process.stdout.write(`\r  ${C.yellow}⏱${C.reset}  ${C.bold}${elapsed}s${C.reset} | ${C.dim}${toolCount} tool call(s)...${C.reset}          `);
     }, 15000);
 
     proc.stdout.on("data", (chunk) => {
@@ -854,9 +883,9 @@ function syncBbscopeIfPossible(context, logPath) {
   logEvent(logPath, "Syncing bbscope intelligence (no credentials required)");
   try {
     runCommand("node", ["scripts/sync-bbscope-intel.js", "--target", context.targetRef]);
-    logEvent(logPath, "bbscope intelligence sync complete");
+    logEvent(logPath, "bbscope intelligence sync complete", "ok");
   } catch (error) {
-    logEvent(logPath, `bbscope intelligence sync failed: ${error.message}`);
+    logEvent(logPath, `bbscope intelligence sync failed: ${error.message}`, "warn");
   }
 }
 
@@ -877,9 +906,9 @@ function syncHackerOneIfPossible(context, logPath) {
   logEvent(logPath, `Syncing HackerOne intelligence for ${programHandle}`);
   try {
     runCommand("node", ["scripts/sync-hackerone-intel.js", "--target", context.targetRef]);
-    logEvent(logPath, "HackerOne intelligence sync complete");
+    logEvent(logPath, "HackerOne intelligence sync complete", "ok");
   } catch (error) {
-    logEvent(logPath, `HackerOne intelligence sync failed: ${error.message}`);
+    logEvent(logPath, `HackerOne intelligence sync failed: ${error.message}`, "warn");
   }
 }
 
@@ -892,7 +921,7 @@ function buildResearchBriefIfPossible(context, logPath) {
     runCommandCapture("node", ["scripts/build-research-brief.js", "--target", context.targetRef]);
     logEvent(logPath, "Research brief refreshed from local/global intelligence");
   } catch (error) {
-    logEvent(logPath, `Research brief refresh failed: ${error.message}`);
+    logEvent(logPath, `Research brief refresh failed: ${error.message}`, "warn");
   }
 }
 
@@ -911,9 +940,9 @@ function syncCveIntelIfPossible(context, logPath) {
         process.stdout.write(`  ${line}\n`);
       }
     }
-    logEvent(logPath, "CVE intel sync complete");
+    logEvent(logPath, "CVE intel sync complete", "ok");
   } catch (error) {
-    logEvent(logPath, `CVE intel sync failed (non-fatal): ${error.message}`);
+    logEvent(logPath, `CVE intel sync failed (non-fatal): ${error.message}`, "warn");
   }
 }
 
@@ -930,9 +959,9 @@ function persistSkillsFromBundle(context, bundlePath, logPath) {
   try {
     db = openDatabase(resolveGlobalDatabasePath());
     const count = persistExtractedSkills(db, bundle, targetRef);
-    if (count > 0) logEvent(logPath, `Persisted ${count} extracted skill(s) to global skill library`);
+    if (count > 0) logEvent(logPath, `Persisted ${count} extracted skill(s) to global skill library`, "ok");
   } catch (error) {
-    logEvent(logPath, `Skill persistence failed (non-fatal): ${error.message}`);
+    logEvent(logPath, `Skill persistence failed (non-fatal): ${error.message}`, "warn");
   } finally {
     if (db) db.close();
   }
@@ -1035,7 +1064,7 @@ async function runDualResearcherPass(context, bundlePath, logPath) {
   try {
     response = await callResearcherModel(prompt, { timeoutMs: 180000 });
   } catch (err) {
-    logEvent(logPath, `Dual researcher call failed: ${err.message}`);
+    logEvent(logPath, `Dual researcher call failed: ${err.message}`, "warn");
     return;
   }
 
@@ -1430,36 +1459,34 @@ async function main() {
 
   // ── Pre-run briefing ──────────────────────────────────────────────────────
   if (!checkpoint) {
-    const bar = "═".repeat(72);
+    const bar = C.magenta + "═".repeat(72) + C.reset;
     const hasOpenRouter = (process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY_1) ? true : false;
     const keyCount = (() => {
       const envs = ["OPENROUTER_API_KEY_1","OPENROUTER_API_KEY_2","OPENROUTER_API_KEY_3","OPENROUTER_API_KEY_4","OPENROUTER_API_KEY_5","OPENROUTER_API_KEY"];
       return envs.filter((e) => process.env[e] && process.env[e].trim()).length;
     })();
-    const dualResearcherStatus = hasOpenRouter ? `enabled (${keyCount} api key(s) in rotation)` : "disabled (no OPENROUTER_API_KEY set)";
+    const dualResearcherStatus = hasOpenRouter
+      ? `${C.bgreen}enabled${C.reset} (${keyCount} api key(s) in rotation)`
+      : `${C.gray}disabled${C.reset} (no OPENROUTER_API_KEY set)`;
     process.stdout.write(`\n${bar}\n`);
-    process.stdout.write(`PIPELINE STARTING\n`);
-    process.stdout.write(`${bar}\n`);
-    process.stdout.write(`\n`);
-    process.stdout.write(`  Target      : ${context.targetRef || context.target || "(direct)"}\n`);
-    process.stdout.write(`  CLI         : ${args.cli}\n`);
-    process.stdout.write(`  Mode        : ${context.mode}\n`);
-    process.stdout.write(`\n`);
-    process.stdout.write(`  Assets to analyse (${allAssets.length}):\n`);
-    for (const a of allAssets) {
-      process.stdout.write(`    • ${a.asset_type.padEnd(12)} ${a.source_path || a.target || ""}\n`);
-    }
-    process.stdout.write(`\n`);
-    process.stdout.write(`  Pipeline phases:\n`);
-    process.stdout.write(`    1. Intel sync    — bbscope scope, HackerOne history, CVE intel\n`);
-    process.stdout.write(`    2. Researcher    — Claude analyses each asset (whitebox/blackbox)\n`);
-    process.stdout.write(`    3. Dual pass     — ${dualResearcherStatus}\n`);
-    process.stdout.write(`       Models tried in order: ${hasOpenRouter ? "researcher_model → free model fallback chain" : "skipped"}\n`);
-    process.stdout.write(`       On 401/429/busy: rotate to next api key, then next model\n`);
-    process.stdout.write(`    4. Triager       — validates findings, NMI rounds if needed\n`);
-    process.stdout.write(`    5. Reports       — H1-ready markdown reports rendered\n`);
-    process.stdout.write(`\n`);
+    process.stdout.write(`${C.bold}${C.bmagenta}PIPELINE STARTING${C.reset}\n`);
     process.stdout.write(`${bar}\n\n`);
+    process.stdout.write(`  ${C.cyan}Target${C.reset}      : ${C.bold}${context.targetRef || context.target || "(direct)"}${C.reset}\n`);
+    process.stdout.write(`  ${C.cyan}CLI${C.reset}         : ${args.cli}\n`);
+    process.stdout.write(`  ${C.cyan}Mode${C.reset}        : ${context.mode}\n\n`);
+    process.stdout.write(`  ${C.cyan}Assets to analyse${C.reset} (${allAssets.length}):\n`);
+    for (const a of allAssets) {
+      process.stdout.write(`    ${C.yellow}•${C.reset} ${C.bold}${a.asset_type.padEnd(12)}${C.reset} ${C.dim}${a.source_path || a.target || ""}${C.reset}\n`);
+    }
+    process.stdout.write(`\n  ${C.cyan}Pipeline phases:${C.reset}\n`);
+    process.stdout.write(`    ${C.yellow}1.${C.reset} Intel sync    — bbscope scope, HackerOne history, CVE intel\n`);
+    process.stdout.write(`    ${C.yellow}2.${C.reset} Researcher    — Claude analyses each asset (whitebox/blackbox)\n`);
+    process.stdout.write(`    ${C.yellow}3.${C.reset} Dual pass     — ${dualResearcherStatus}\n`);
+    process.stdout.write(`       ${C.dim}Models tried in order: ${hasOpenRouter ? "researcher_model → free model fallback chain" : "skipped"}${C.reset}\n`);
+    process.stdout.write(`       ${C.dim}On 401/429/busy: rotate to next api key, then next model${C.reset}\n`);
+    process.stdout.write(`    ${C.yellow}4.${C.reset} Triager       — validates findings, NMI rounds if needed\n`);
+    process.stdout.write(`    ${C.yellow}5.${C.reset} Reports       — H1-ready markdown reports rendered\n`);
+    process.stdout.write(`\n${bar}\n\n`);
   }
 
   // Only re-sync if this is a fresh run (not resume — intel is already current)
@@ -1559,7 +1586,7 @@ async function main() {
   await runDualResearcherPass(context, bundlePath, runLog);
   persistSkillsFromBundle(context, bundlePath, runLog);
   const findingCount = (readJson(bundlePath).findings || []).length;
-  logEvent(runLog, `All researcher passes complete with ${findingCount} confirmed finding(s)`);
+  logEvent(runLog, `All researcher passes complete with ${findingCount} confirmed finding(s)`, "ok");
 
   // Print triager hint so the user knows what to run next
   const bar = "─".repeat(72);
@@ -1619,7 +1646,7 @@ async function main() {
     ? fs.readdirSync(context.reportsDir).filter((entry) => entry.endsWith(".md")).length
     : 0;
   printFlavour("pipeline_complete");
-  logEvent(runLog, `Pipeline complete with ${readyCount} H1-ready report(s)`);
+  logEvent(runLog, `Pipeline complete with ${readyCount} H1-ready report(s)`, "ok");
 }
 
 main().catch((error) => {
