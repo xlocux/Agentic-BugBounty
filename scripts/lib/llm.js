@@ -11,7 +11,6 @@ function loadOpenRouterConfig() {
   try {
     return JSON.parse(fs.readFileSync(configPath, "utf8"));
   } catch {
-    // Fallback if config file is missing
     return {
       free_models: [
         "meta-llama/llama-3.3-70b-instruct:free",
@@ -27,67 +26,144 @@ function loadOpenRouterConfig() {
 
 const OPENROUTER_CONFIG = loadOpenRouterConfig();
 
-/**
- * Collect all non-empty API keys from env vars listed in config.
- * Returns an array; empty array means no keys configured.
- */
+// ─── Flavour ──────────────────────────────────────────────────────────────────
+
+const FLAVOUR = {
+  gemini_try: [
+    "asking gemini. it usually knows things.",
+    "routing to gemini. the oracle is in.",
+    "gemini on the line. let's see what it says.",
+    "pinging the big G. stand by.",
+  ],
+  gemini_ok: [
+    "gemini delivered. moving on.",
+    "the oracle has spoken.",
+    "gemini came through. good.",
+  ],
+  gemini_fail: [
+    "gemini went dark. switching lanes.",
+    "gemini shrugged. trying openrouter.",
+    "gemini is not available. escalating to plan B.",
+    "no response from gemini. pivoting.",
+  ],
+  openrouter_try: [
+    "trying {model} via openrouter...",
+    "routing to {model}...",
+    "spinning up {model}...",
+    "{model} — you're up.",
+  ],
+  openrouter_ok: [
+    "{model} delivered. done.",
+    "got a response from {model}.",
+    "{model} came through.",
+  ],
+  openrouter_fail: [
+    "{model} failed ({reason}). next.",
+    "{model} is busy or banned ({reason}). rotating.",
+    "{model} down ({reason}). trying the next one.",
+    "rotating away from {model}: {reason}.",
+  ],
+  key_rotate: [
+    "key …{key} exhausted on {model}. rotating to next key.",
+    "switching api key (…{key} failed on {model}).",
+    "key rotation triggered. {model} rejected …{key}.",
+  ],
+  all_failed: [
+    "every model and key has been tried. nothing worked. check your api keys and try again.",
+    "full fallback chain exhausted. no llm responded. giving up.",
+    "all backends down. either the internet is on fire or your keys are wrong.",
+  ],
+  researcher_start: [
+    "dual researcher online. spinning up {model} for second opinion.",
+    "calling {model} for a second pass. what did the first miss?",
+    "second researcher engaged ({model}). let's see if there's anything left.",
+    "bringing in {model} for cross-verification.",
+  ],
+  researcher_fallback: [
+    "primary model failed. falling back to free model chain.",
+    "switching to fallback chain for researcher pass.",
+    "{model} unavailable. trying alternatives.",
+  ],
+};
+
+function flavour(category, vars = {}) {
+  const lines = FLAVOUR[category];
+  if (!lines || lines.length === 0) return "";
+  let line = lines[Math.floor(Math.random() * lines.length)];
+  for (const [k, v] of Object.entries(vars)) {
+    line = line.replace(new RegExp(`\\{${k}\\}`, "g"), v);
+  }
+  return line;
+}
+
+function log(msg) {
+  process.stdout.write(`  \x1b[2m[llm] ${msg}\x1b[0m\n`);
+}
+
+// ─── Key helpers ──────────────────────────────────────────────────────────────
+
 function getApiKeys() {
   const keys = [];
   for (const envVar of (OPENROUTER_CONFIG.api_keys_env || [])) {
     const val = process.env[envVar];
     if (val && val.trim()) keys.push(val.trim());
   }
-  // Deduplicate
   return [...new Set(keys)];
 }
-
-const RETRY_STATUSES = new Set(OPENROUTER_CONFIG.retry_on_status || [401, 429, 503, 502]);
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Call a free LLM with the given prompt, expecting a JSON object back.
- * Falls back: Gemini CLI (sync via spawnSync) → OpenRouter model+key rotation (async).
- *
- * NOTE: callGeminiCli is intentionally synchronous (uses spawnSync).
- * Do NOT convert it to async — the sync call is correct for script contexts.
+ * Call a free LLM expecting a JSON object back.
+ * Chain: Gemini CLI → OpenRouter model×key matrix.
  */
 async function callLLMJson(prompt, { timeoutMs = 120000 } = {}) {
   const fullPrompt = `${prompt}\n\nRespond ONLY with a valid JSON object. No markdown, no explanation, no code fences.`;
 
-  // 1. Try Gemini via ccw cli (spawnSync — no shell, no quoting issues on any platform)
+  // 1. Gemini CLI
+  log(flavour("gemini_try"));
   try {
-    return callGeminiCli(fullPrompt, timeoutMs);
+    const result = callGeminiCli(fullPrompt, timeoutMs);
+    log(flavour("gemini_ok"));
+    return result;
   } catch (e) {
-    process.stderr.write(`[llm] Gemini CLI failed: ${e.message}\n`);
+    log(flavour("gemini_fail") + ` (${e.message.slice(0, 80)})`);
   }
 
-  // 2. Try OpenRouter with key+model rotation
+  // 2. OpenRouter key×model matrix
   const apiKeys = getApiKeys();
   if (apiKeys.length === 0) {
-    throw new Error(
-      "All LLM backends failed. Gemini CLI unavailable and no OPENROUTER_API_KEY* env vars are set."
-    );
+    const msg = flavour("all_failed");
+    log(msg);
+    throw new Error("All LLM backends failed. Gemini CLI unavailable and no OPENROUTER_API_KEY* env vars are set.");
   }
+
+  log(`  ${apiKeys.length} api key(s) loaded. trying ${(OPENROUTER_CONFIG.free_models || []).length} free models...`);
 
   const models = OPENROUTER_CONFIG.free_models || [];
   for (const model of models) {
     for (const key of apiKeys) {
+      log(flavour("openrouter_try", { model }));
       try {
-        return await callOpenRouter(fullPrompt, model, key, timeoutMs);
+        const result = await callOpenRouter(fullPrompt, model, key, timeoutMs);
+        log(flavour("openrouter_ok", { model }));
+        return result;
       } catch (e) {
-        process.stderr.write(`[llm] OpenRouter ${model} (key …${key.slice(-4)}) failed: ${e.message}\n`);
-        // Continue to next key/model on retryable errors
+        const reason = e.message.slice(0, 60);
+        log(flavour("openrouter_fail", { model, reason }));
+        if (apiKeys.length > 1 && apiKeys.indexOf(key) < apiKeys.length - 1) {
+          log(flavour("key_rotate", { key: key.slice(-4), model }));
+        }
       }
     }
   }
 
+  log(flavour("all_failed"));
   throw new Error("All LLM backends exhausted (Gemini CLI + all OpenRouter free models × all keys).");
 }
 
 /**
  * Synchronous Gemini call via ccw cli subprocess.
- * Uses spawnSync with an args array — no shell involved, works on Windows and Unix.
  * NOTE: intentionally synchronous. Do not convert to async.
  */
 function callGeminiCli(prompt, timeoutMs) {
@@ -104,8 +180,7 @@ function callGeminiCli(prompt, timeoutMs) {
 }
 
 /**
- * Call one OpenRouter model with one API key.
- * Throws on HTTP errors — caller rotates to next key/model.
+ * Call one OpenRouter model with one API key, expect JSON back.
  */
 async function callOpenRouter(prompt, model, apiKey, timeoutMs) {
   const controller = new AbortController();
@@ -143,10 +218,9 @@ async function callOpenRouter(prompt, model, apiKey, timeoutMs) {
 }
 
 /**
- * Call a specific OpenRouter model for researcher use (not the free fallback chain).
- * Rotates through all configured API keys on retryable failures.
- * Falls back to the free model chain if the primary model fails on all keys.
- * Returns the raw text response — researcher outputs are markdown/JSON mixed.
+ * Call a specific OpenRouter model for the dual researcher pass.
+ * Rotates all API keys on failure, falls back to free model chain.
+ * Returns raw text — no JSON parsing.
  */
 async function callResearcherModel(prompt, { model, timeoutMs = 300000 } = {}) {
   const primaryModel = model || OPENROUTER_CONFIG.researcher_model || "openai/gpt-oss-120b:free";
@@ -155,29 +229,44 @@ async function callResearcherModel(prompt, { model, timeoutMs = 300000 } = {}) {
     throw new Error("OPENROUTER_API_KEY* not set — cannot call secondary researcher model");
   }
 
+  log(flavour("researcher_start", { model: primaryModel }));
+  log(`  ${apiKeys.length} api key(s) available for rotation`);
+
   // Try primary model with all keys
   for (const key of apiKeys) {
+    log(`  trying ${primaryModel} (key …${key.slice(-4)})`);
     try {
-      return await callOpenRouterRaw(prompt, primaryModel, key, timeoutMs);
+      const result = await callOpenRouterRaw(prompt, primaryModel, key, timeoutMs);
+      log(flavour("openrouter_ok", { model: primaryModel }));
+      return result;
     } catch (e) {
-      process.stderr.write(`[llm] Researcher model ${primaryModel} (key …${key.slice(-4)}) failed: ${e.message}\n`);
-    }
-  }
-
-  // Fallback to free model chain (raw text, no JSON enforcement)
-  process.stderr.write("[llm] Primary researcher model failed — trying free model fallback chain\n");
-  const models = OPENROUTER_CONFIG.free_models || [];
-  for (const fallbackModel of models) {
-    if (fallbackModel === primaryModel) continue; // already tried
-    for (const key of apiKeys) {
-      try {
-        return await callOpenRouterRaw(prompt, fallbackModel, key, timeoutMs);
-      } catch (e) {
-        process.stderr.write(`[llm] Fallback ${fallbackModel} (key …${key.slice(-4)}) failed: ${e.message}\n`);
+      const reason = e.message.slice(0, 60);
+      log(flavour("openrouter_fail", { model: primaryModel, reason }));
+      if (apiKeys.indexOf(key) < apiKeys.length - 1) {
+        log(flavour("key_rotate", { key: key.slice(-4), model: primaryModel }));
       }
     }
   }
 
+  // Fallback to free model chain
+  log(flavour("researcher_fallback", { model: primaryModel }));
+  const models = OPENROUTER_CONFIG.free_models || [];
+  for (const fallbackModel of models) {
+    if (fallbackModel === primaryModel) continue;
+    for (const key of apiKeys) {
+      log(flavour("openrouter_try", { model: fallbackModel }));
+      try {
+        const result = await callOpenRouterRaw(prompt, fallbackModel, key, timeoutMs);
+        log(flavour("openrouter_ok", { model: fallbackModel }));
+        return result;
+      } catch (e) {
+        const reason = e.message.slice(0, 60);
+        log(flavour("openrouter_fail", { model: fallbackModel, reason }));
+      }
+    }
+  }
+
+  log(flavour("all_failed"));
   throw new Error("All researcher model backends exhausted.");
 }
 

@@ -1418,6 +1418,40 @@ async function main() {
 
   logEvent(runLog, `Starting pipeline assets=${allAssets.map((a) => a.asset_type).join(",")} mode=${context.mode} cli=${args.cli}`);
 
+  // ── Pre-run briefing ──────────────────────────────────────────────────────
+  if (!checkpoint) {
+    const bar = "═".repeat(72);
+    const hasOpenRouter = (process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY_1) ? true : false;
+    const keyCount = (() => {
+      const envs = ["OPENROUTER_API_KEY_1","OPENROUTER_API_KEY_2","OPENROUTER_API_KEY_3","OPENROUTER_API_KEY_4","OPENROUTER_API_KEY_5","OPENROUTER_API_KEY"];
+      return envs.filter((e) => process.env[e] && process.env[e].trim()).length;
+    })();
+    const dualResearcherStatus = hasOpenRouter ? `enabled (${keyCount} api key(s) in rotation)` : "disabled (no OPENROUTER_API_KEY set)";
+    process.stdout.write(`\n${bar}\n`);
+    process.stdout.write(`PIPELINE STARTING\n`);
+    process.stdout.write(`${bar}\n`);
+    process.stdout.write(`\n`);
+    process.stdout.write(`  Target      : ${context.targetRef || context.target || "(direct)"}\n`);
+    process.stdout.write(`  CLI         : ${args.cli}\n`);
+    process.stdout.write(`  Mode        : ${context.mode}\n`);
+    process.stdout.write(`\n`);
+    process.stdout.write(`  Assets to analyse (${allAssets.length}):\n`);
+    for (const a of allAssets) {
+      process.stdout.write(`    • ${a.asset_type.padEnd(12)} ${a.source_path || a.target || ""}\n`);
+    }
+    process.stdout.write(`\n`);
+    process.stdout.write(`  Pipeline phases:\n`);
+    process.stdout.write(`    1. Intel sync    — bbscope scope, HackerOne history, CVE intel\n`);
+    process.stdout.write(`    2. Researcher    — Claude analyses each asset (whitebox/blackbox)\n`);
+    process.stdout.write(`    3. Dual pass     — ${dualResearcherStatus}\n`);
+    process.stdout.write(`       Models tried in order: ${hasOpenRouter ? "researcher_model → free model fallback chain" : "skipped"}\n`);
+    process.stdout.write(`       On 401/429/busy: rotate to next api key, then next model\n`);
+    process.stdout.write(`    4. Triager       — validates findings, NMI rounds if needed\n`);
+    process.stdout.write(`    5. Reports       — H1-ready markdown reports rendered\n`);
+    process.stdout.write(`\n`);
+    process.stdout.write(`${bar}\n\n`);
+  }
+
   // Only re-sync if this is a fresh run (not resume — intel is already current)
   if (!checkpoint) {
     syncBbscopeIfPossible(context, runLog);
