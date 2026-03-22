@@ -33,7 +33,9 @@ function parseArgs(argv) {
     const arg = argv[i];
     if (arg === "--yes" || arg === "-y") {
       parsed.yes = true;
-    } else if (!parsed.target) {
+    } else if (arg === "--target" && argv[i + 1]) {
+      parsed.target = argv[++i];
+    } else if (!arg.startsWith("--") && !parsed.target) {
       parsed.target = arg;
     }
   }
@@ -63,7 +65,7 @@ async function main() {
   const args = parseArgs(process.argv);
 
   if (!args.target) {
-    console.error("Usage: node scripts/reset-target.js <target-name> [--yes]");
+    console.error("Usage: node scripts/reset-target.js --target <name> [--yes]");
     process.exit(1);
   }
 
