@@ -4,11 +4,29 @@
 // Suppress Node.js experimental/deprecation warnings in this process and all children.
 // SQLite is stable enough for our use; shell=false with an args array is intentional.
 process.env.NODE_OPTIONS = `${process.env.NODE_OPTIONS || ""} --no-warnings`.trim();
+process.removeAllListeners("warning");
+process.on("warning", () => {});
 
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const readline = require("node:readline");
+
+// Load .env from project root (no dotenv dependency needed)
+(function loadDotEnv() {
+  const envPath = path.resolve(__dirname, "../.env");
+  if (!fs.existsSync(envPath)) return;
+  const lines = fs.readFileSync(envPath, "utf8").split("\n");
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eqIdx = trimmed.indexOf("=");
+    if (eqIdx === -1) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    const val = trimmed.slice(eqIdx + 1).trim();
+    if (key && !(key in process.env)) process.env[key] = val;
+  }
+})();
 const { spawn, spawnSync } = require("node:child_process");
 const {
   deriveProgramHandle,
@@ -24,6 +42,7 @@ const {
   writeJson
 } = require("./lib/contracts");
 const { callResearcherModel } = require("./lib/llm");
+const { runHybridRecon, formatReconContextForPrompt } = require("./lib/hybrid-recon");
 const { detectAssetsInSrcDir, describeAsset } = require("./lib/detect-assets");
 
 function parseArgs(argv) {
@@ -973,6 +992,23 @@ async function runResearcherPhase(cli, assetContext, args, bundlePath, isAdditio
     : "";
   if (resumeHint) extraText += resumeHint;
   logEvent(runLog, `Starting researcher phase asset=${assetContext.asset} source=${assetContext.target}`);
+
+  // Run Phase 0+1 via free LLM to save Claude tokens — inject result as pre-computed context.
+  // Falls back silently (null) if free LLM is unavailable; Claude handles Phase 0+1 itself.
+  try {
+    logEvent(runLog, "Running hybrid recon (Phase 0+1) via free LLM...");
+    const reconContext = await runHybridRecon(assetContext, path.resolve(__dirname, ".."));
+    const reconText = formatReconContextForPrompt(reconContext);
+    if (reconText) {
+      extraText += reconText;
+      logEvent(runLog, "Hybrid recon injected into researcher prompt", "ok");
+    } else {
+      logEvent(runLog, "Hybrid recon skipped — Claude will handle Phase 0+1", "warn");
+    }
+  } catch (e) {
+    logEvent(runLog, `Hybrid recon error: ${e.message} — Claude handles Phase 0+1`, "warn");
+  }
+
   // SessionLimitError propagates to main() — do not catch here
   await invokeAgent(cli, "researcher", assetContext, args, extraText, runLog);
   printFlavour("researcher_done");
@@ -1009,7 +1045,7 @@ function mergeResearcherFindings(existingBundle, newFindings) {
 }
 
 async function runDualResearcherPass(context, bundlePath, logPath) {
-  if (!process.env.OPENROUTER_API_KEY) {
+  if (!process.env.OPENROUTER_API_KEY && !process.env.OPENROUTER_API_KEY_1) {
     logEvent(logPath, "Dual researcher skipped: OPENROUTER_API_KEY not set");
     return;
   }

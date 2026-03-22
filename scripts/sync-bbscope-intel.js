@@ -47,6 +47,7 @@ function parseArgs(argv) {
 function guessPlatform(config) {
   const url = (config.program_url || "").toLowerCase();
   if (url.includes("hackerone.com")) return "h1";
+  if (url.includes("bugcrowd.com")) return "bc";
   if (url.includes("intigriti.com")) return "it";
   if (url.includes("yeswehack.com")) return "ywh";
   // bbscope URL format: https://bbscope.com/programs/h1/handle
@@ -56,8 +57,9 @@ function guessPlatform(config) {
 }
 
 // Extract program handle from target config or program_url
-function resolveHandle(config, argHandle) {
+function resolveHandle(config, argHandle, platform) {
   if (argHandle) return argHandle;
+  if (platform === "bc" && config.bugcrowd?.program_handle) return config.bugcrowd.program_handle;
   if (config.hackerone?.program_handle) return config.hackerone.program_handle;
   if (config.program_handle) return config.program_handle;
   try {
@@ -65,6 +67,8 @@ function resolveHandle(config, argHandle) {
     // bbscope URL: /programs/h1/<handle>
     const bbscopeMatch = url.pathname.match(/\/programs\/(?:h1|bc|it|ywh)\/([^/]+)/);
     if (bbscopeMatch) return bbscopeMatch[1];
+    // Bugcrowd engagement URL: /engagements/<slug> → handle = /engagements/<slug>
+    if (url.hostname.includes("bugcrowd.com")) return url.pathname.replace(/\/$/, "");
     return url.pathname.replace(/^\/+|\/+$/g, "").split("/").pop();
   } catch {
     return null;
@@ -98,7 +102,7 @@ async function main() {
     process.exit(1);
   }
 
-  const handle = resolveHandle(config, args.handle);
+  const handle = resolveHandle(config, args.handle, platform);
   if (!handle) {
     console.error(
       "Cannot determine program handle. Use --handle <slug> or set hackerone.program_handle / program_url in target.json."

@@ -234,6 +234,7 @@ async function callLLMJson(prompt, { timeoutMs = 120000 } = {}) {
 
   const models = OPENROUTER_CONFIG.free_models || [];
   for (const model of models) {
+    let modelPermanentlyFailed = false;
     for (const key of apiKeys) {
       log(flavour("openrouter_try", { model }));
       try {
@@ -243,11 +244,17 @@ async function callLLMJson(prompt, { timeoutMs = 120000 } = {}) {
       } catch (e) {
         const reason = e.message.slice(0, 60);
         log(flavour("openrouter_fail", { model, reason }));
+        // 404 = model unavailable for this account — no point rotating keys
+        if (e.message.includes("HTTP 404")) {
+          modelPermanentlyFailed = true;
+          break;
+        }
         if (apiKeys.length > 1 && apiKeys.indexOf(key) < apiKeys.length - 1) {
           log(flavour("key_rotate", { key: key.slice(-4), model }));
         }
       }
     }
+    if (modelPermanentlyFailed) continue;
   }
 
   log(flavour("all_failed"));
@@ -289,8 +296,7 @@ async function callOpenRouter(prompt, model, apiKey, timeoutMs) {
       body: JSON.stringify({
         model,
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.2,
-        response_format: { type: "json_object" }
+        temperature: 0.2
       }),
       signal: controller.signal
     });
@@ -324,7 +330,8 @@ async function callResearcherModel(prompt, { model, timeoutMs = 300000 } = {}) {
   log(flavour("researcher_start", { model: primaryModel }));
   log(`  ${apiKeys.length} api key(s) available for rotation`);
 
-  // Try primary model with all keys
+  // Try primary model with all keys (skip all keys if model returns 404)
+  let primaryPermanentFail = false;
   for (const key of apiKeys) {
     log(`  trying ${primaryModel} (key …${key.slice(-4)})`);
     try {
@@ -334,6 +341,7 @@ async function callResearcherModel(prompt, { model, timeoutMs = 300000 } = {}) {
     } catch (e) {
       const reason = e.message.slice(0, 60);
       log(flavour("openrouter_fail", { model: primaryModel, reason }));
+      if (e.message.includes("HTTP 404")) { primaryPermanentFail = true; break; }
       if (apiKeys.indexOf(key) < apiKeys.length - 1) {
         log(flavour("key_rotate", { key: key.slice(-4), model: primaryModel }));
       }
@@ -344,7 +352,8 @@ async function callResearcherModel(prompt, { model, timeoutMs = 300000 } = {}) {
   log(flavour("researcher_fallback", { model: primaryModel }));
   const models = OPENROUTER_CONFIG.free_models || [];
   for (const fallbackModel of models) {
-    if (fallbackModel === primaryModel) continue;
+    if (fallbackModel === primaryModel && !primaryPermanentFail) continue;
+    let modelPermanentFail = false;
     for (const key of apiKeys) {
       log(flavour("openrouter_try", { model: fallbackModel }));
       try {
@@ -354,8 +363,10 @@ async function callResearcherModel(prompt, { model, timeoutMs = 300000 } = {}) {
       } catch (e) {
         const reason = e.message.slice(0, 60);
         log(flavour("openrouter_fail", { model: fallbackModel, reason }));
+        if (e.message.includes("HTTP 404")) { modelPermanentFail = true; break; }
       }
     }
+    if (modelPermanentFail) continue;
   }
 
   log(flavour("all_failed"));

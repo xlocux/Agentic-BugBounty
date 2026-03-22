@@ -20,7 +20,7 @@ const {
 } = require("./db");
 const { ensureDir, writeJson } = require("./io");
 
-const API_BASE_URL = "https://bbscope.com/api/v1";
+const API_BASE_URL = "https://bbscope.com/api/v1/";
 
 // bbscope platform codes → human label
 const PLATFORM_LABELS = {
@@ -121,7 +121,7 @@ async function fetchAllPrograms(options = {}) {
   if (options.platform) params.platform = options.platform;
   if (options.type) params.type = options.type;
 
-  const data = await requestJson("/programs", params);
+  const data = await requestJson("programs", params);
   // bbscope returns array of program objects
   const programs = Array.isArray(data) ? data : (data.programs || data.data || []);
   return programs;
@@ -134,7 +134,10 @@ async function fetchAllPrograms(options = {}) {
  */
 async function fetchProgramScope(platform, handle, options = {}) {
   const scopeParam = options.scope || "in";
-  const data = await requestJson(`/programs/${platform}/${handle}`, { scope: scopeParam });
+  // Handles containing slashes (e.g. Bugcrowd engagement paths like "engagements/okta")
+  // must be fully percent-encoded so the server receives %2Fengagements%2Fokta as a single token
+  const encodedHandle = handle.includes("/") ? encodeURIComponent("/" + handle) : handle;
+  const data = await requestJson(`programs/${platform}/${encodedHandle}`, { scope: scopeParam });
 
   // Response may be { targets: [...] } or a flat array
   const targets = Array.isArray(data) ? data : (data.targets || data.in_scope || data.data || []);
@@ -153,7 +156,7 @@ async function fetchScopeUpdates(options = {}) {
   if (options.perPage) params.per_page = options.perPage;
   if (options.platform) params.platform = options.platform;
 
-  const data = await requestJson("/updates", params);
+  const data = await requestJson("updates", params);
   return Array.isArray(data) ? data : (data.updates || data.data || []);
 }
 

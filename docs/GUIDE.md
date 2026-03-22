@@ -1,8 +1,6 @@
 # Agentic BugBounty — Complete Guide
 
----
-
-> **Design philosophy**: this framework is built around **whitebox analysis** — clone the source, point the agent at it, get deep findings with file:line precision and working PoCs. Blackbox mode is supported for targets where source is unavailable, but whitebox is the primary mode and delivers significantly higher signal quality.
+> **Design philosophy**: built around whitebox analysis — clone the source, point the agent at it, get deep findings with file:line precision and working PoCs. Blackbox mode is supported for targets where source is unavailable, but whitebox is the primary mode and delivers significantly higher signal quality.
 
 ---
 
@@ -19,18 +17,17 @@
 9. [Intelligence sources](#intelligence-sources)
 10. [bbscope](#bbscope)
 11. [HackerOne intelligence](#hackerone-intelligence)
-    - [Global disclosed dataset](#global-disclosed-dataset)
-    - [Calibration dataset](#calibration-dataset)
 12. [Skill library](#skill-library)
 13. [CVE intel](#cve-intel)
-14. [Dual researcher (second AI pass)](#dual-researcher-second-ai-pass)
-15. [OpenRouter — free models + key rotation](#openrouter--free-models--key-rotation)
-16. [Intel UI](#intel-ui)
-17. [Direct agent invocation](#direct-agent-invocation)
-18. [JSON contracts](#json-contracts)
-19. [Validation](#validation)
-20. [Package scripts reference](#package-scripts-reference)
-21. [Environment variables](#environment-variables)
+14. [Hybrid recon (free LLM pre-pass)](#hybrid-recon-free-llm-pre-pass)
+15. [Dual researcher (second AI pass)](#dual-researcher-second-ai-pass)
+16. [OpenRouter — free models + key rotation](#openrouter--free-models--key-rotation)
+17. [Intel UI](#intel-ui)
+18. [Direct agent invocation](#direct-agent-invocation)
+19. [JSON contracts](#json-contracts)
+20. [Validation](#validation)
+21. [Package scripts reference](#package-scripts-reference)
+22. [Environment variables](#environment-variables)
 
 ---
 
@@ -41,15 +38,20 @@ The pipeline runs two agents in sequence.
 ```mermaid
 flowchart TD
     SRC["Source code (whitebox)\nor target URL (blackbox)"]
-    R["Researcher"]
+    HR["Hybrid recon\n(free LLM — Phase 0+1)"]
+    R["Researcher (Claude)\nPhase 2–6"]
     B["report_bundle.json"]
+    DR["Dual researcher\n(OpenRouter free model)"]
     T["Triager"]
     NMI{"NEEDS MORE INFO?"}
     TR["triage_result.json"]
     H1["H1-ready reports"]
 
-    SRC --> R
+    SRC --> HR
+    HR --> R
     R --> B
+    B --> DR
+    DR --> B
     B --> T
     T --> NMI
     NMI -- "yes (max 2 rounds)" --> R
@@ -57,13 +59,17 @@ flowchart TD
     TR --> H1
 ```
 
-**One command runs both agents.** `node scripts/run-pipeline.js` launches the Researcher, waits for it to finish, then automatically launches the Triager. You do not need to run them separately unless you want manual control.
+**One command runs everything.** `node scripts/run-pipeline.js` runs hybrid recon, then the Researcher, then the dual researcher pass, then the Triager. You do not need to run them separately unless you want manual control.
 
-**Researcher** operates in either whitebox (source available) or blackbox mode. It loads a structured threat model for the asset type, consumes a pre-built intelligence brief, runs grep patterns, reads source files, and produces a `report_bundle.json` with confirmed findings — each with a full PoC, CVSS score, and reproduction steps. If the target has multiple assets (e.g. a Chrome extension + a backend API), the Researcher runs a separate pass per asset, appending findings to the same bundle. The pipeline pauses between passes so you can review before continuing.
+**Hybrid recon** runs Phase 0 (calibration briefing) and Phase 1 (source reconnaissance) using a free LLM via OpenRouter or Gemini CLI before Claude starts. The output — entry points, sink map, IPC channels, interesting patterns — is injected into the Claude prompt. Claude picks up at Phase 2 (static analysis) with the groundwork already done. If the free LLM is unavailable, Claude handles Phase 0+1 itself — no regression.
 
-**Triager** runs six checks on every finding: scope, completeness, validity, CVSS reassessment, novelty (duplicate detection against HackerOne history), and submission decision. Findings that need clarification get flagged as `NEEDS_MORE_INFO`, which triggers a second Researcher pass. This loops up to `--max-nmi-rounds` times (default 2).
+**Researcher** operates in whitebox or blackbox mode. It reads source files, traces data flows, confirms every candidate with a working PoC before writing to the bundle. For targets with multiple assets, it runs a separate pass per asset, appending findings to the same bundle. The pipeline pauses between passes.
 
-**Deterministic fallback**: if the Triager agent fails to write `triage_result.json`, the pipeline runs a local Node.js triage pass with the same six checks and H1 universal rules.
+**Dual researcher** runs a second pass after Claude using a different model via OpenRouter. It cross-validates findings and hunts for anything the first pass missed. New findings are merged into the bundle by deduplication on `affected_component + vulnerability_class`.
+
+**Triager** runs six checks on every finding: scope, completeness, validity, CVSS reassessment, novelty (duplicate detection), and submission decision. Findings that need clarification get flagged as `NEEDS_MORE_INFO`, which triggers a second Researcher pass. This loops up to `--max-nmi-rounds` times (default 2).
+
+**Deterministic fallback**: if the Triager agent fails to write `triage_result.json`, the pipeline runs a local Node.js triage pass with the same six checks.
 
 ---
 
@@ -134,7 +140,6 @@ Assets detected: 2
 
 [2/2] ./src/acme-api
   Detected as : Web App (Node.js)
-  Type options: webapp | chromeext | mobileapp | executable
   Confirm type [Enter = webapp] or type to override:
   Analysis mode [Enter = whitebox] or blackbox:
   → webapp | whitebox
@@ -148,12 +153,10 @@ Assets configured: chromeext (./src/acme-extension), webapp (./src/acme-api)
 The wizard:
 1. Creates the workspace and shows where to place sources
 2. Waits for you to clone/copy the repos
-3. Scans every subdirectory in `src/` — detects asset type from marker files (`manifest.json` + `manifest_version`, `AndroidManifest.xml`, `build.gradle`, `next.config.js`, `go.mod`, PE/ELF magic bytes, etc.) and reads framework/version info where available
+3. Scans every subdirectory in `src/` — detects asset type from marker files (`manifest.json`, `AndroidManifest.xml`, `build.gradle`, `next.config.js`, `go.mod`, PE/ELF magic bytes) and reads framework/version info where available
 4. Shows each asset with its detected type and lets you confirm or override
 5. Writes `target.json` with all assets — primary + `additional_assets`
 6. Starts the pipeline
-
-Multiple assets get separate Researcher passes. The pipeline pauses between passes so you can review findings before continuing.
 
 ### Create manually
 
@@ -183,6 +186,7 @@ targets/<name>/
 │   └── pipeline-*.log
 └── intelligence/
     ├── agentic-bugbounty.db
+    ├── bbscope_scope_snapshot.json
     ├── h1_scope_snapshot.json
     ├── h1_vulnerability_history.json
     ├── h1_skill_suggestions.json
@@ -223,6 +227,18 @@ Minimal working config:
 }
 ```
 
+For Bugcrowd programs, use `bugcrowd` instead of `hackerone`:
+
+```json
+{
+  "program_url": "https://bugcrowd.com/engagements/acme",
+  "bugcrowd": {
+    "program_handle": "engagements/acme",
+    "sync_enabled": false
+  }
+}
+```
+
 Multi-asset config:
 
 ```json
@@ -258,22 +274,13 @@ node scripts/run-pipeline.js --target <name> --cli claude
 | `--mode whitebox\|blackbox` | from target.json | Override analysis mode |
 | `--interactive` | off | Manual finding review before triage |
 | `--max-nmi-rounds <n>` | 2 | Max NEEDS_MORE_INFO feedback loops |
+| `--resume` | off | Resume from checkpoint after session limit |
 
 **Environment overrides:**
 
 ```bash
 AGENTIC_CLI=claude
 AGENTIC_MODEL=claude-opus-4-6
-```
-
-**Per-target wrappers** (generated automatically):
-
-```bash
-# Linux / macOS
-./targets/<name>/run.sh --cli claude
-
-# Windows
-targets\<name>\run.cmd --cli claude
 ```
 
 ---
@@ -283,7 +290,14 @@ targets\<name>\run.cmd --cli claude
 The pipeline streams every tool call as it happens:
 
 ```
-[2026-03-20T20:08:07Z] → Starting researcher[chromeext] agent
+[2026-03-20T20:08:07Z] Running hybrid recon (Phase 0+1) via free LLM...
+  [hybrid-recon] phase 0: loading calibration briefing for chromeext...
+  [hybrid-recon] phase 1: found 109 source files — sampling key files...
+  [hybrid-recon] phase 1: asking free LLM to map attack surface...
+  [llm] google/gemma-3-27b-it:free delivered. done.
+[2026-03-20T20:08:14Z] Hybrid recon injected into researcher prompt
+
+[2026-03-20T20:08:14Z] → Starting researcher[chromeext] agent
   [  12s] Bash       grep -r "postMessage" src/ --include="*.js"
   [  18s] Read       src/background/messaging.js
   [  34s] Grep       eval( src/
@@ -298,20 +312,6 @@ When the agent is reasoning between tool calls, a heartbeat fires every 15 secon
 
 ```
   ⏱  45s | 12 tool call(s)...
-```
-
-After the Researcher completes, the pipeline prints the next command:
-
-```
-────────────────────────────────────────────────────────────────────────
-Researcher done — 3 finding(s) confirmed.
-
-To run the triager now:
-  /triager --asset chromeext
-
-Or run the full pipeline (researcher + triager) in one shot:
-  node scripts/run-pipeline.js --target acme --cli claude
-────────────────────────────────────────────────────────────────────────
 ```
 
 Token usage and cost are logged to `logs/pipeline-*.log` at the end of each agent phase.
@@ -329,21 +329,13 @@ targets/<name>/poc/
   summary.md
 ```
 
-`summary.md` contains:
-- target metadata table
-- analysis stats
-- findings overview table (all findings at a glance)
-- full detail section per finding: CVSS, CWE, component, steps, impact, remediation, observed result
+`summary.md` contains a findings overview table and full detail per finding: CVSS, CWE, component, steps, impact, remediation, observed result.
 
 **Run standalone:**
 
 ```bash
 node scripts/render-poc-artifacts.js findings/confirmed/report_bundle.json --poc-dir targets/<name>/poc
-```
-
-Or:
-
-```bash
+# or
 npm run poc:render
 ```
 
@@ -376,38 +368,7 @@ MANUAL REVIEW — 3 finding(s) to validate before triage
 
 ## Session resume (Claude Pro usage limits)
 
-Claude Pro sessions have a rolling usage cap. If the cap hits mid-run, the pipeline detects it automatically, saves a checkpoint, and tells you exactly what to run when the session resets.
-
-### How it works
-
-1. `spawnClaude` streams JSON events from the agent
-2. On `SessionLimitError` detected in the stream:
-   - saves `targets/<name>/logs/checkpoint.json`
-   - prints the exact resume command
-   - exits cleanly
-3. When the session resets, run with `--resume`:
-   - if phase was **researcher**: skips completed assets, injects resume hint into prompt
-   - if phase was **triage**: skips researcher loop, re-runs triage on existing bundle
-4. On clean completion, checkpoint is deleted
-
-### What gets saved
-
-The checkpoint lives at `targets/<name>/logs/checkpoint.json`:
-
-```json
-{
-  "phase": "researcher",
-  "assetIndex": 0,
-  "asset": "chromeext",
-  "totalAssets": 1,
-  "findingsCount": 3,
-  "savedAt": "2026-03-21T22:00:00.000Z"
-}
-```
-
-Everything written to `findings/confirmed/report_bundle.json` before the limit hit is preserved — the researcher picks up from where it stopped and is instructed not to re-analyse already-confirmed findings.
-
-### When a limit hits
+Claude Pro sessions have a rolling usage cap. If the cap hits mid-run, the pipeline saves a checkpoint and tells you exactly what to run when the session resets.
 
 ```
 ════════════════════════════════════════════════════════════════════════
@@ -425,24 +386,16 @@ The pipeline will pick up exactly where it stopped.
 ════════════════════════════════════════════════════════════════════════
 ```
 
-### Resuming
-
 ```bash
 node scripts/run-pipeline.js --target acme --cli claude --resume
 ```
 
-On resume the pipeline:
+On resume:
+- If phase was `researcher`: skips completed assets, injects resume hint into the agent prompt
+- If phase was `triage`: skips researcher loop entirely, re-runs triage on existing bundle
+- On clean completion, checkpoint is deleted
 
-1. Loads `checkpoint.json` and prints what it found
-2. If phase was `researcher`: skips assets already completed, injects a resume hint into the agent prompt (`N findings already confirmed, continue from where you left off`)
-3. If phase was `triage`: skips the researcher loop entirely, re-runs triage on the existing bundle
-4. On clean completion, deletes the checkpoint
-
-### Notes
-
-- `--resume` with no checkpoint is a no-op — the pipeline starts fresh
-- Intelligence syncs (bbscope, HackerOne) are skipped on resume (already current)
-- If you want to force a full re-run despite a checkpoint, delete `targets/<name>/logs/checkpoint.json` and run without `--resume`
+`--resume` with no checkpoint is a no-op — the pipeline starts fresh.
 
 ---
 
@@ -457,14 +410,16 @@ flowchart TD
     GDB["Global DB\ndata/global-intelligence/"]
     LDB["Target DB\ntargets/name/intelligence/"]
     BRIEF["research_brief.json"]
-    R["Researcher"]
+    HR["Hybrid recon\n(free LLM)"]
+    R["Researcher (Claude)"]
 
     BBSCOPE -- "bbscope:sync" --> LDB
     H1API -- "h1:bootstrap / h1:disclosed" --> GDB
     H1API -- "h1:sync" --> LDB
     GDB --> BRIEF
     LDB --> BRIEF
-    BRIEF --> R
+    BRIEF --> HR
+    HR --> R
 ```
 
 ---
@@ -473,35 +428,30 @@ flowchart TD
 
 [bbscope.com](https://bbscope.com) aggregates scope data from HackerOne, Bugcrowd, Intigriti, and YesWeHack — no API credentials required.
 
-Use it to populate scope for any program, regardless of platform.
-
-### Check connectivity
-
 ```bash
 npm run bbscope:doctor
-```
-
-### Sync scope for a target
-
-```bash
 node scripts/sync-bbscope-intel.js --target <name>
-# or
-npm run bbscope:sync
 ```
 
-Auto-detects platform from `program_url` in `target.json`. Override with `--platform`:
+Auto-detects platform from `program_url` in `target.json`:
+- `hackerone.com` → `h1`
+- `bugcrowd.com` → `bc`
+- `intigriti.com` → `it`
+- `yeswehack.com` → `ywh`
+
+Override with `--platform`:
 
 ```bash
-node scripts/sync-bbscope-intel.js --target <name> --platform bc   # Bugcrowd
-node scripts/sync-bbscope-intel.js --target <name> --platform h1   # HackerOne
-node scripts/sync-bbscope-intel.js --target <name> --platform it   # Intigriti
-node scripts/sync-bbscope-intel.js --target <name> --platform ywh  # YesWeHack
+node scripts/sync-bbscope-intel.js --target <name> --platform bc
+node scripts/sync-bbscope-intel.js --target <name> --platform h1 --handle acme
 ```
 
-Or specify the program handle directly:
+For Bugcrowd programs with engagement paths (e.g. `/engagements/acme`), set `bugcrowd.program_handle` in `target.json`:
 
-```bash
-node scripts/sync-bbscope-intel.js --target <name> --platform bc --handle my-program
+```json
+{
+  "bugcrowd": { "program_handle": "engagements/acme" }
+}
 ```
 
 Writes to `targets/<name>/intelligence/`:
@@ -517,17 +467,10 @@ Writes to `targets/<name>/intelligence/`:
 ```bash
 export H1_API_USERNAME="your_api_username"
 export H1_API_TOKEN="your_api_token"
-```
-
-Check connectivity:
-
-```bash
 npm run h1:doctor
 ```
 
 ### Target-local sync
-
-Fetches structured scope, accessible history, and derived skill suggestions for the target:
 
 ```bash
 node scripts/sync-hackerone-intel.js --target <name>
@@ -535,13 +478,9 @@ node scripts/sync-hackerone-intel.js --target <name>
 npm run h1:sync
 ```
 
-Writes to `targets/<name>/intelligence/`.
-
 Auto-runs at pipeline start when `hackerone.sync_enabled: true` in `target.json` and credentials are present.
 
 ### Global disclosed dataset
-
-Builds a cross-program dataset from publicly disclosed HackerOne reports:
 
 ```bash
 npm run h1:disclosed         # incremental sync
@@ -558,41 +497,35 @@ Writes to `data/global-intelligence/`.
 
 ### Calibration dataset
 
-After syncing disclosed reports, build a queryable calibration index with severity distributions and real disclosure examples:
+After syncing disclosed reports, build a queryable calibration index:
 
 ```bash
 npm run calibration:sync
 ```
 
-This classifies all 12,000+ disclosed reports by `(asset_type, vuln_class)` and aggregates:
-- Severity distributions (critical/high/medium/low counts)
-- Typical CWE and weakness per class
-- Top programs by disclosure volume
-- Real `hacktivity_summary` excerpts stored as behavior examples
+Classifies 12,000+ disclosed reports by `(asset_type, vuln_class)` and aggregates severity distributions, typical CWEs, and real `hacktivity_summary` excerpts.
 
 Query the data:
 
 ```bash
-# Severity distribution for all chromeext vuln classes
+# Severity distribution for a given asset type
 node scripts/query-calibration.js --asset chromeext
 
-# Specific class, JSON output (for agent piping)
+# JSON output (used by hybrid recon and agents)
 node scripts/query-calibration.js --asset webapp --vuln xss --json
 
-# Real H1 report summaries — how researchers described the vuln and what triage validated
+# Real H1 report summaries
 node scripts/query-calibration.js --asset webapp --vuln xss --behaviors --limit 5
 
 # All asset types
 node scripts/query-calibration.js --all
 ```
 
-The **Researcher** queries this before touching the target (Phase 0) to bias module loading toward historically rewarded vuln classes and read real disclosure examples.
+The **Researcher** queries this before touching the target (Phase 0 in direct mode, or it is injected by hybrid recon) to bias module loading toward historically rewarded vuln classes.
 
-The **Triager** queries this at Check 4.5 to cross-check the researcher's severity claim against historical H1 triage outcomes for the same `(asset_type, vuln_class)` combination.
+The **Triager** queries this at Check 4.5 to cross-check the researcher's severity claim against historical H1 triage outcomes.
 
 ### Research brief
-
-Build the intelligence brief the Researcher reads before touching the target:
 
 ```bash
 node scripts/build-research-brief.js --target <name>
@@ -614,7 +547,7 @@ npm run research:focus
 
 The skill library stores reusable attack techniques distilled from H1 disclosed reports by LLM analysis. Each skill captures how a real researcher exploited a vuln — specific enough to replicate.
 
-### Extract skills from disclosed reports
+### Extract skills
 
 Requires a working LLM backend (Gemini CLI or OpenRouter key):
 
@@ -622,21 +555,14 @@ Requires a working LLM backend (Gemini CLI or OpenRouter key):
 npm run calibration:extract-skills
 ```
 
-Processes all disclosed reports in batches of 30. Skips already-processed reports (incremental). Each skill is stored with: `title`, `technique`, `chain_steps`, `insight`, `bypass_of`, `severity_achieved`.
+Processes disclosed reports in batches of 30. Skips already-processed reports (incremental). Each skill is stored with: `title`, `technique`, `chain_steps`, `insight`, `bypass_of`, `severity_achieved`.
 
 ### Query skills
 
 ```bash
-# All skills for an asset type
 node scripts/query-skills.js --asset chromeext --limit 15
-
-# Program-specific first, then global
 node scripts/query-skills.js --asset webapp --program hackerone --limit 10
-
-# Filter by vuln class
 node scripts/query-skills.js --asset webapp --vuln xss
-
-# JSON output
 node scripts/query-skills.js --asset webapp --json
 ```
 
@@ -653,25 +579,22 @@ If the Researcher discovers a new technique during analysis, it documents it in 
 
 ## CVE intel
 
-Per-target CVE database enriched with patch analysis and variant hunting hints. Fetched from NVD, enriched with Exploit-DB PoC links, analyzed by LLM.
+Per-target CVE database fetched from NVD, enriched with Exploit-DB PoC links, analyzed by LLM.
 
-### Sync CVEs for a target
+### Sync CVEs
 
 ```bash
 node scripts/sync-cve-intel.js --target <name>
-# or via pipeline (auto-runs on every fresh start)
 ```
 
 Options:
 
 ```bash
---no-analysis          skip LLM patch analysis (faster, saves API calls)
---max-age-days 0       force refresh even if recently synced (default: skip if < 1 day old)
+--no-analysis          skip LLM patch analysis (faster)
+--max-age-days 0       force refresh even if recently synced
 ```
 
-Keywords are auto-detected from `target.json`: `target_name`, Chrome extension `manifest.json` name, `package.json` name, APK filename.
-
-If no LLM backend is available, CVEs are saved without variant hints. A single clear message is printed instead of spamming per-CVE failures.
+Keywords are auto-detected from `target.json`: `target_name`, Chrome extension name, `package.json` name, APK filename.
 
 ### Query CVEs
 
@@ -683,33 +606,57 @@ node scripts/query-cve-intel.js --target <name> --json
 
 ### How the Researcher uses CVEs
 
-Phase 0, step 0.6 — after the skill library query, the Researcher checks CVEs for the target. For each CVE:
-- Verifies if the target version is in `affected_versions`
-- Reads `variant_hints` — specific functions/patterns to grep in the source
-- Flags CVEs with `High bypass_likelihood` for immediate attention
+Phase 0, step 0.6 — after the skill library query, the Researcher checks CVEs for the target. For each CVE it verifies whether the target version is in `affected_versions`, reads `variant_hints` for specific functions to grep, and flags CVEs with high bypass likelihood for immediate attention.
+
+---
+
+## Hybrid recon (free LLM pre-pass)
+
+Before invoking Claude, the pipeline runs Phase 0 and Phase 1 using a free LLM to save Claude tokens for the work that requires deep reasoning.
+
+### What it does
+
+**Phase 0** — runs `query-calibration.js` locally and captures the calibration briefing for the asset type. This is synchronous and zero-cost.
+
+**Phase 1** — walks the source tree (up to 300 files), samples key files (manifest, config, auth, routing, entry points), and asks the free LLM to produce a structured recon map:
+- entry points
+- auth layer
+- data sinks (`eval`, `innerHTML`, `exec`, query builders, etc.)
+- IPC / messaging channels
+- external comms
+- interesting patterns worth investigating
+
+The output is injected into the Claude prompt as a pre-computed context block. Claude starts directly at Phase 2 (static analysis) with the groundwork already done.
+
+### Failure behaviour
+
+If the free LLM is unavailable (no keys, all models failing, timeout), the hybrid recon returns null silently. The pipeline logs a warning and Claude handles Phase 0+1 itself — existing behaviour, no regression.
+
+### Token savings
+
+The primary savings are on file listing, structure mapping, and calibration loading — mechanical work that a smaller model handles fine. Claude's token budget goes toward taint tracing, fuzzing mindset analysis, PoC development, and CVSS reasoning.
 
 ---
 
 ## Dual researcher (second AI pass)
 
-After the primary Claude researcher completes, the pipeline optionally runs a **second researcher pass** using a different AI model via OpenRouter. This cross-validates findings and hunts for anything the first pass missed.
+After the primary Claude researcher completes, the pipeline runs a second researcher pass using a different model via OpenRouter. This cross-validates findings and hunts for anything the first pass missed.
 
 ### How it works
 
 1. Primary Claude researcher runs, produces `report_bundle.json`
-2. Dual researcher is called with context of what Claude already found (component + vuln class per finding)
-3. It looks for additional vulnerabilities on **different components** or **different attack surfaces**
+2. Dual researcher is called with context of what Claude already found
+3. It hunts for additional vulnerabilities on different components or attack surfaces
 4. New findings are merged into the bundle — deduplication by `affected_component + vulnerability_class`
-5. If all findings already overlap → nothing merged, logged as "no additional findings"
 
 ### Enable
 
-Set any `OPENROUTER_API_KEY*` env var. The dual pass activates automatically — no flag needed.
+Set any `OPENROUTER_API_KEY*` in `.env`. The dual pass activates automatically — no flag needed.
 
-If no key is set, the dual pass is silently skipped. The pre-run banner shows its status:
+The pre-run banner shows its status:
 
 ```
-    3. Dual pass     — enabled (3 api key(s) in rotation)
+    3. Dual pass     — enabled (6 api key(s) in rotation)
     3. Dual pass     — disabled (no OPENROUTER_API_KEY set)
 ```
 
@@ -719,7 +666,7 @@ Edit `config/openrouter.json`:
 
 ```json
 {
-  "researcher_model": "openai/gpt-oss-120b:free"
+  "researcher_model": "google/gemma-3-27b-it:free"
 }
 ```
 
@@ -729,58 +676,37 @@ Falls back to the free model chain if the primary model fails on all keys.
 
 ## OpenRouter — free models + key rotation
 
-The framework uses OpenRouter for two purposes:
-1. **LLM batch work** — skill extraction, CVE patch analysis (free models)
-2. **Dual researcher pass** — second opinion after Claude (configurable model)
+Used for: hybrid recon (Phase 0+1), skill extraction, CVE patch analysis, dual researcher pass.
 
-### Free model list
+### Model selection
 
-Defined in `config/openrouter.json` → `free_models`. Models are tried in order; the framework switches to the next on any `401 / 429 / 503 / 502` error.
+Defined in `config/openrouter.json` → `free_models`. Models are tried in order. The framework distinguishes between:
 
-Current list (edit the file to change priority):
+- **HTTP 404** — model unavailable for this account. Skipped immediately, no key rotation attempted.
+- **HTTP 401 / 429 / 503 / 502** — transient error. All keys rotated before moving to next model.
 
-```
-openai/gpt-oss-120b:free         ← researcher_model default
-openai/gpt-oss-20b:free
-meta-llama/llama-3.3-70b-instruct:free
-qwen/qwen3-next-80b-a3b-instruct:free
-qwen/qwen3-coder:free
-nvidia/nemotron-3-super-120b-a12b:free
-minimax/minimax-m2.5:free
-nousresearch/hermes-3-llama-3.1-405b:free
-arcee-ai/trinity-large-preview:free
-... (22 models total)
-```
+This means a 404 on the first model costs one request, not `N_keys` requests.
 
 ### API key rotation
 
-Up to 5 keys can be set — all are pooled and rotated automatically:
+Up to 6 keys can be set — all are pooled and rotated automatically:
 
 ```bash
-OPENROUTER_API_KEY=key1          # single-key shorthand
-OPENROUTER_API_KEY_1=key1        # pooled rotation
+OPENROUTER_API_KEY=key          # single-key shorthand
+OPENROUTER_API_KEY_1=key1
 OPENROUTER_API_KEY_2=key2
 OPENROUTER_API_KEY_3=key3
 OPENROUTER_API_KEY_4=key4
 OPENROUTER_API_KEY_5=key5
 ```
 
-On failure, the framework tries all keys for the current model before moving to the next model. Log output shows which key (last 4 chars) and model failed:
-
-```
-  [llm] rotating away from openai/gpt-oss-120b:free: HTTP 429: rate limited.
-  [llm] switching api key (…ab12 failed on openai/gpt-oss-120b:free).
-  [llm] trying openai/gpt-oss-120b:free (key …cd34)
-  [llm] got a response from openai/gpt-oss-120b:free.
-```
-
 ### LLM backend priority
 
-Every LLM call follows this chain:
+Every free LLM call follows this chain:
 
 ```
 1. Gemini via ccw CLI (synchronous, free if ccw is installed)
-2. OpenRouter model × key matrix (all combos, in config order)
+2. OpenRouter model × key matrix (config order, 404-skip enabled)
 3. Error — clear message, operation skipped gracefully
 ```
 
@@ -796,7 +722,7 @@ npm run ui:intel
 
 Open `http://127.0.0.1:31337`.
 
-Includes: target config, structured scope, local history, skill suggestions, global DB navigator with search/filters/pagination, file browser.
+Includes: target config, structured scope, local history, skill suggestions, global DB navigator with search, filters, and pagination.
 
 ---
 
@@ -856,9 +782,9 @@ findings[]
     file                 relative path to vulnerable file
     line_start           start line (integer)
     line_end             end line (integer)
-    snippet              verbatim source lines — copied exactly from the file
+    snippet              verbatim source lines
     annotation           one sentence: which line is the root cause and why
-  attack_flow_diagram    Mermaid sequenceDiagram or flowchart LR showing attacker→sink chain
+  attack_flow_diagram    Mermaid sequenceDiagram or flowchart showing attacker→sink chain
   researcher_notes
   confirmation_status    confirmed | unconfirmed
 ```
@@ -890,11 +816,11 @@ results[]
 ```mermaid
 flowchart TD
     F["Finding"]
-    S{"Scope\ncheck"}
-    C{"Complete\ncheck"}
-    V{"Valid\nPoC?"}
-    CV{"CVSS\ncheck"}
-    N{"Novelty\ncheck"}
+    S{"Scope check"}
+    C{"Complete check"}
+    V{"Valid PoC?"}
+    CV{"CVSS check"}
+    N{"Novelty check"}
     OK["✅ TRIAGED\nready_to_submit: true"]
     NA["❌ NOT_APPLICABLE"]
     NMI["🔁 NEEDS_MORE_INFO"]
@@ -941,8 +867,8 @@ All validation runs automatically during the pipeline. Failures abort the run.
 
 | Command | Description |
 |---------|-------------|
-| `npm run pipeline` | Run full pipeline for the default target (duckduckgo) |
-| `npm test` | Contract regression tests (18 tests) |
+| `npm run pipeline` | Run full pipeline for the default target |
+| `npm test` | Contract regression tests |
 
 ### Target management
 
@@ -970,25 +896,30 @@ All validation runs automatically during the pipeline. Failures abort the run.
 | `npm run h1:disclosed` | Incremental sync of global disclosed reports |
 | `npm run h1:bootstrap` | Full history backfill of global disclosed reports |
 
-### Intelligence — calibration + skills + CVE
+### Intelligence — bbscope
 
 | Command | Description |
 |---------|-------------|
-| `npm run calibration:sync` | Classify disclosed reports into calibration patterns + behavior examples |
-| `npm run calibration:query` | Query calibration dataset (human table output) |
-| `npm run calibration:extract-skills` | Extract hacker skill patterns from disclosed reports (LLM batch) |
+| `npm run bbscope:doctor` | Check bbscope connectivity |
+| `npm run bbscope:sync` | Sync scope from bbscope.com (no credentials) |
+
+### Intelligence — calibration, skills, CVE
+
+| Command | Description |
+|---------|-------------|
+| `npm run calibration:sync` | Classify disclosed reports into calibration patterns |
+| `npm run calibration:query` | Query calibration dataset |
+| `npm run calibration:extract-skills` | Extract hacker skill patterns (LLM batch) |
 | `npm run skills:query` | Query the skill library |
 | `npm run cve:sync` | Sync CVE intel for the default target |
 | `npm run cve:query` | Query CVE intel for the default target |
 
-### Research brief + scope
+### Research brief + focus
 
 | Command | Description |
 |---------|-------------|
 | `npm run research:brief` | Build researcher intel brief |
 | `npm run research:focus` | Get prioritized research focus suggestions |
-| `npm run bbscope:doctor` | Check bbscope connectivity |
-| `npm run bbscope:sync` | Sync scope from bbscope.com (no credentials) |
 
 ### Validation + UI
 
@@ -1007,9 +938,11 @@ All validation runs automatically during the pipeline. Failures abort the run.
 |----------|----------|-------------|
 | `H1_API_USERNAME` / `HACKERONE_API_USERNAME` | For H1 sync | HackerOne API username |
 | `H1_API_TOKEN` / `HACKERONE_API_TOKEN` | For H1 sync | HackerOne API token |
-| `OPENROUTER_API_KEY` | For dual researcher + CVE analysis | Single key shorthand |
+| `OPENROUTER_API_KEY` | For dual researcher, hybrid recon, CVE analysis | Single key shorthand |
 | `OPENROUTER_API_KEY_1` … `_5` | For key rotation | Additional keys — all pooled automatically |
 | `AGENTIC_CLI` | No | Default CLI backend (`claude` or `codex`) |
 | `AGENTIC_MODEL` | No | Default model override |
 
-Copy `.env.example` to `.env` and fill in the values. See `config/openrouter.json` to configure model priority and fallback order.
+Copy `.env.example` to `.env` and fill in the values. The pipeline loads `.env` automatically — no need to export variables manually.
+
+See `config/openrouter.json` to configure model priority and fallback order.

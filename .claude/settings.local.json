@@ -8,7 +8,8 @@
       "Bash(./run.sh)",
       "Bash(node:*)",
       "Bash(cp:*)",
-      "Bash(ccw cli:*)"
+      "Bash(ccw cli:*)",
+      "Bash(source .env)"
     ]
   }
 }
