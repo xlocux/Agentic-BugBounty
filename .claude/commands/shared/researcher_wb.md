@@ -151,6 +151,80 @@ Taint tracing procedure for each hit:
 
 ---
 
+## PHASE 2.5 — Fuzzing Mindset Pass
+
+Think like a developer writing fuzz tests, not like a pentester running a scanner.
+Goal: find inputs the static analysis missed because they look "normal" until they break something.
+
+**Step 1 — Enumerate ALL input surfaces (go beyond the obvious)**
+
+For every entry point in your Phase 1 map, extend it:
+  - HTTP layer:    query params, headers, cookies, body (JSON/XML/multipart), method override, path segments
+  - IPC / messaging: postMessage origin+data, chrome runtime messages, intent extras, deep link params
+  - File parsing:  uploaded files, config files read at runtime, imported data (CSV, JSON, XML)
+  - Environment:   env vars, CLI flags, config values that reach code logic
+  - Time / order:  request sequence, session state, race conditions between concurrent calls
+
+For each surface ask: "what types does this field accept, and what happens with the unexpected ones?"
+
+**Step 2 — Type confusion and boundary probing**
+
+For every field identified above, mentally fuzz these dimensions:
+
+  TYPE CONFUSION
+    Expected string  → send number, array, null, object, boolean
+    Expected integer → send float, negative, MAX_SAFE_INTEGER+1, "0", "0x0", []
+    Expected array   → send single value (no wrapping), nested arrays, sparse arrays
+    Expected object  → send null, primitive, array, prototype-polluted key (__proto__, constructor)
+
+  BOUNDARY VALUES
+    Strings:  empty "", single char, 65536 chars, unicode boundary (U+FFFF, surrogates), null bytes (\x00), CRLF
+    Numbers:  0, -1, MAX_INT, MIN_INT, NaN, Infinity, 1e308
+    Arrays:   length=0, length=1, length=MAX_SAFE_INTEGER
+    Dates:    epoch 0, year 9999, DST transition, negative timestamp
+
+  FORMAT CONFUSION
+    JSON field that also goes into SQL → does the ORM escape it at every layer?
+    Value used as both filename and DB key → path traversal vs. injection divergence?
+    Number parsed by two different libraries → integer overflow in one, float in other?
+
+**Step 3 — Parser discrepancy hunting**
+
+Look for places where the SAME value is parsed by MORE than one component:
+  - Frontend validation  ≠  backend validation
+  - API gateway parsing  ≠  service parsing
+  - ORM query builder   ≠  raw query fallback
+  - JSON.parse()        ≠  eval() of the same string
+  - Regex check         ≠  actual usage of the value
+
+If two parsers see the same input differently → injection or bypass candidate.
+
+**Step 4 — State machine abuse**
+
+Map the expected operation sequence, then probe out-of-order:
+  - Skip authentication step → go directly to privileged action
+  - Repeat a one-time action (token use, payment step, email verify)
+  - Interleave two concurrent sessions sharing the same resource
+  - Send step N before step N-1 has completed (race condition)
+  - Replay a previously valid but now-expired token or nonce
+
+**Step 5 — Error path analysis**
+
+Error handlers are written once and rarely tested. Check:
+  - What happens when the DB is unavailable mid-request?
+  - What does the app expose in stack traces, error messages, or log output?
+  - Do catch blocks silently swallow errors that should abort the operation?
+  - Does an error in one part of a chained operation leave state partially committed?
+  - Does retry logic create duplicate side-effects (double charge, double account creation)?
+
+**Output of Phase 2.5:**
+
+Add any new candidates discovered here to the candidate list from Phase 2.
+Tag them with `source: fuzzing_mindset` in your analysis notes so they are easy to track.
+These candidates flow into Phase 3 → Phase 4 for dynamic confirmation like any other.
+
+---
+
 ## PHASE 3 — Candidate Classification
 
 For each candidate, assign:
