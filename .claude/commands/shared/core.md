@@ -33,6 +33,7 @@ Do not add fields. Do not omit required fields.
   "findings": [
     {
       "report_id": "PREFIX-NNN (WEB-001, MOB-002, EXT-003, EXE-001)",
+      "source_asset": "basename of source_path (e.g. glnpjglilkicbckjpbgcfkogebgllemb or OktaVerify). Set from EXECUTION CONTEXT source_name. Omit or null if only one asset.",
       "finding_title": "[VulnClass] in [component] allows [impact] via [vector]",
       "severity_claimed": "Critical | High | Medium | Low | Informative",
       "cvss_vector_claimed": "CVSS:3.1/AV:_/AC:_/PR:_/UI:_/S:_/C:_/I:_/A:_",
@@ -187,6 +188,99 @@ Triager (Check 4.5 — after duplicate check):
 ```bash
 npm run h1:bootstrap       # sync disclosed reports (first time or full refresh)
 npm run calibration:sync   # classify + aggregate into calibration_patterns table
+```
+
+---
+
+## SKILL LIBRARY — Distilled Hacker Techniques
+
+Auto-extracted from H1 disclosed reports by LLM analysis. Each skill is a reusable
+technique pattern — specific enough to replicate, distilled from real researcher behavior.
+
+### What it contains
+For each skill entry:
+  - asset_type / vuln_class / program_handle
+  - title: short descriptive name
+  - technique: how it works — specific enough to replicate
+  - chain_steps: ordered list of steps if multi-stage
+  - insight: the non-obvious part that makes it work
+  - bypass_of: if this technique bypasses a known defense
+  - severity_achieved: Critical/High/Medium/Low
+
+### How to query
+```bash
+# Global skills for an asset type
+node scripts/query-skills.js --asset chromeext --limit 15
+
+# Program-specific + global (program-specific ranked first)
+node scripts/query-skills.js --asset webapp --program hackerone --limit 10
+
+# Filter by vuln class
+node scripts/query-skills.js --asset webapp --vuln xss --limit 10
+
+# JSON output
+node scripts/query-skills.js --asset webapp --json
+```
+
+### How agents use this
+Researcher (Phase 0, step 0.5 — after calibration briefing):
+  Run: node scripts/query-skills.js --asset [type] --program [handle] --limit 10
+  Use: read each skill, prioritize bypass_of and 3+ chain_step skills
+  Ask: "what hacker techniques have actually worked on this asset type?"
+
+  Capture new techniques found during research by adding `extracted_skill` field to findings:
+  ```json
+  "extracted_skill": {
+    "title": "...", "technique": "...", "chain_steps": [...],
+    "insight": "...", "vuln_class": "...", "asset_type": "...",
+    "severity_achieved": "High", "bypass_of": null
+  }
+  ```
+  These are auto-persisted to the skill library after the session.
+
+### Refresh
+```bash
+npm run calibration:extract-skills   # extract skills from all disclosed reports (LLM batch)
+```
+
+---
+
+## CVE INTEL — Known Vulnerabilities for Target
+
+Per-target CVE database enriched with patch analysis and variant hunting hints.
+Automatically fetched from NVD, enriched with Exploit-DB PoC links, and LLM-analyzed.
+
+### What it contains
+For each CVE entry:
+  - cve_id, cvss_score, cvss_vector, cwe_id
+  - description: NVD description
+  - affected_versions: version ranges from NVD data
+  - poc_urls: PoC links from Exploit-DB
+  - patch_analysis: LLM summary of what was patched and how
+  - variant_hints: LLM suggestions for searching similar patterns in source
+  - bypass_likelihood: High/Medium/Low — how likely a patch bypass exists
+
+### How to query
+```bash
+# All CVEs for a target
+node scripts/query-cve-intel.js --target duckduckgo
+
+# Filter by CVSS score
+node scripts/query-cve-intel.js --target okta --min-cvss 6.0
+
+# JSON output
+node scripts/query-cve-intel.js --target okta --json
+```
+
+### How agents use this
+Researcher (Phase 0, step 0.6 — after skill library):
+  Run: node scripts/query-cve-intel.js --target [target_name] --min-cvss 6.0
+  Use: check affected_versions, read variant_hints, flag High bypass_likelihood CVEs
+  Ask: "what known bugs exist near this code, and where should I look for variants?"
+
+### Refresh
+```bash
+npm run cve:sync -- --target <name>   # sync CVEs for a specific target
 ```
 
 ---

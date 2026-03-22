@@ -11,12 +11,15 @@ const {
   initDatabase,
   loadProgramIntel,
   openDatabase,
+  persistExtractedSkills,
   readJson,
   resolveDatabasePath,
+  resolveGlobalDatabasePath,
   resolveTargetConfigPath,
   validateTargetConfig,
   writeJson
 } = require("./lib/contracts");
+const { callResearcherModel } = require("./lib/llm");
 const { detectAssetsInSrcDir, describeAsset } = require("./lib/detect-assets");
 
 function parseArgs(argv) {
@@ -86,6 +89,7 @@ const FLAVOUR = {
     "you feelin' lucky, punk? well, do ya, sysadmin?",
     "go ahead, make my day. expose that admin panel.",
     "i'll be back. with root.",
+    "kagebushing into the target. shadow clone jutsu: admin panel edition.",
     "hasta la vista, vulnerable service.",
     "come with me if you want to live. and patch.",
     "i see you shiver with antici... pation. for the exploit to land.",
@@ -809,9 +813,12 @@ async function invokeAgent(cli, role, context, args, extraText = "", logPath = n
         `  findings/triage_result.json            →  ${path.join(context.findingsDir, "triage_result.json")}\n` +
         `  findings/h1_submission_ready/          →  ${context.reportsDir}\n`
       : "";
+    const sourceHint = context.source_name
+      ? `\n\nSOURCE ASSET: ${context.source_name}`
+      : "";
     const prompt =
       role === "researcher"
-        ? `/researcher --asset ${context.asset} --mode ${context.mode} ${context.target}${pathHint}${extraText}`
+        ? `/researcher --asset ${context.asset} --mode ${context.mode} ${context.target}${pathHint}${sourceHint}${extraText}`
         : `/triager --asset ${context.asset}${pathHint}`;
     await spawnClaude(prompt, args.model, logPath);
     if (logPath) logEvent(logPath, `← ${label} agent done in ${Math.round((Date.now() - t0) / 1000)}s`);
@@ -826,6 +833,7 @@ async function invokeAgent(cli, role, context, args, extraText = "", logPath = n
       context.asset,
       ...(role === "researcher" ? ["--mode", context.mode] : []),
       ...(context.targetRef ? ["--target", context.targetRef] : []),
+      ...(role === "researcher" && context.source_name ? ["--source-name", context.source_name] : []),
     ]);
     runCommand("codex", [prompt + (extraText ? `\n\n${extraText}` : "")]);
     if (logPath) logEvent(logPath, `← ${label} agent done in ${Math.round((Date.now() - t0) / 1000)}s`);
@@ -884,6 +892,42 @@ function buildResearchBriefIfPossible(context, logPath) {
   }
 }
 
+
+function syncCveIntelIfPossible(context, logPath) {
+  if (!context.config || !context.targetRef) return;
+  const targetName = context.config.target_name;
+  if (!targetName) return;
+
+  logEvent(logPath, `Syncing CVE intel for ${targetName}`);
+  try {
+    runCommand("node", ["scripts/sync-cve-intel.js", "--target", targetName]);
+    logEvent(logPath, "CVE intel sync complete");
+  } catch (error) {
+    logEvent(logPath, `CVE intel sync failed (non-fatal): ${error.message}`);
+  }
+}
+
+function persistSkillsFromBundle(context, bundlePath, logPath) {
+  if (!fs.existsSync(bundlePath)) return;
+  let bundle;
+  try {
+    bundle = readJson(bundlePath);
+  } catch {
+    return;
+  }
+  const targetRef = context.targetRef || context.config?.target_name || 'unknown';
+  let db = null;
+  try {
+    db = openDatabase(resolveGlobalDatabasePath());
+    const count = persistExtractedSkills(db, bundle, targetRef);
+    if (count > 0) logEvent(logPath, `Persisted ${count} extracted skill(s) to global skill library`);
+  } catch (error) {
+    logEvent(logPath, `Skill persistence failed (non-fatal): ${error.message}`);
+  } finally {
+    if (db) db.close();
+  }
+}
+
 async function runResearcherPhase(cli, assetContext, args, bundlePath, isAdditional, runLog, resumeHint = "") {
   let extraText = isAdditional
     ? `\n\nIMPORTANT: A report_bundle.json already exists from a previous asset pass. APPEND your new findings to it — do NOT remove or overwrite existing entries.`
@@ -893,6 +937,131 @@ async function runResearcherPhase(cli, assetContext, args, bundlePath, isAdditio
   // SessionLimitError propagates to main() — do not catch here
   await invokeAgent(cli, "researcher", assetContext, args, extraText, runLog);
   printFlavour("researcher_done");
+}
+
+/**
+ * Merge findings from a second researcher pass into an existing bundle.
+ * Deduplication key: affected_component — if a new finding targets the same component
+ * as an existing one of the same vuln class, skip it (already covered, confidence signal).
+ * New unique findings get appended with a new report_id.
+ */
+function mergeResearcherFindings(existingBundle, newFindings) {
+  const existing = existingBundle.findings || [];
+  const coveredKeys = new Set(
+    existing.map((f) => `${f.affected_component}::${f.vulnerability_class || ""}`.toLowerCase())
+  );
+
+  let nextId = existing.length + 1;
+  const prefix = existing[0]?.report_id?.slice(0, 3) || "WEB";
+  const merged = [];
+
+  for (const f of newFindings) {
+    const key = `${f.affected_component}::${f.vulnerability_class || ""}`.toLowerCase();
+    if (coveredKeys.has(key)) continue; // duplicate component+class — skip
+    // Assign a fresh report_id so it doesn't collide
+    f.report_id = `${prefix}-${String(nextId).padStart(3, "0")}`;
+    f.source_model = f.source_model || "dual-researcher";
+    merged.push(f);
+    coveredKeys.add(key);
+    nextId++;
+  }
+
+  return { ...existingBundle, findings: [...existing, ...merged] };
+}
+
+async function runDualResearcherPass(context, bundlePath, logPath) {
+  if (!process.env.OPENROUTER_API_KEY) {
+    logEvent(logPath, "Dual researcher skipped: OPENROUTER_API_KEY not set");
+    return;
+  }
+  if (!fs.existsSync(bundlePath)) return;
+
+  const bundle = readJson(bundlePath);
+  const existing = bundle.findings || [];
+  if (existing.length === 0) return;
+
+  logEvent(logPath, "Starting dual researcher pass (GPT-4.5 via OpenRouter)");
+  process.stdout.write("  [dual] Second researcher pass (GPT-4.5)...\n");
+
+  // Summarise what the first pass already found so the second doesn't duplicate it
+  const coveredSummary = existing
+    .map((f) => `  - ${f.report_id}: ${f.vulnerability_class} in ${f.affected_component}`)
+    .join("\n");
+
+  const prompt = [
+    `You are an expert bug bounty security researcher performing a SECOND PASS over a target.`,
+    `Asset type: ${context.asset}. Target: ${context.target || "(see source_path)"}.`,
+    ``,
+    `The FIRST researcher pass already confirmed these findings:`,
+    coveredSummary,
+    ``,
+    `Your job: find ADDITIONAL vulnerabilities NOT already covered above.`,
+    `Focus on: different components, different vulnerability classes, or missed attack surfaces.`,
+    ``,
+    `Respond with a JSON object matching this schema:`,
+    `{`,
+    `  "findings": [`,
+    `    {`,
+    `      "report_id": "TBD",`,
+    `      "finding_title": "...",`,
+    `      "vulnerability_class": "...",`,
+    `      "affected_component": "...",`,
+    `      "severity_claimed": "Critical|High|Medium|Low",`,
+    `      "summary": "...",`,
+    `      "steps_to_reproduce": ["step1", "step2"],`,
+    `      "poc_type": "code|request|command|screenshot",`,
+    `      "poc_code": "...",`,
+    `      "cvss_vector": "...",`,
+    `      "impact": "..."`,
+    `    }`,
+    `  ]`,
+    `}`,
+    ``,
+    `If you cannot find additional confirmed vulnerabilities, return: {"findings": []}`,
+    `Only include CONFIRMED findings with real PoC — no theoretical candidates.`
+  ].join("\n");
+
+  let response;
+  try {
+    response = await callResearcherModel(prompt, { timeoutMs: 180000 });
+  } catch (err) {
+    logEvent(logPath, `Dual researcher call failed: ${err.message}`);
+    return;
+  }
+
+  // Parse the JSON response
+  let newFindings = [];
+  try {
+    const parsed = JSON.parse(response);
+    newFindings = parsed.findings || [];
+  } catch {
+    // Try brace-match extraction
+    try {
+      const brace = response.indexOf("{");
+      if (brace !== -1) {
+        const parsed = JSON.parse(response.slice(brace, response.lastIndexOf("}") + 1));
+        newFindings = parsed.findings || [];
+      }
+    } catch {
+      logEvent(logPath, "Dual researcher: could not parse response as JSON — skipping merge");
+      return;
+    }
+  }
+
+  if (newFindings.length === 0) {
+    logEvent(logPath, "Dual researcher: no additional findings");
+    return;
+  }
+
+  const merged = mergeResearcherFindings(bundle, newFindings);
+  const added = merged.findings.length - existing.length;
+  if (added > 0) {
+    writeJson(bundlePath, merged);
+    logEvent(logPath, `Dual researcher merged ${added} new finding(s) into bundle`);
+    process.stdout.write(`  [dual] +${added} new finding(s) merged from second pass\n`);
+  } else {
+    logEvent(logPath, "Dual researcher: all findings duplicated existing components — none merged");
+  }
 }
 
 async function runTriagePhase(cli, context, args, bundlePath, triagePath, runLog) {
@@ -1223,7 +1392,7 @@ async function main() {
     ? context.config.additional_assets
     : [];
   const allAssets = [
-    { asset_type: context.asset, source_path: null, target: context.target },
+    { asset_type: context.asset, source_path: context.config?.source_path || null, target: context.target },
     ...additionalAssets.map((a) => ({
       asset_type: a.asset_type,
       source_path: a.source_path,
@@ -1253,6 +1422,7 @@ async function main() {
   if (!checkpoint) {
     syncBbscopeIfPossible(context, runLog);
     syncHackerOneIfPossible(context, runLog);
+    syncCveIntelIfPossible(context, runLog);
     buildResearchBriefIfPossible(context, runLog);
   }
 
@@ -1288,7 +1458,8 @@ async function main() {
     const assetContext = {
       ...context,
       asset: assetEntry.asset_type,
-      target: resolvedTarget
+      target: resolvedTarget,
+      source_name: assetEntry.source_path ? path.basename(assetEntry.source_path) : null
     };
 
     // Pause between assets so the user can review before the next researcher pass
@@ -1341,6 +1512,8 @@ async function main() {
   }
 
   runCommand("node", ["scripts/validate-bundle.js", bundlePath]);
+  await runDualResearcherPass(context, bundlePath, runLog);
+  persistSkillsFromBundle(context, bundlePath, runLog);
   const findingCount = (readJson(bundlePath).findings || []).length;
   logEvent(runLog, `All researcher passes complete with ${findingCount} confirmed finding(s)`);
 

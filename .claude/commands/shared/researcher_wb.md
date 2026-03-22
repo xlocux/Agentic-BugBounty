@@ -58,6 +58,55 @@ Before touching the target, load historical H1 signal for this asset type.
     Exception: always check for critical single-report finds
     (one critical outweighs twenty medium disclosures in calibration value).
 
+0.5 Query the skill library for this asset type + target:
+    ```bash
+    node scripts/query-skills.js --asset [asset_type] --program [program_handle] --limit 10
+    node scripts/query-skills.js --asset [asset_type] --limit 15
+    ```
+    Read each skill. Prioritize ones with:
+      - `bypass_of` set → patch bypass technique, apply immediately to version check
+      - `chain_steps` with 3+ steps → complex chains automated scanners miss
+      - `insight` field → the non-obvious part, use as your first hypothesis
+
+    This answers: "what hacker techniques have actually worked on this asset type?"
+
+0.6 Query CVE intel for the target:
+    ```bash
+    node scripts/query-cve-intel.js --target [target_name] --min-cvss 6.0
+    ```
+    For each CVE:
+      - Check if the target version falls in `affected_versions`
+      - Read `variant_hints` — specific patterns to grep/search in the source
+      - High `bypass_likelihood` → add to your explicit search checklist
+
+    This answers: "what known bugs exist near this code, and where should I look for variants?"
+
+0.7 Build your pre-analysis checklist (in analysis notes, not in the bundle):
+    ```
+    PRE-ANALYSIS INTELLIGENCE
+    Skills loaded: [N] | Top techniques: [list titles]
+    CVEs found: [N total, N high/critical]
+    Variant hunting targets: [specific functions/patterns from variant_hints]
+    Bypass candidates: [CVE IDs with High bypass_likelihood]
+    Chain opportunities: [skill titles with 3+ chain_steps]
+    ```
+
+0.8 If you discover a new technique not in the skill library, add it to your finding:
+    In the finding JSON, add an optional `extracted_skill` field:
+    ```json
+    "extracted_skill": {
+      "title": "short title",
+      "technique": "how it works — specific enough to replicate",
+      "chain_steps": ["step 1", "step 2"],
+      "insight": "the non-obvious part",
+      "vuln_class": "...",
+      "asset_type": "...",
+      "severity_achieved": "Critical|High|Medium|Low",
+      "bypass_of": null
+    }
+    ```
+    The pipeline automatically persists this to the skill library after your session.
+
 ---
 
 ## PHASE 1 — Source Reconnaissance
