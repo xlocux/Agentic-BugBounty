@@ -1,0 +1,40 @@
+{
+  "_comment": "OpenRouter configuration — free model list and API key rotation. Keys are read from OPENROUTER_API_KEY_1..N env vars (or OPENROUTER_API_KEY for single key). Models are tried in order; on 401/429/busy errors the next key+model is tried.",
+  "free_models": [
+    "openai/gpt-oss-120b:free",
+    "openai/gpt-oss-20b:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "qwen/qwen3-next-80b-a3b-instruct:free",
+    "qwen/qwen3-coder:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "minimax/minimax-m2.5:free",
+    "nousresearch/hermes-3-llama-3.1-405b:free",
+    "arcee-ai/trinity-large-preview:free",
+    "z-ai/glm-4.5-air:free",
+    "google/gemma-3-27b-it:free",
+    "google/gemma-3-12b-it:free",
+    "stepfun/step-3.5-flash:free",
+    "nvidia/nemotron-3-nano-30b-a3b:free",
+    "arcee-ai/trinity-mini:free",
+    "nvidia/nemotron-nano-9b-v2:free",
+    "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+    "meta-llama/llama-3.2-3b-instruct:free",
+    "google/gemma-3-4b-it:free",
+    "google/gemma-3n-e2b-it:free",
+    "liquid/lfm-2.5-1.2b-thinking:free",
+    "liquid/lfm-2.5-1.2b-instruct:free"
+  ],
+  "researcher_model": "openai/gpt-oss-120b:free",
+  "_researcher_model_comment": "Primary model for dual researcher pass. Falls back to free_models chain if unavailable.",
+  "api_keys_env": [
+    "OPENROUTER_API_KEY_1",
+    "OPENROUTER_API_KEY_2",
+    "OPENROUTER_API_KEY_3",
+    "OPENROUTER_API_KEY_4",
+    "OPENROUTER_API_KEY_5",
+    "OPENROUTER_API_KEY"
+  ],
+  "_api_keys_comment": "Env vars checked in order. All non-empty values are collected into a rotation pool. Set at least OPENROUTER_API_KEY for single-key use.",
+  "retry_on_status": [401, 429, 503, 502],
+  "_retry_comment": "HTTP status codes that trigger key rotation + model fallback."
+}
