@@ -41,12 +41,6 @@ node scripts/run-pipeline.js --target <name> --cli claude
 
 First run launches a setup wizard — creates workspace, detects assets, starts the pipeline.
 
-### Reset a target (wipe findings, keep source)
-
-```bash
-node scripts/reset-target.js --target <name>
-```
-
 ### Resume after a Claude Pro session limit
 
 ```bash
@@ -63,6 +57,12 @@ node scripts/run-pipeline.js --target <name> --cli claude --interactive
 
 ```bash
 /triager --asset <type>
+```
+
+### Reset a target (wipe findings, keep source)
+
+```bash
+node scripts/reset-target.js --target <name>
 ```
 
 ### Render reports from existing bundle
