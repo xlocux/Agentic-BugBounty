@@ -8,7 +8,11 @@ const {
   deriveProgramHandle,
   loadDisclosedDataset,
   loadProgramIntel,
+  openDatabase,
+  queryCveIntel,
+  querySkills,
   readJson,
+  resolveGlobalDatabasePath,
   resolveTargetConfigPath
 } = require("./lib/contracts");
 
@@ -40,6 +44,7 @@ function parseArgs(argv) {
     asset: null,
     mode: null,
     target: null,
+    sourceName: null,
     vuln: [],
     bypass: []
   };
@@ -54,6 +59,8 @@ function parseArgs(argv) {
       args.mode = argv[++index];
     } else if (value === "--target") {
       args.target = argv[++index];
+    } else if (value === "--source-name") {
+      args.sourceName = argv[++index];
     } else if (value === "--vuln") {
       args.vuln = String(argv[++index]).split(",").filter(Boolean);
     } else if (value === "--bypass") {
@@ -94,6 +101,42 @@ function resolveTargetContext(targetArg) {
     };
   } catch {
     return null;
+  }
+}
+
+/**
+ * Build an intelligence brief from skill_library + cve_intel for the given asset + target.
+ * Opens and closes the global DB internally. Returns null if DB unavailable or empty.
+ */
+function buildIntelligenceBrief(asset, targetName) {
+  let db = null;
+  try {
+    db = openDatabase(resolveGlobalDatabasePath());
+    const skills = querySkills(db, { asset_type: asset, limit: 10 });
+    const cves = targetName ? queryCveIntel(db, targetName, { limit: 10 }) : [];
+    if (skills.length === 0 && cves.length === 0) return null;
+
+    const skillLines = skills.slice(0, 5).map((s) => {
+      const bypass = s.bypass_of ? ` (bypasses ${s.bypass_of})` : "";
+      return `  - [${s.asset_type}/${s.vuln_class}] ${s.title}${bypass}: ${s.technique.slice(0, 120)}...`;
+    }).join("\n");
+
+    const cveLines = cves.slice(0, 5).map((c) => {
+      const hints = c.variant_hints ? `\n    Variant hints: ${c.variant_hints.slice(0, 150)}` : "";
+      return `  - ${c.cve_id} CVSS:${c.cvss_score || "?"} — ${(c.description || "").slice(0, 100)}${hints}`;
+    }).join("\n");
+
+    return [
+      `## Extracted Hacker Skills (${skills.length} for ${asset})`,
+      skillLines || "  (none yet — run: npm run calibration:extract-skills)",
+      `\n## CVE Intel for ${targetName || "target"} (${cves.length} CVEs)`,
+      cveLines || `  (none yet — run: npm run cve:sync -- --target ${targetName || "name"})`,
+      "\nApply this intelligence in Phase 0 steps 0.5–0.8."
+    ].join("\n");
+  } catch {
+    return null; // DB unavailable — skip silently
+  } finally {
+    if (db) db.close();
   }
 }
 
@@ -152,7 +195,7 @@ Before starting broad exploration:
 - role: researcher
 - asset: ${args.asset}
 - mode: ${args.mode}
-- target: ${args.target || "(not provided)"}
+- target: ${args.target || "(not provided)"}${args.sourceName ? `\n- source_name: ${args.sourceName}` : ""}
 - vuln modules: ${args.vuln.join(", ") || "(none)"}
 - bypass modules: ${args.bypass.join(", ") || "(none)"}
 
@@ -160,6 +203,13 @@ Produce:
 - findings/confirmed/report_bundle.json
 - findings/unconfirmed/candidates.json
 `);
+
+  // Intelligence brief — skill_library + cve_intel (silently skipped if DB not populated)
+  const targetName = targetContext?.config?.target_name || null;
+  const brief = buildIntelligenceBrief(args.asset, targetName);
+  if (brief) {
+    sections.push(`\n# INTELLIGENCE BRIEF\n\n${brief}\n`);
+  }
 
   return sections.filter(Boolean).join("\n");
 }
