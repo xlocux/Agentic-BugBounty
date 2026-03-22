@@ -4,7 +4,11 @@
       "Bash(grep -E \"\\\\.\\(js|json|md\\)$\")",
       "Bash(git rev-list:*)",
       "Bash(sort -k3 -n -r)",
-      "Bash(git-filter-repo:*)"
+      "Bash(git-filter-repo:*)",
+      "Bash(./run.sh)",
+      "Bash(node:*)",
+      "Bash(cp:*)",
+      "Bash(ccw cli:*)"
     ]
   }
 }

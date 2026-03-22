@@ -131,8 +131,8 @@ function validateFindingCommon(finding, assetType, pathName, options = {}) {
     if (confirmationStatus !== "confirmed") {
       errors.push(err(`${pathName}.confirmation_status`, "must be 'confirmed' for findings"));
     }
-    if (finding.reason_not_confirmed !== null) {
-      errors.push(err(`${pathName}.reason_not_confirmed`, "must be null for confirmed findings"));
+    if (finding.reason_not_confirmed != null) {
+      errors.push(err(`${pathName}.reason_not_confirmed`, "must be null or absent for confirmed findings"));
     }
   }
 
