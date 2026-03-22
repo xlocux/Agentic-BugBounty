@@ -47,6 +47,14 @@ Do not add fields. Do not omit required fields.
       "observed_result": "what actually happened — not what could happen",
       "impact_claimed": "concrete attacker capability gained",
       "remediation_suggested": "specific fix: function name + file + line",
+      "vulnerable_code_snippet": {
+        "file": "relative/path/to/file.js",
+        "line_start": 0,
+        "line_end": 0,
+        "snippet": "exact source lines — copy verbatim from the file, no paraphrasing",
+        "annotation": "one-line explanation of why this line is the root cause"
+      },
+      "attack_flow_diagram": "Mermaid sequenceDiagram or flowchart showing attacker→victim→component chain. Omit if N/A.",
       "researcher_notes": "context the triager needs",
       "confirmation_status": "confirmed | unconfirmed",
       "reason_not_confirmed": null,
@@ -100,6 +108,86 @@ Before starting every session:
   2. Verify the target asset is in scope
   3. Verify the vulnerability class is not explicitly excluded
   4. Test ONLY on local/staging — never on production
+
+---
+
+## CALIBRATION DATASET — Historical H1 Disclosed Reports
+
+Both Researcher and Triager agents have access to a calibration dataset built from
+12,000+ publicly disclosed HackerOne reports, classified by asset_type and vuln_class.
+
+### What it contains
+For each (asset_type, vuln_class) combination:
+  - Total disclosed report count
+  - Severity distribution (critical/high/medium/low counts)
+  - Typical severity (most common outcome in real H1 triage)
+  - Typical CWE as filed on HackerOne
+  - Sample report titles from real disclosures
+  - Top programs by disclosure volume for this class
+
+### How to query
+```bash
+# All patterns for a specific asset type
+node scripts/query-calibration.js --asset chromeext
+node scripts/query-calibration.js --asset webapp
+
+# Specific asset + vuln class
+node scripts/query-calibration.js --asset webapp --vuln xss
+node scripts/query-calibration.js --asset chromeext --vuln privilege_escalation_messages
+
+# JSON output (for piping or programmatic use)
+node scripts/query-calibration.js --asset chromeext --json
+
+# All patterns
+node scripts/query-calibration.js --all
+
+# Real H1 report behavior summaries (how researchers reported, what triage validated)
+node scripts/query-calibration.js --asset webapp --vuln xss --behaviors --limit 5
+node scripts/query-calibration.js --asset chromeext --vuln uxss --behaviors --json
+```
+
+### What the --behaviors flag returns
+For each result: program handle, severity, disclosed date, URL, and `hacktivity_summary`
+(an AI-generated description of the finding from the HackerOne platform).
+
+Use behaviors to understand:
+  - How real researchers framed the vulnerability title and impact
+  - What PoC evidence the community considered sufficient for disclosure
+  - The tone and specificity expected in a submittable report
+
+### Asset type values
+  webapp, mobileapp, chromeext, executable
+
+### Vuln class values (partial list)
+  webapp:    xss, sqli, ssrf, idor, csrf, rce, ssti, xxe, file_upload, open_redirect,
+             auth_bypass, oauth, saml, cors, postmessage, prototype_pollution,
+             deserialization, race_condition, business_logic, subdomain_takeover,
+             information_disclosure, command_injection, host_header, graphql,
+             http_smuggling, supply_chain, account_takeover
+  chromeext: uxss, privilege_escalation_messages, extension_data_leak
+  mobileapp: deep_link_injection, insecure_data_storage, webview_xss, ssl_pinning_bypass, exported_component
+  executable: buffer_overflow, memory_corruption, command_injection_native, format_string
+
+### How agents use this
+Researcher (Phase 0 — before analysis):
+  Run: node scripts/query-calibration.js --asset [asset_type] --json
+  Use: to bias vulnerability class prioritization toward historically rewarded classes.
+  Ask: "which vuln classes have the highest critical/high ratio for this asset type?"
+
+  Run: node scripts/query-calibration.js --asset [asset_type] --vuln [top_class] --behaviors --limit 5
+  Use: to read real disclosed report summaries — understand what a submittable finding looks like.
+  Ask: "how did real researchers describe this vuln? what impact was validated by triage?"
+
+Triager (Check 4.5 — after duplicate check):
+  Run: node scripts/query-calibration.js --asset [asset_type] --vuln [vuln_class] --json
+  Use: to cross-check researcher's severity claim against real H1 outcomes.
+  Ask: "does this severity claim match historical H1 triage for this asset+vuln combination?"
+
+### Refresh
+```bash
+npm run h1:bootstrap       # sync disclosed reports (first time or full refresh)
+npm run calibration:sync   # classify + aggregate into calibration_patterns table
+```
 
 ---
 

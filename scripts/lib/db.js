@@ -17,7 +17,27 @@ function openDatabase(databasePath) {
   const db = new DatabaseSync(databasePath);
   db.exec("PRAGMA journal_mode = WAL");
   db.exec("PRAGMA foreign_keys = ON");
+  initDatabase(db);
+  migrateDatabase(db);
   return db;
+}
+
+function migrateDatabase(db) {
+  // Add asset_type and vuln_class columns to disclosed_reports if they don't exist
+  const columns = db
+    .prepare("PRAGMA table_info(disclosed_reports)")
+    .all()
+    .map((c) => c.name);
+
+  if (!columns.includes("asset_type")) {
+    db.exec("ALTER TABLE disclosed_reports ADD COLUMN asset_type TEXT");
+  }
+  if (!columns.includes("vuln_class")) {
+    db.exec("ALTER TABLE disclosed_reports ADD COLUMN vuln_class TEXT");
+  }
+  if (!columns.includes("hacktivity_summary")) {
+    db.exec("ALTER TABLE disclosed_reports ADD COLUMN hacktivity_summary TEXT");
+  }
 }
 
 function initDatabase(db) {
@@ -95,7 +115,49 @@ function initDatabase(db) {
       cwe TEXT,
       disclosed_at TEXT,
       created_at TEXT,
-      url TEXT
+      url TEXT,
+      asset_type TEXT,
+      vuln_class TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS calibration_sync_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      synced_at TEXT NOT NULL,
+      total_reports INTEGER NOT NULL DEFAULT 0,
+      classified_reports INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS calibration_patterns (
+      pattern_key TEXT PRIMARY KEY,
+      asset_type TEXT NOT NULL,
+      vuln_class TEXT NOT NULL,
+      severity_rating TEXT,
+      total_count INTEGER NOT NULL DEFAULT 0,
+      critical_count INTEGER NOT NULL DEFAULT 0,
+      high_count INTEGER NOT NULL DEFAULT 0,
+      medium_count INTEGER NOT NULL DEFAULT 0,
+      low_count INTEGER NOT NULL DEFAULT 0,
+      informative_count INTEGER NOT NULL DEFAULT 0,
+      sample_titles_json TEXT NOT NULL DEFAULT '[]',
+      sample_urls_json TEXT NOT NULL DEFAULT '[]',
+      top_programs_json TEXT NOT NULL DEFAULT '[]',
+      typical_cwe TEXT,
+      typical_weakness TEXT,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS report_behaviors (
+      behavior_key TEXT PRIMARY KEY,
+      asset_type TEXT NOT NULL,
+      vuln_class TEXT NOT NULL,
+      report_id TEXT,
+      program_handle TEXT,
+      title TEXT,
+      severity_rating TEXT,
+      hacktivity_summary TEXT,
+      url TEXT,
+      disclosed_at TEXT,
+      updated_at TEXT NOT NULL
     );
   `);
 }
@@ -315,8 +377,8 @@ function replaceDisclosedReports(db, payload) {
   const insertDisclosed = db.prepare(`
     INSERT OR REPLACE INTO disclosed_reports (
       disclosed_key, remote_id, program_handle, program_name, program_url, title,
-      severity_rating, weakness, cwe, disclosed_at, created_at, url
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      severity_rating, weakness, cwe, disclosed_at, created_at, url, hacktivity_summary
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   db.exec("BEGIN");
@@ -341,7 +403,8 @@ function replaceDisclosedReports(db, payload) {
         sqlValue(report.cwe),
         sqlValue(report.disclosed_at),
         sqlValue(report.created_at),
-        sqlValue(report.url)
+        sqlValue(report.url),
+        sqlValue(report.hacktivity_summary)
       );
     }
 
@@ -411,12 +474,213 @@ function readDisclosedDatasetFromDb(db) {
   };
 }
 
+function replaceCalibrationPatterns(db, payload) {
+  const insertSyncRun = db.prepare(`
+    INSERT INTO calibration_sync_runs (synced_at, total_reports, classified_reports)
+    VALUES (?, ?, ?)
+  `);
+  const upsertPattern = db.prepare(`
+    INSERT OR REPLACE INTO calibration_patterns (
+      pattern_key, asset_type, vuln_class,
+      total_count, critical_count, high_count, medium_count, low_count, informative_count,
+      sample_titles_json, sample_urls_json, top_programs_json,
+      typical_cwe, typical_weakness, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const upsertAssetType = db.prepare(`
+    UPDATE disclosed_reports SET asset_type = ?, vuln_class = ?
+    WHERE disclosed_key = ?
+  `);
+
+  db.exec("BEGIN");
+  try {
+    insertSyncRun.run(
+      payload.meta.synced_at,
+      payload.meta.total_reports,
+      payload.meta.classified_reports
+    );
+
+    for (const [key, pattern] of Object.entries(payload.patterns)) {
+      upsertPattern.run(
+        key,
+        pattern.asset_type,
+        pattern.vuln_class,
+        pattern.total_count,
+        pattern.critical_count,
+        pattern.high_count,
+        pattern.medium_count,
+        pattern.low_count,
+        pattern.informative_count,
+        JSON.stringify(pattern.sample_titles || []),
+        JSON.stringify(pattern.sample_urls || []),
+        JSON.stringify(pattern.top_programs || []),
+        sqlValue(pattern.typical_cwe),
+        sqlValue(pattern.typical_weakness),
+        payload.meta.synced_at
+      );
+    }
+
+    for (const report of payload.classified_reports) {
+      upsertAssetType.run(
+        sqlValue(report.asset_type),
+        sqlValue(report.vuln_class),
+        report.disclosed_key
+      );
+    }
+
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function queryCalibrationDataset(db, { assetType, vulnClass } = {}) {
+  let where = "1=1";
+  const params = [];
+  if (assetType) {
+    where += " AND asset_type = ?";
+    params.push(assetType);
+  }
+  if (vulnClass) {
+    where += " AND vuln_class = ?";
+    params.push(vulnClass);
+  }
+
+  const patterns = db
+    .prepare(`
+      SELECT asset_type, vuln_class,
+             total_count, critical_count, high_count, medium_count, low_count, informative_count,
+             sample_titles_json, sample_urls_json, top_programs_json,
+             typical_cwe, typical_weakness, updated_at
+      FROM calibration_patterns
+      WHERE ${where}
+      ORDER BY total_count DESC, asset_type, vuln_class
+    `)
+    .all(...params)
+    .map((row) => ({
+      asset_type: row.asset_type,
+      vuln_class: row.vuln_class,
+      counts: {
+        total: row.total_count,
+        critical: row.critical_count,
+        high: row.high_count,
+        medium: row.medium_count,
+        low: row.low_count,
+        informative: row.informative_count
+      },
+      typical_severity: deriveTypicalSeverity(row),
+      typical_cwe: row.typical_cwe,
+      typical_weakness: row.typical_weakness,
+      sample_titles: JSON.parse(row.sample_titles_json),
+      sample_urls: JSON.parse(row.sample_urls_json),
+      top_programs: JSON.parse(row.top_programs_json),
+      updated_at: row.updated_at
+    }));
+
+  const latestSync = db
+    .prepare(`
+      SELECT synced_at, total_reports, classified_reports
+      FROM calibration_sync_runs
+      ORDER BY synced_at DESC
+      LIMIT 1
+    `)
+    .get();
+
+  return {
+    meta: latestSync || { synced_at: null, total_reports: 0, classified_reports: 0 },
+    patterns
+  };
+}
+
+function replaceReportBehaviors(db, payload) {
+  const deleteExisting = db.prepare(
+    "DELETE FROM report_behaviors WHERE asset_type = ? AND vuln_class = ?"
+  );
+  const insert = db.prepare(`
+    INSERT OR REPLACE INTO report_behaviors (
+      behavior_key, asset_type, vuln_class, report_id, program_handle,
+      title, severity_rating, hacktivity_summary, url, disclosed_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  db.exec("BEGIN");
+  try {
+    for (const [key, records] of Object.entries(payload.by_class)) {
+      const [asset_type, vuln_class] = key.split("::");
+      deleteExisting.run(asset_type, vuln_class);
+      for (const r of records) {
+        insert.run(
+          r.behavior_key,
+          asset_type,
+          vuln_class,
+          sqlValue(r.report_id),
+          sqlValue(r.program_handle),
+          sqlValue(r.title),
+          sqlValue(r.severity_rating),
+          sqlValue(r.hacktivity_summary),
+          sqlValue(r.url),
+          sqlValue(r.disclosed_at),
+          payload.meta.synced_at
+        );
+      }
+    }
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function queryReportBehaviors(db, { assetType, vulnClass, limit = 10 } = {}) {
+  let where = "1=1";
+  const params = [];
+  if (assetType) {
+    where += " AND asset_type = ?";
+    params.push(assetType);
+  }
+  if (vulnClass) {
+    where += " AND vuln_class = ?";
+    params.push(vulnClass);
+  }
+
+  const rows = db
+    .prepare(`
+      SELECT asset_type, vuln_class, report_id, program_handle,
+             title, severity_rating, hacktivity_summary, url, disclosed_at
+      FROM report_behaviors
+      WHERE ${where} AND hacktivity_summary IS NOT NULL
+      ORDER BY disclosed_at DESC
+      LIMIT ?
+    `)
+    .all(...params, limit);
+
+  return rows;
+}
+
+function deriveTypicalSeverity(row) {
+  const ranked = [
+    { label: "critical", count: row.critical_count },
+    { label: "high", count: row.high_count },
+    { label: "medium", count: row.medium_count },
+    { label: "low", count: row.low_count },
+    { label: "informative", count: row.informative_count }
+  ].filter((s) => s.count > 0);
+  if (ranked.length === 0) return null;
+  ranked.sort((a, b) => b.count - a.count);
+  return ranked[0].label;
+}
+
 module.exports = {
   initDatabase,
   openDatabase,
+  queryCalibrationDataset,
+  queryReportBehaviors,
   readDisclosedDatasetFromDb,
   readProgramIntelFromDb,
+  replaceCalibrationPatterns,
   replaceDisclosedReports,
+  replaceReportBehaviors,
   replaceProgramIntel,
   resolveDatabasePath,
   resolveGlobalDatabasePath

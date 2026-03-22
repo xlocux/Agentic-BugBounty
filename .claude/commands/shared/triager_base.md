@@ -56,6 +56,37 @@ VERDICT:
     Accept: HTML, curl, Python script, Burp request, GDB script, video ≤2min
     Reject: screenshots of source code only, theoretical payloads, no evidence
 
+2.4 Does the PoC mechanism match the actual code?  ← CRITICAL STEP
+    Read the vulnerable_code_snippet field in the bundle.
+    If vulnerable_code_snippet is absent, locate the affected_component file
+    and read the relevant section yourself.
+
+    Answer these questions before proceeding:
+
+    a) Does the PoC invoke the correct API / channel?
+       Example failure: PoC uses window.postMessage but the handler is on
+       chrome.runtime.onMessage — these are separate channels, postMessage
+       does not reach background script listeners.
+
+    b) Does the PoC reach the vulnerable code path?
+       Trace: PoC trigger → intermediate code → vulnerable sink.
+       If any hop is missing or guarded, the PoC is non-functional.
+
+    c) Do the message/request field names in the PoC match the actual
+       property names in the handler's switch/if statements?
+       Example failure: PoC sends { type: 'openTab' } but handler reads
+       msg.action — the field name mismatch means the case is never reached.
+
+    d) Are there guards the researcher missed?
+       - Origin checks (event.origin, sender.url, sender.tab.url)
+       - Authentication / session requirements
+       - Extension-context-only APIs (chrome.runtime.sendMessage only works
+         from extension pages or content scripts, NOT from arbitrary web pages)
+
+    If any answer is NO: verdict = NEEDS_MORE_INFO.
+    Document the specific mismatch in nmi_questions[].
+    Provide the exact code line that contradicts the PoC claim.
+
 VERDICT:
   PASS            → proceed to Check 3
   NEEDS_MORE_INFO → stop, return max 3 specific actionable questions
@@ -113,8 +144,41 @@ VERDICT:
     If same class but different code path → note similarity, treat as potentially new
 
 VERDICT:
-  PASS      → proceed to Check 5
+  PASS      → proceed to Check 4.5
   DUPLICATE → cite specific CVE or H1 report reference
+
+---
+
+### CHECK 4.5 — Calibration Cross-Check (Historical H1 Signal)
+
+Query the calibration dataset to anchor severity and assess finding quality.
+
+Run:
+  node scripts/query-calibration.js --asset [asset_type] --vuln [mapped_vuln_class] --json
+
+Map the finding to the closest vuln_class value (see shared/core.md CALIBRATION DATASET section).
+
+4.5.1 Severity calibration
+  Compare researcher's claimed severity against the real H1 distribution:
+    - If researcher claims Critical but calibration shows 0 critical in N reports → flag
+    - If calibration shows dominant severity is 2+ levels below claim → downgrade with explanation
+    - If calibration shows consistent high/critical → researcher claim is plausible
+
+4.5.2 Quality calibration
+  Look at sample_titles from real disclosures:
+    - Do they describe findings with more concrete, demonstrable impact than this finding?
+    - If yes → the bar is higher. Require equivalent specificity before TRIAGED verdict.
+    - If no matches are found (vuln_class "other") → proceed without calibration adjustment
+
+4.5.3 Document findings
+  In the triage summary's SEVERITY ADJUSTMENT section, add one line:
+    "H1 calibration: [N] disclosed reports of [vuln_class] on [asset_type];
+     distribution: [X]C/[Y]H/[Z]M/[W]L; typical outcome: [severity]"
+
+If calibration dataset is not available (no DB):
+  → Skip this check, note "calibration data unavailable" in summary
+
+VERDICT: (informational, does not block — feeds into Check 5 CVSS recalculation)
 
 ---
 
@@ -148,8 +212,35 @@ ISSUE SUMMARY:
 What is vulnerable, how attacker triggers it, what they gain.
 Write for a developer who is not a security expert.]
 
+VULNERABLE CODE:
+File: [relative/path/to/file.js]  Lines: [N–M]
+```[language]
+[verbatim snippet from source — copy exact lines, include line numbers as comments]
+```
+Root cause: [one sentence — which line and why it is the bug]
+
+ATTACK FLOW:
+```mermaid
+sequenceDiagram
+    participant A as Attacker
+    participant B as [Component 1]
+    participant C as [Component 2]
+    participant D as [Privileged API / Sink]
+    A->>B: [trigger action]
+    B->>C: [forwarded / transformed]
+    C->>D: [vulnerable call with attacker data]
+    D-->>A: [impact: data exfiltrated / action taken]
+```
+[If a flowchart better fits the vuln class, use flowchart LR instead.]
+
 REPRODUCTION CONFIRMED: YES / NO / PARTIAL
-[Describe what was followed and what was observed]
+[Describe what steps were traced through the code and what was observed.
+If PARTIAL: state exactly which step could not be verified and why.]
+
+POC MECHANISM VALIDATION:
+[State which API/channel the PoC uses and confirm it matches the code.
+List any guards checked: origin checks, auth requirements, extension-context restrictions.
+If any mismatch was found: describe it even if verdict remains TRIAGED for partial issues.]
 
 IMPACT ANALYSIS:
 [Realistic attacker capability. Who is affected. Interaction required?]
@@ -160,7 +251,8 @@ SEVERITY ADJUSTMENT:
 
 REMEDIATION RECOMMENDATION:
 [Specific and actionable. Name the function, the API, the sanitizer, the line.
-Never write "sanitize the input" — write exactly what to use and where.]
+Never write "sanitize the input" — write exactly what to use and where.
+Include a minimal correct code example where possible.]
 
 RESPONSE TO RESEARCHER:
 [Draft the H1 comment. Professional, respectful, acknowledges effort.

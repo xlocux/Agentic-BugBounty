@@ -19,6 +19,8 @@
 9. [Intelligence sources](#intelligence-sources)
 10. [bbscope](#bbscope)
 11. [HackerOne intelligence](#hackerone-intelligence)
+    - [Global disclosed dataset](#global-disclosed-dataset)
+    - [Calibration dataset](#calibration-dataset)
 12. [Intel UI](#intel-ui)
 13. [Direct agent invocation](#direct-agent-invocation)
 14. [JSON contracts](#json-contracts)
@@ -33,14 +35,14 @@
 The pipeline runs two agents in sequence.
 
 ```mermaid
-flowchart LR
-    SRC["📁 Source code\n(whitebox)\nor target URL\n(blackbox)"]
-    R["🔍 Researcher"]
+flowchart TD
+    SRC["Source code (whitebox)\nor target URL (blackbox)"]
+    R["Researcher"]
     B["report_bundle.json"]
-    T["⚖️ Triager"]
+    T["Triager"]
+    NMI{"NEEDS MORE INFO?"}
     TR["triage_result.json"]
-    H1["📄 H1 Reports"]
-    NMI{"NEEDS\nMORE INFO?"}
+    H1["H1-ready reports"]
 
     SRC --> R
     R --> B
@@ -62,20 +64,6 @@ flowchart LR
 ---
 
 ## Analysis modes
-
-```mermaid
-flowchart TD
-    WB["🔬 Whitebox mode\n(recommended)"]
-    BB["🌑 Blackbox mode"]
-
-    WB --> WB1["Clone or copy source into targets/name/src/"]
-    WB --> WB2["Researcher reads files directly\ngrep patterns, AST traversal, data-flow tracing"]
-    WB --> WB3["File:line precision on every finding\nWorking PoC guaranteed before reporting"]
-
-    BB --> BB1["Provide live URL or APK/binary"]
-    BB --> BB2["Researcher probes externally\nHTTP, JS analysis, dynamic signals"]
-    BB --> BB3["Findings rely on observed behavior\nPoC based on HTTP requests or scripts"]
-```
 
 | | Whitebox | Blackbox |
 |---|---|---|
@@ -173,34 +161,29 @@ node scripts/setup-target.js <name> --detect
 
 ### Workspace layout
 
-```mermaid
-graph TD
-    ROOT["targets/name/"]
-    ROOT --> TJ["target.json — machine config"]
-    ROOT --> CM["CLAUDE.md — target notes for agents"]
-    ROOT --> RS["run.sh / run.cmd — convenience wrappers"]
-    ROOT --> SRC["src/ — target source code"]
-    ROOT --> F["findings/"]
-    ROOT --> POC["poc/"]
-    ROOT --> LOG["logs/"]
-    ROOT --> INT["intelligence/"]
-
-    F --> FC["confirmed/report_bundle.json"]
-    F --> FU["unconfirmed/candidates.json"]
-    F --> FT["triage_result.json"]
-    F --> FH["h1_submission_ready/*.md"]
-
-    POC --> PP["ID_slug.ext — extracted PoC files"]
-    POC --> PS["summary.md — vulnerability summary"]
-
-    LOG --> LL["pipeline-*.log"]
-
-    INT --> IDB["agentic-bugbounty.db"]
-    INT --> IS["h1_scope_snapshot.json"]
-    INT --> IH["h1_vulnerability_history.json"]
-    INT --> IK["h1_skill_suggestions.json"]
-    INT --> IP["target_profile.json"]
-    INT --> IB["research_brief.json"]
+```
+targets/<name>/
+├── target.json                          machine config
+├── CLAUDE.md                            target notes for agents
+├── run.sh / run.cmd                     convenience wrappers
+├── src/                                 target source code
+├── findings/
+│   ├── confirmed/report_bundle.json     confirmed findings
+│   ├── unconfirmed/candidates.json      unconfirmed candidates
+│   ├── triage_result.json               triager verdicts
+│   └── h1_submission_ready/*.md         HackerOne-ready reports
+├── poc/
+│   ├── EXT-001_slug.html                extracted PoC files
+│   └── summary.md                       vulnerability summary
+├── logs/
+│   └── pipeline-*.log
+└── intelligence/
+    ├── agentic-bugbounty.db
+    ├── h1_scope_snapshot.json
+    ├── h1_vulnerability_history.json
+    ├── h1_skill_suggestions.json
+    ├── target_profile.json
+    └── research_brief.json
 ```
 
 ### target.json
@@ -393,22 +376,15 @@ Claude Pro sessions have a rolling usage cap. If the cap hits mid-run, the pipel
 
 ### How it works
 
-```mermaid
-flowchart TD
-    A[spawnClaude] -->|stream-json events| B{SessionLimitError?}
-    B -- no --> C[Phase completes normally]
-    B -- yes --> D[Save checkpoint.json]
-    D --> E[Print resume command]
-    E --> F[Exit cleanly]
-    F --> G([Session resets])
-    G --> H["--resume flag"]
-    H --> I[Load checkpoint]
-    I --> J{Phase?}
-    J -- researcher --> K[Skip completed assets\nInject resume hint into prompt]
-    J -- triage --> L[Skip researcher loop\nRe-run triage only]
-    K --> C
-    L --> C
-```
+1. `spawnClaude` streams JSON events from the agent
+2. On `SessionLimitError` detected in the stream:
+   - saves `targets/<name>/logs/checkpoint.json`
+   - prints the exact resume command
+   - exits cleanly
+3. When the session resets, run with `--resume`:
+   - if phase was **researcher**: skips completed assets, injects resume hint into prompt
+   - if phase was **triage**: skips researcher loop, re-runs triage on existing bundle
+4. On clean completion, checkpoint is deleted
 
 ### What gets saved
 
@@ -471,17 +447,17 @@ On resume the pipeline:
 ### Intelligence flow
 
 ```mermaid
-flowchart LR
+flowchart TD
     BBSCOPE["bbscope.com\n(no auth)"]
     H1API["HackerOne API\n(credentials)"]
     GDB["Global DB\ndata/global-intelligence/"]
     LDB["Target DB\ntargets/name/intelligence/"]
     BRIEF["research_brief.json"]
-    R["🔍 Researcher"]
+    R["Researcher"]
 
-    BBSCOPE -- "bbscope:sync\nscope for any platform" --> LDB
-    H1API -- "h1:bootstrap / h1:disclosed\nvuln history" --> GDB
-    H1API -- "h1:sync\nscope + history" --> LDB
+    BBSCOPE -- "bbscope:sync" --> LDB
+    H1API -- "h1:bootstrap / h1:disclosed" --> GDB
+    H1API -- "h1:sync" --> LDB
     GDB --> BRIEF
     LDB --> BRIEF
     BRIEF --> R
@@ -576,7 +552,39 @@ node scripts/sync-hackerone-disclosed.js --full-history --start-date 2025-01-01 
 
 Writes to `data/global-intelligence/`.
 
-The Researcher uses this dataset to bias module loading toward historically active bug families and underexplored surfaces.
+### Calibration dataset
+
+After syncing disclosed reports, build a queryable calibration index with severity distributions and real disclosure examples:
+
+```bash
+npm run calibration:sync
+```
+
+This classifies all 12,000+ disclosed reports by `(asset_type, vuln_class)` and aggregates:
+- Severity distributions (critical/high/medium/low counts)
+- Typical CWE and weakness per class
+- Top programs by disclosure volume
+- Real `hacktivity_summary` excerpts stored as behavior examples
+
+Query the data:
+
+```bash
+# Severity distribution for all chromeext vuln classes
+node scripts/query-calibration.js --asset chromeext
+
+# Specific class, JSON output (for agent piping)
+node scripts/query-calibration.js --asset webapp --vuln xss --json
+
+# Real H1 report summaries — how researchers described the vuln and what triage validated
+node scripts/query-calibration.js --asset webapp --vuln xss --behaviors --limit 5
+
+# All asset types
+node scripts/query-calibration.js --all
+```
+
+The **Researcher** queries this before touching the target (Phase 0) to bias module loading toward historically rewarded vuln classes and read real disclosure examples.
+
+The **Triager** queries this at Check 4.5 to cross-check the researcher's severity claim against historical H1 triage outcomes for the same `(asset_type, vuln_class)` combination.
 
 ### Research brief
 
@@ -664,6 +672,13 @@ findings[]
   observed_result
   impact_claimed
   remediation_suggested
+  vulnerable_code_snippet
+    file                 relative path to vulnerable file
+    line_start           start line (integer)
+    line_end             end line (integer)
+    snippet              verbatim source lines — copied exactly from the file
+    annotation           one sentence: which line is the root cause and why
+  attack_flow_diagram    Mermaid sequenceDiagram or flowchart LR showing attacker→sink chain
   researcher_notes
   confirmation_status    confirmed | unconfirmed
 ```
@@ -752,6 +767,8 @@ All validation runs automatically during the pipeline. Failures abort the run.
 | `npm run h1:sync` | Sync target-local intel from H1 |
 | `npm run h1:disclosed` | Incremental sync of global disclosed reports |
 | `npm run h1:bootstrap` | Full history backfill of global disclosed reports |
+| `npm run calibration:sync` | Classify disclosed reports into calibration patterns + behavior examples |
+| `npm run calibration:query` | Query the calibration dataset (human table output) |
 | `npm run target:new` | Create a new target workspace scaffold |
 | `npm run target:setup` | Detect and configure assets in existing workspace |
 | `npm run target:profile` | Build target profile JSON |

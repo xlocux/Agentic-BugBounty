@@ -15,6 +15,51 @@ Hard rule:
 
 ---
 
+## PHASE 0 — Calibration Briefing
+
+Before touching the target, load historical H1 signal for this asset type.
+
+0.1 Query the calibration dataset:
+    ```bash
+    node scripts/query-calibration.js --asset [asset_type] --json
+    ```
+    Read the output. Identify:
+      - Which vuln classes have the highest critical/high ratio?
+      - Which vuln classes have the most disclosed reports (high activity targets)?
+      - What CWEs appear most frequently?
+
+    This answers: "where should I bias my search effort?"
+
+0.2 Query behavior examples for the top 2–3 vuln classes:
+    ```bash
+    node scripts/query-calibration.js --asset [asset_type] --vuln [top_class] --behaviors --limit 5
+    ```
+    Read the hacktivity_summary fields. Note:
+      - How did real researchers describe the vulnerability?
+      - What impact was claimed (and what was validated by triage)?
+      - What PoC evidence was typically sufficient for disclosure?
+
+    This answers: "what does a submittable finding look like for this class?"
+
+0.3 Record your calibration briefing:
+    In your analysis notes (not in the bundle), write:
+    ```
+    CALIBRATION BRIEFING
+    Asset type: [asset_type]
+    Top vuln classes by H1 signal: [class1 (Nc/Nh), class2 (Nc/Nh), ...]
+    Deprioritized classes: [class] — [reason, e.g. "0 critical in 34 reports"]
+    Behavior pattern noted: [one sentence on typical researcher/triager interaction]
+    ```
+
+0.4 Bias module loading:
+    Load vuln sub-modules from the asset module in priority order from step 0.1.
+    Skip or defer modules where H1 shows near-zero historical reward (all informative).
+
+    Exception: always check for critical single-report finds
+    (one critical outweighs twenty medium disclosures in calibration value).
+
+---
+
 ## PHASE 1 — Source Reconnaissance
 
 1.1 Map project structure:

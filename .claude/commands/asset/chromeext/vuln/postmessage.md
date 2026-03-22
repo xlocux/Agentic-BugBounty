@@ -7,23 +7,45 @@
 
 Extensions have THREE message channels, each with different trust:
 
-  1. window.postMessage
+  1. window.postMessage / window.addEventListener('message')
      Web page ↔ content script (same window object)
      Attacker: ANY website the victim visits
+     NOTE: Does NOT reach background script directly
 
-  2. chrome.runtime.sendMessage / runtime.onMessage
+  2. chrome.runtime.sendMessage / runtime.onMessage.addListener()
      Content script ↔ background service worker
-     Attacker: malicious web page → content script → background escalation
+     Attacker: malicious web page → ONLY via content script relay
+     NOTE: A plain web page CANNOT call chrome.runtime.sendMessage directly.
+           Only extension content scripts and extension pages can use this API.
 
-  3. chrome.runtime.onMessageExternal
-     Other extensions → this extension
+  3. chrome.runtime.onMessageExternal / onConnectExternal
+     Other extensions → this extension (if in externally_connectable manifest field)
      Attacker: malicious extension installed on same browser
+
+  4. Custom event bus (e.g., CustomEvent / dispatchEvent patterns)
+     Used by some extensions as an alternative to postMessage
+     Scope: same window — triggerable by page if content script listens
 
 The most dangerous path:
   Attacker web page
-    → postMessage to content script (no restriction)
-    → content script forwards to background (if not validated)
+    → window.postMessage to content script (no restriction on receiver)
+    → content script forwards via chrome.runtime.sendMessage (if no origin check)
     → background executes privileged chrome API (tabs, cookies, scripting)
+
+CRITICAL: If no content script relay exists (postMessage listener → sendMessage),
+  then window.postMessage from attacker page CANNOT reach the background handler.
+  In that case the attack is BLOCKED at the content script boundary.
+
+```mermaid
+flowchart LR
+    W[Attacker Web Page] -->|window.postMessage| CS[Content Script\nlistener]
+    CS -->|IF no origin check AND relay exists| BG[Background Script\nonMessage handler]
+    BG -->|IF no validation| API[Chrome API\ntabs/cookies/scripting]
+
+    W2[Attacker Web Page] -->|chrome.runtime.sendMessage| X[BLOCKED\nAPI not accessible\nfrom web pages]
+
+    EXT[Malicious Extension] -->|chrome.runtime.sendMessage\nwith target ext ID| BG2[Background Script\nonMessageExternal]
+```
 
 ## WHITEBOX STATIC ANALYSIS
 
@@ -147,3 +169,65 @@ Content script forwards unvalidated to background:
 Extension sends cookies/tokens with wildcard:
   → attacker page receives sensitive data passively
   → High (credential theft without any user interaction beyond page visit)
+
+---
+
+## EVIDENCE CAPTURE PROTOCOL — Required for every postMessage finding
+
+### Step 1: Map the full chain in code (before writing any PoC)
+
+For each message handler found, record:
+
+```
+HANDLER INVENTORY:
+  File: [path:line]
+  Channel: [ ] window.addEventListener('message')
+            [ ] chrome.runtime.onMessage.addListener
+            [ ] chrome.runtime.onMessageExternal
+            [ ] dispatchEvent / CustomEvent
+  Origin check: [ ] YES (event.origin checked) — WHICH VALUES?
+                [ ] NO  — handler accepts any origin
+  Message fields read: type=[field], data=[field], url=[field]
+  Relay to background: [ ] YES — via chrome.runtime.sendMessage at [path:line]
+                       [ ] NO  — handler stays in content script
+  Privileged API calls inside handler (or reachable from relay):
+    [list chrome.tabs / scripting / cookies / storage calls with line numbers]
+```
+
+### Step 2: Write the vulnerable_code_snippet
+
+Read the actual lines. Copy verbatim. Include:
+  - The message listener registration (where it is set up)
+  - The missing guard (no event.origin / no sender check)
+  - The sink (the privileged API call or DOM write)
+
+### Step 3: Generate the attack flow diagram
+
+```mermaid
+sequenceDiagram
+    participant ATK as Attacker Page (attacker.com)
+    participant CS as Content Script ([filename]:line)
+    participant BG as Background Script ([filename]:line)
+    participant CHROME as Chrome API
+
+    ATK->>CS: window.postMessage({type: '[TYPE]', url: 'https://attacker.com'}, '*')
+    Note over CS: No event.origin check at line [N]
+    CS->>BG: chrome.runtime.sendMessage({type: '[TYPE]', url: 'https://attacker.com'})
+    Note over BG: No URL validation — line [N]: [exact code]
+    BG->>CHROME: chrome.tabs.create({url: 'https://attacker.com'})
+    CHROME-->>ATK: New tab opens to attacker URL
+```
+
+### Step 4: PoC correctness checklist
+
+Before setting confirmation_status = "confirmed":
+  □ PoC uses window.postMessage (not chrome.runtime.sendMessage)
+    because attacker is a web page, not an extension content script
+  □ Message type in PoC matches the exact case string in handler switch/if
+  □ All required message fields are present ({type, url} vs {msg, action, data})
+  □ Content script relay to background has been confirmed to exist in code
+  □ No origin guard at content script layer
+  □ No sender.url / sender.tab guard at background layer
+  □ Privileged API call reachable without additional authentication
+
+If any box is unchecked: set confirmation_status = "unconfirmed", explain in reason_not_confirmed

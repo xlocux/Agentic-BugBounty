@@ -20,6 +20,8 @@
     "bbscope:sync": "node scripts/sync-bbscope-intel.js --target duckduckgo",
     "h1:disclosed": "node scripts/sync-hackerone-disclosed.js",
     "h1:bootstrap": "node scripts/sync-hackerone-disclosed.js --full-history",
+    "calibration:sync": "node scripts/sync-calibration-dataset.js",
+    "calibration:query": "node scripts/query-calibration.js",
     "target:profile": "node scripts/build-target-profile.js --target duckduckgo",
     "research:brief": "node scripts/build-research-brief.js --target duckduckgo",
     "research:focus": "node scripts/recommend-research-focus.js --target duckduckgo",

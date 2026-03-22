@@ -162,6 +162,81 @@ uXSS confirmation requirement:
 
 ---
 
+## MANDATORY EVIDENCE CAPTURE — For every confirmed finding
+
+Before writing a finding to REPORT_BUNDLE, you MUST collect:
+
+### 1. Vulnerable Code Snippet
+Read the exact lines from the source file.
+Populate vulnerable_code_snippet with:
+  - file: relative path from extension root
+  - line_start / line_end: the exact line numbers
+  - snippet: verbatim copy of the lines (no paraphrasing)
+  - annotation: which specific line is the root cause and why
+
+Example:
+```json
+{
+  "file": "shared/bg/start-background-script.js",
+  "line_start": 1,
+  "line_end": 1,
+  "snippet": "case\"openTab\":return p.openTab(r.url);",
+  "annotation": "Line passes r.url directly to openTab() without any URL validation"
+}
+```
+
+### 2. Attack Flow Diagram
+For every finding, write a Mermaid diagram in attack_flow_diagram.
+Choose the diagram type that best fits the vulnerability:
+
+**For message-passing vulns** (postMessage, runtime.onMessage):
+```
+sequenceDiagram
+    participant A as Attacker Page
+    participant CS as Content Script
+    participant BG as Background Script
+    participant API as Chrome API
+    A->>CS: window.postMessage({type:'openTab', url:'evil.com'})
+    Note over CS: No event.origin check
+    CS->>BG: chrome.runtime.sendMessage({type:'openTab', url:'evil.com'})
+    Note over BG: No URL validation
+    BG->>API: chrome.tabs.create({url:'evil.com'})
+    API-->>A: New tab opens to attacker URL
+```
+
+**For uXSS vulns** (DOM injection):
+```
+flowchart LR
+    A[Attacker controls\nURL fragment / postMessage] --> B[Content Script reads\nattacker data]
+    B --> C[innerHTML assignment\non victim page]
+    C --> D[Script executes in\nvictim origin context]
+    D --> E[alert document.domain\nshows victim.com]
+```
+
+**For data leakage vulns**:
+```
+sequenceDiagram
+    participant P as Victim Page
+    participant CS as Content Script
+    participant BG as Background Script
+    participant EXT as External Server
+    P->>CS: Page loads, content script active
+    CS->>BG: Sends browsing data
+    BG->>EXT: POST https://tracker.com/collect\n{url: full_url, userId: id}
+```
+
+### 3. PoC Channel Verification (REQUIRED before confirming)
+For ANY message-based finding, explicitly trace the channel:
+  □ What listener is registered in the code? (postMessage vs onMessage vs CustomEvent)
+  □ Does the PoC trigger the correct channel?
+  □ Do field names in PoC match the switch/case in the handler?
+  □ Is there a relay from content script to background? Read the relay code.
+  □ Does any origin/sender check guard the handler?
+
+If you cannot confirm all 5 points: mark as unconfirmed, explain in reason_not_confirmed.
+
+---
+
 ## ADDITIONAL VULN MODULES
 
 | Vector | Module path |

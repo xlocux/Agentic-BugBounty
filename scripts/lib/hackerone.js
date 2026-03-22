@@ -197,6 +197,11 @@ function normalizeStructuredScope(item, programHandle) {
   };
 }
 
+function extractHacktivitySummary(item) {
+  const generated = getRelationshipAttributes(item, "report_generated_content");
+  return generated?.hacktivity_summary || null;
+}
+
 function normalizeHistoryItem(item, source, fallbackHandle) {
   const attributes = getAttributes(item);
   const programAttributes = getRelationshipAttributes(item, "program");
@@ -214,7 +219,8 @@ function normalizeHistoryItem(item, source, fallbackHandle) {
     disclosed_at: attributes.disclosed_at || null,
     created_at: attributes.created_at || null,
     updated_at: attributes.updated_at || null,
-    url: attributes.url || attributes.html_url || null
+    url: attributes.url || attributes.html_url || null,
+    hacktivity_summary: extractHacktivitySummary(item)
   };
 }
 
