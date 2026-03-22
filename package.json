@@ -7,6 +7,7 @@
     "test": "node --test --test-isolation=none tests/contracts.test.js",
     "pipeline": "node scripts/run-pipeline.js --target duckduckgo",
     "target:new": "node scripts/new-target.js",
+    "target:reset": "node scripts/reset-target.js",
     "target:setup": "node scripts/setup-target.js duckduckgo",
     "validate:bundle": "node scripts/validate-bundle.js findings/confirmed/report_bundle.json",
     "validate:triage": "node scripts/validate-triage-result.js findings/triage_result.json",
@@ -28,6 +29,10 @@
     "ui:intel": "node scripts/serve-intel-ui.js --target duckduckgo --port 31337 --open",
     "agent:prompt:researcher": "node scripts/compose-agent-prompt.js researcher --asset webapp --mode whitebox --target duckduckgo",
     "agent:prompt:triager": "node scripts/compose-agent-prompt.js triager --asset webapp --target duckduckgo",
-    "apk:decompile": "node scripts/decompile-apk.js"
+    "apk:decompile": "node scripts/decompile-apk.js",
+    "calibration:extract-skills": "node scripts/extract-skills.js",
+    "skills:query": "node scripts/query-skills.js",
+    "cve:sync": "node scripts/sync-cve-intel.js",
+    "cve:query": "node scripts/query-cve-intel.js"
   }
 }
