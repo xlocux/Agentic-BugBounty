@@ -17,10 +17,14 @@ const {
 const {
   initDatabase,
   openDatabase,
+  queryCveIntel,
+  querySkills,
   readDisclosedDatasetFromDb,
   readProgramIntelFromDb,
+  replaceCveIntel,
   replaceDisclosedReports,
   replaceProgramIntel,
+  replaceSkills,
   resolveDatabasePath,
   resolveGlobalDatabasePath
 } = require("./db");
@@ -44,6 +48,28 @@ const {
   syncBbscopeProgramIntel,
   PLATFORM_LABELS
 } = require("./bbscope");
+
+/**
+ * Persist any researcher-extracted skills from a report bundle into skill_library.
+ * Receives an already-open db handle — caller manages open/close.
+ * Returns the number of skills saved.
+ */
+function persistExtractedSkills(db, bundle, targetRef) {
+  const now = new Date().toISOString();
+  const skills = (bundle.findings || [])
+    .map((f) => f.extracted_skill)
+    .filter(Boolean)
+    .map((s, i) => ({
+      ...s,
+      skill_id: s.skill_id || `SK-researcher-${targetRef}-${now}-${i}`,
+      program_handle: s.program_handle || targetRef,
+      created_at: now,
+      manual: 0
+    }));
+  if (skills.length === 0) return 0;
+  replaceSkills(db, skills);
+  return skills.length;
+}
 
 module.exports = {
   buildResearchBrief,
@@ -75,6 +101,11 @@ module.exports = {
   validateBundle,
   validateTargetConfig,
   validateTriageResult,
+  queryCveIntel,
+  querySkills,
+  replaceCveIntel,
+  replaceSkills,
+  persistExtractedSkills,
   writeJson,
   writeProgramIntel
 };
