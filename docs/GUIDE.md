@@ -308,13 +308,19 @@ The pipeline streams every tool call as it happens:
 [2026-03-20T20:21:22Z] ← researcher[chromeext] agent done in 774s
 ```
 
-When the agent is reasoning between tool calls, a heartbeat fires every 15 seconds:
+When the agent is reasoning between tool calls, its reasoning text is printed live:
 
 ```
-  ⏱  45s | 12 tool call(s)...
+  » Checking the rpId validation function in content.entry.js — the endsWith() ↵ call lacks a dot-boundary prefix...
 ```
 
-Token usage and cost are logged to `logs/pipeline-*.log` at the end of each agent phase.
+Only substantive reasoning blocks are shown (single-line filler is suppressed). A progress spinner fires every 60 seconds showing elapsed time and tool call count:
+
+```
+  ⏱  120s | 18 tool call(s)...
+```
+
+Token usage is logged to `logs/pipeline-*.log` at the end of each agent phase.
 
 ---
 
@@ -396,6 +402,22 @@ On resume:
 - On clean completion, checkpoint is deleted
 
 `--resume` with no checkpoint is a no-op — the pipeline starts fresh.
+
+### Interrupting with Ctrl+C
+
+Pressing `Ctrl+C` during any phase also saves a checkpoint:
+
+```
+[interrupted] checkpoint saved (phase=researcher asset=0 findings=2). use --resume to continue.
+```
+
+Resume the same way:
+
+```bash
+node scripts/run-pipeline.js --target acme --cli claude --resume
+```
+
+**Important**: the checkpoint records which asset and phase was interrupted, but not the internal state of the Claude session. On resume, the researcher restarts the current asset from the beginning — previously confirmed findings already written to `report_bundle.json` are preserved and the agent is instructed not to re-analyse them.
 
 ---
 

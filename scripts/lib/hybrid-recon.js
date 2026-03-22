@@ -135,7 +135,7 @@ async function runSourceReconPhase(assetType, sourceDir, calibrationData) {
 
   log(`phase 1: found ${files.length} source files — sampling key files...`);
 
-  // Sample: manifest/config/entry-point files get full head; rest just paths
+  // Sample: only the most security-relevant files get content; rest just paths
   const KEY_PATTERNS = [
     /manifest/i, /package\.json$/, /config/i, /settings/i, /routes?/i,
     /index\.(js|ts|html)$/i, /main\.(js|ts|java|kt|swift|go)$/i,
@@ -148,49 +148,32 @@ async function runSourceReconPhase(assetType, sourceDir, calibrationData) {
   for (const f of files) {
     const rel = path.relative(sourceDir, f);
     if (KEY_PATTERNS.some((p) => p.test(rel))) {
-      sampledFiles.push({ path: rel, head: readFileHead(f, 50) });
+      sampledFiles.push({ path: rel, head: readFileHead(f, 20) }); // 20 lines max per file
     } else {
       pathsOnly.push(rel);
     }
   }
 
-  // Cap samples to avoid overloading the free model context window
-  const MAX_SAMPLES = 20;
+  // Keep prompt small: 8 key files + 80 paths = fits in 8k context
+  const MAX_SAMPLES = 8;
   const truncatedSamples = sampledFiles.slice(0, MAX_SAMPLES);
-  const truncatedPaths = pathsOnly.slice(0, 200);
+  const truncatedPaths = pathsOnly.slice(0, 80);
 
   const calibrationSummary = calibrationData
-    ? `Top vuln classes for ${assetType}: ${
-        (calibrationData.top_classes || []).slice(0, 5).map((c) => c.name || c).join(", ")
-      }`
-    : `No calibration data available for ${assetType}.`;
+    ? (calibrationData.top_classes || []).slice(0, 3).map((c) => c.name || c).join(", ")
+    : "";
 
-  const prompt = `You are a security researcher performing Phase 1 source reconnaissance on a ${assetType} asset.
+  const prompt = `Security recon on a ${assetType}. Asset: ${path.basename(sourceDir)}.
+${calibrationSummary ? `Top vuln classes: ${calibrationSummary}.` : ""}
 
-CALIBRATION CONTEXT:
-${calibrationSummary}
+KEY FILES:
+${truncatedSamples.map((f) => `[${f.path}]\n${f.head}`).join("\n---\n")}
 
-SOURCE FILES (${files.length} total):
+ALL PATHS (${files.length} total, sample):
+${truncatedPaths.join(", ")}
 
-KEY FILES WITH CONTENT:
-${truncatedSamples.map((f) => `### ${f.path}\n\`\`\`\n${f.head}\n\`\`\``).join("\n\n")}
-
-ALL FILE PATHS:
-${truncatedPaths.join("\n")}
-
-Your task: produce a structured JSON reconnaissance report with these fields:
-{
-  "entry_points": ["list of main entry point files"],
-  "auth_layer": ["files handling authentication/authorization"],
-  "data_sinks": ["files likely containing dangerous sinks: eval, innerHTML, exec, query, etc."],
-  "ipc_channels": ["files handling message passing, IPC, intents, postMessage, etc."],
-  "external_comms": ["files making HTTP requests or talking to external services"],
-  "config_files": ["configuration and credential files"],
-  "interesting_patterns": ["up to 10 specific file:pattern pairs worth investigating, e.g. 'background.js: uses eval()'"],
-  "attack_surface_summary": "2-3 sentence summary of the most promising attack surface for a ${assetType}"
-}
-
-Be specific. File paths must be real paths from the list above.`;
+Return JSON only:
+{"entry_points":[],"auth_layer":[],"data_sinks":[],"ipc_channels":[],"external_comms":[],"interesting_patterns":[],"attack_surface_summary":""}`;
 
   log("phase 1: asking free LLM to map attack surface...");
   const result = await callLLMJson(prompt, { timeoutMs: 90000 });

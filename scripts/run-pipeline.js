@@ -506,7 +506,6 @@ const FLAVOUR = {
     "call the police, the results have been kidnapped. but we're negotiating with the kidnappers. results are still being held hostage.",
     "fucking swat team called on the results. but we're talking them down. results are still being swatted.",
     "yo bro, the results are still being processed. but they're gonna be lit when they come out.",
-    "oh oh ohoh, oh oh ohoh, wolf of wallstreet style, the results are still being processed. but they're gonna be so money when they come out.",
     "for the next hour bring me a drink every 10 minutes, because the results are still being processed. but they're gonna be worth it.",
   ],
   apk_decompile: [
@@ -698,6 +697,18 @@ function fmtK(n) {
 function handleStreamEvent(event, logPath, t0, toolCount) {
   if (event.type === "assistant") {
     for (const block of (event.message?.content || [])) {
+      if (block.type === "text") {
+        // Print Claude's reasoning text only when it looks substantive (not short filler lines).
+        // Threshold: at least one line >= 80 chars, or 3+ non-empty lines (structured output).
+        const lines = (block.text || "").split("\n").map(l => l.trim()).filter(Boolean);
+        const hasSubstantiveLine = lines.some(l => l.length >= 80);
+        const isStructured = lines.length >= 3;
+        if (hasSubstantiveLine || isStructured) {
+          const preview = lines.slice(0, 4).join(" ↵ ").substring(0, 220);
+          process.stdout.write(`  ${C.yellow}»${C.reset} ${C.dim}${preview}${C.reset}\n`);
+        }
+        continue;
+      }
       if (block.type !== "tool_use") continue;
       const name = block.name || "?";
       const inp = block.input || {};
@@ -787,13 +798,13 @@ async function spawnClaude(prompt, model, logPath) {
     const heartbeat = setInterval(() => {
       const elapsed = Math.round((Date.now() - t0) / 1000);
       heartbeatTick += 1;
-      // Every other tick: flavour line above the spinner
-      if (heartbeatTick % 2 === 0) {
+      // Every 4 ticks (4 min): print a flavour line above the spinner
+      if (heartbeatTick % 4 === 0) {
         process.stdout.write(`\r` + " ".repeat(60) + `\r`);
         printFlavour("heartbeat");
       }
       process.stdout.write(`\r  ${C.yellow}⏱${C.reset}  ${C.bold}${elapsed}s${C.reset} | ${C.dim}${toolCount} tool call(s)...${C.reset}          `);
-    }, 15000);
+    }, 60000);
 
     proc.stdout.on("data", (chunk) => {
       // Clear the heartbeat line on first real output
@@ -1544,7 +1555,27 @@ async function main() {
   // Determine start index from checkpoint
   const startAssetIndex = (checkpoint && checkpoint.phase === "researcher") ? checkpoint.assetIndex : 0;
 
+  // Save checkpoint on Ctrl+C so --resume can pick up from the current phase/asset.
+  let currentAssetIndex = startAssetIndex;
+  let currentPhase = "researcher";
+  process.once("SIGINT", () => {
+    const findingsCount = fs.existsSync(bundlePath)
+      ? (readJson(bundlePath).findings || []).length
+      : 0;
+    saveCheckpoint(context, {
+      phase: currentPhase,
+      assetIndex: currentAssetIndex,
+      asset: (allAssets[currentAssetIndex] || {}).asset_type || context.asset,
+      totalAssets: allAssets.length,
+      findingsCount,
+      savedAt: new Date().toISOString()
+    });
+    process.stdout.write(`\n${C.yellow}[interrupted]${C.reset} checkpoint saved (phase=${currentPhase} asset=${currentAssetIndex} findings=${findingsCount}). use --resume to continue.\n`);
+    process.exit(130);
+  });
+
   for (let index = startAssetIndex; !(checkpoint && checkpoint.phase === "triage") && index < allAssets.length; index += 1) {
+    currentAssetIndex = index;
     const assetEntry = allAssets[index];
     let resolvedTarget = assetEntry.target || context.target;
 
@@ -1654,6 +1685,7 @@ async function main() {
 
   // If we resumed from a researcher checkpoint and triage isn't needed yet, skip saving triage checkpoint
   // (triage is a single-target phase — checkpoint just marks it as in-progress)
+  currentPhase = "triage";
   try {
     await runTriagePhase(args.cli, context, args, bundlePath, triagePath, runLog);
   } catch (err) {

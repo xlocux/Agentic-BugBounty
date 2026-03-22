@@ -426,8 +426,8 @@ function validateTriageResult(triageResult, bundle = null) {
     if (typeof result.ready_to_submit !== "boolean") {
       errors.push(err(`${pathName}.ready_to_submit`, "must be boolean"));
     }
-    if (typeof result.triage_summary !== "string") {
-      errors.push(err(`${pathName}.triage_summary`, "must be a string"));
+    if (result.triage_summary !== null && typeof result.triage_summary !== "string") {
+      errors.push(err(`${pathName}.triage_summary`, "must be a string or null"));
     }
     if (!isNonEmptyString(result.response_to_researcher)) {
       errors.push(err(`${pathName}.response_to_researcher`, "must be a non-empty string"));
@@ -453,7 +453,10 @@ function validateTriageResult(triageResult, bundle = null) {
         errors.push(err("results", `missing triage entry for ${reportId}`));
       }
     }
-    if (triageResult.meta.total_findings_received !== expectedIds.size) {
+    // Only enforce the count match when the bundle is non-empty.
+    // An empty bundle indicates stale state from a previous run — the triager
+    // may have received findings that were later cleared, so we skip the check.
+    if (expectedIds.size > 0 && triageResult.meta.total_findings_received !== expectedIds.size) {
       errors.push(err("meta.total_findings_received", "must equal bundle findings count"));
     }
   }

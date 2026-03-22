@@ -9,7 +9,9 @@
       "Bash(node:*)",
       "Bash(cp:*)",
       "Bash(ccw cli:*)",
-      "Bash(source .env)"
+      "Bash(source .env)",
+      "Bash(openssl req:*)",
+      "Bash(docker compose:*)"
     ]
   }
 }

@@ -24,11 +24,25 @@ Mobile apps run on user-controlled devices. Attackers can:
 9.  Path Traversal via Content Provider CWE-22   — Android file provider abuse
 10. Broken Authentication               CWE-287  — token storage, biometric bypass
 
+## DECOMPILATION NOTE
+
+The pipeline decompiles the APK before launching this agent.
+If the target path points to a directory (not an `.apk`/`.apkx` file), decompilation is already done — do NOT run `apktool` or `jadx` again.
+
+Check once:
+```bash
+# If target is a directory → already decompiled, skip to static analysis
+# If target is a file ending in .apk/.apkx → decompile first (fallback case)
+ls "$TARGET"   # directory = skip decompilation
+```
+
+---
+
 ## WHITEBOX STATIC ANALYSIS
 
 ### Android (APK / Java / Kotlin)
 ```bash
-# Decompile APK
+# Decompile APK (only if target is a .apk/.apkx file, not already a directory)
 apktool d target.apk -o ./decompiled
 jadx -d ./jadx-output target.apk
 

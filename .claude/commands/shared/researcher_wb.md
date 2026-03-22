@@ -109,6 +109,18 @@ Before touching the target, load historical H1 signal for this asset type.
 
 ---
 
+## SHELL TOOL RULES
+
+Performance rules for all bash/shell calls. Non-negotiable.
+
+- **ALWAYS use `grep -rn` or `grep -n`** for pattern searches — never `python3 -c "import re..."` for simple string/regex matching
+- **Use `find`** for file discovery — never `python3 -c "import os..."` for directory walks
+- Use `python3` only when you genuinely need multi-step logic that grep cannot express (e.g. AST parsing, multi-file state tracking across results)
+- On Windows the shell is bash via Node spawn — `grep`, `find`, `sed` all work natively; prefer them
+- When a grep result is ambiguous, run a second targeted grep — do not rewrite it as Python
+
+---
+
 ## PHASE 1 — Source Reconnaissance
 
 1.1 Map project structure:

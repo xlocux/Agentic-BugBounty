@@ -41,11 +41,13 @@ node scripts/run-pipeline.js --target <name> --cli claude
 
 First run launches a setup wizard — creates workspace, detects assets, starts the pipeline.
 
-### Resume after a Claude Pro session limit
+### Resume after a session limit or Ctrl+C
 
 ```bash
 node scripts/run-pipeline.js --target <name> --cli claude --resume
 ```
+
+Both Claude Pro session limits and manual `Ctrl+C` interruptions save a checkpoint. The pipeline resumes from the interrupted phase — confirmed findings already in `report_bundle.json` are never lost.
 
 ### Manual finding review before triage
 

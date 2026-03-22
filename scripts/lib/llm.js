@@ -234,27 +234,34 @@ async function callLLMJson(prompt, { timeoutMs = 120000 } = {}) {
 
   const models = OPENROUTER_CONFIG.free_models || [];
   for (const model of models) {
+    log(flavour("openrouter_try", { model }));
     let modelPermanentlyFailed = false;
+    let lastError = null;
     for (const key of apiKeys) {
-      log(flavour("openrouter_try", { model }));
       try {
         const result = await callOpenRouter(fullPrompt, model, key, timeoutMs);
         log(flavour("openrouter_ok", { model }));
         return result;
       } catch (e) {
-        const reason = e.message.slice(0, 60);
-        log(flavour("openrouter_fail", { model, reason }));
-        // 404 = model unavailable for this account — no point rotating keys
+        lastError = e;
+        // 404 = model unavailable — skip immediately, no key rotation
         if (e.message.includes("HTTP 404")) {
+          log(flavour("openrouter_fail", { model, reason: "HTTP 404 unavailable" }));
           modelPermanentlyFailed = true;
           break;
         }
-        if (apiKeys.length > 1 && apiKeys.indexOf(key) < apiKeys.length - 1) {
-          log(flavour("key_rotate", { key: key.slice(-4), model }));
+        // 400 context window = prompt too large for this model — skip model (don't rotate keys)
+        if (e.message.includes("HTTP 400") && (e.message.toLowerCase().includes("context") || e.message.toLowerCase().includes("maximum"))) {
+          log(`  [llm] ${model}: context window exceeded — skipping`);
+          modelPermanentlyFailed = true;
+          break;
         }
+        // transient error — rotate key silently
       }
     }
     if (modelPermanentlyFailed) continue;
+    // All keys failed — log once
+    if (lastError) log(flavour("openrouter_fail", { model, reason: lastError.message.slice(0, 60) }));
   }
 
   log(flavour("all_failed"));
@@ -332,20 +339,21 @@ async function callResearcherModel(prompt, { model, timeoutMs = 300000 } = {}) {
 
   // Try primary model with all keys (skip all keys if model returns 404)
   let primaryPermanentFail = false;
+  log(flavour("openrouter_try", { model: primaryModel }));
   for (const key of apiKeys) {
-    log(`  trying ${primaryModel} (key …${key.slice(-4)})`);
     try {
       const result = await callOpenRouterRaw(prompt, primaryModel, key, timeoutMs);
       log(flavour("openrouter_ok", { model: primaryModel }));
       return result;
     } catch (e) {
-      const reason = e.message.slice(0, 60);
-      log(flavour("openrouter_fail", { model: primaryModel, reason }));
       if (e.message.includes("HTTP 404")) { primaryPermanentFail = true; break; }
-      if (apiKeys.indexOf(key) < apiKeys.length - 1) {
-        log(flavour("key_rotate", { key: key.slice(-4), model: primaryModel }));
-      }
+      // transient — rotate key silently
     }
+  }
+  if (!primaryPermanentFail) {
+    log(flavour("openrouter_fail", { model: primaryModel, reason: "all keys failed" }));
+  } else {
+    log(flavour("openrouter_fail", { model: primaryModel, reason: "HTTP 404 unavailable" }));
   }
 
   // Fallback to free model chain
@@ -353,19 +361,21 @@ async function callResearcherModel(prompt, { model, timeoutMs = 300000 } = {}) {
   const models = OPENROUTER_CONFIG.free_models || [];
   for (const fallbackModel of models) {
     if (fallbackModel === primaryModel && !primaryPermanentFail) continue;
+    log(flavour("openrouter_try", { model: fallbackModel }));
     let modelPermanentFail = false;
+    let lastErr = null;
     for (const key of apiKeys) {
-      log(flavour("openrouter_try", { model: fallbackModel }));
       try {
         const result = await callOpenRouterRaw(prompt, fallbackModel, key, timeoutMs);
         log(flavour("openrouter_ok", { model: fallbackModel }));
         return result;
       } catch (e) {
-        const reason = e.message.slice(0, 60);
-        log(flavour("openrouter_fail", { model: fallbackModel, reason }));
+        lastErr = e;
         if (e.message.includes("HTTP 404")) { modelPermanentFail = true; break; }
+        // transient — rotate key silently
       }
     }
+    if (lastErr) log(flavour("openrouter_fail", { model: fallbackModel, reason: modelPermanentFail ? "HTTP 404" : lastErr.message.slice(0, 60) }));
     if (modelPermanentFail) continue;
   }
 
