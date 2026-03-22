@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 "use strict";
 
+// Suppress Node.js experimental/deprecation warnings in this process and all children.
+// SQLite is stable enough for our use; shell=false with an args array is intentional.
+process.env.NODE_OPTIONS = `${process.env.NODE_OPTIONS || ""} --no-warnings`.trim();
+
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
@@ -560,7 +564,7 @@ function clearCheckpoint(context) {
 function runCommand(command, args, options = {}) {
   const result = spawnSync(command, args, {
     stdio: "inherit",
-    shell: process.platform === "win32",
+    shell: false,
     ...options
   });
 
@@ -572,7 +576,7 @@ function runCommand(command, args, options = {}) {
 function runCommandCapture(command, args, options = {}) {
   const result = spawnSync(command, args, {
     encoding: "utf8",
-    shell: process.platform === "win32",
+    shell: false,
     ...options
   });
 
@@ -885,7 +889,7 @@ function buildResearchBriefIfPossible(context, logPath) {
   }
 
   try {
-    runCommand("node", ["scripts/build-research-brief.js", "--target", context.targetRef]);
+    runCommandCapture("node", ["scripts/build-research-brief.js", "--target", context.targetRef]);
     logEvent(logPath, "Research brief refreshed from local/global intelligence");
   } catch (error) {
     logEvent(logPath, `Research brief refresh failed: ${error.message}`);
@@ -900,7 +904,13 @@ function syncCveIntelIfPossible(context, logPath) {
 
   logEvent(logPath, `Syncing CVE intel for ${targetName}`);
   try {
-    runCommand("node", ["scripts/sync-cve-intel.js", "--target", targetName]);
+    const out = runCommandCapture("node", ["scripts/sync-cve-intel.js", "--target", targetName]);
+    // Print subprocess output indented so it's visually grouped under the sync step
+    if (out && out.trim()) {
+      for (const line of out.trim().split("\n")) {
+        process.stdout.write(`  ${line}\n`);
+      }
+    }
     logEvent(logPath, "CVE intel sync complete");
   } catch (error) {
     logEvent(logPath, `CVE intel sync failed (non-fatal): ${error.message}`);
