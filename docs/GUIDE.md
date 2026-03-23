@@ -133,10 +133,10 @@ Assets detected: 2
 
 [1/2] ./src/acme-extension
   Detected as : Chrome Extension (name: "Acme", v1.4.2, MV3)
-  Type options: webapp | chromeext | mobileapp | executable
-  Confirm type [Enter = chromeext] or type to override:
+  Type options: webapp | browserext | mobileapp | executable
+  Confirm type [Enter = browserext] or type to override:
   Analysis mode [Enter = whitebox] or blackbox:
-  → chromeext | whitebox
+  → browserext | whitebox
 
 [2/2] ./src/acme-api
   Detected as : Web App (Node.js)
@@ -146,7 +146,7 @@ Assets detected: 2
 
 ────────────────────────────────────────────────────────────
 Workspace ready: targets/acme
-Assets configured: chromeext (./src/acme-extension), webapp (./src/acme-api)
+Assets configured: browserext (./src/acme-extension), webapp (./src/acme-api)
 ────────────────────────────────────────────────────────────
 ```
 
@@ -243,7 +243,7 @@ Multi-asset config:
 
 ```json
 {
-  "asset_type": "chromeext",
+  "asset_type": "browserext",
   "source_path": "./src/acme-extension",
   "additional_assets": [
     { "asset_type": "webapp", "source_path": "./src/acme-backend" }
@@ -251,7 +251,7 @@ Multi-asset config:
 }
 ```
 
-**Asset types:** `webapp` `mobileapp` `chromeext` `executable`
+**Asset types:** `webapp` `mobileapp` `browserext` `executable`
 
 **Report ID prefixes:** `WEB-NNN` `MOB-NNN` `EXT-NNN` `EXE-NNN`
 
@@ -291,13 +291,13 @@ The pipeline streams every tool call as it happens:
 
 ```
 [2026-03-20T20:08:07Z] Running hybrid recon (Phase 0+1) via free LLM...
-  [hybrid-recon] phase 0: loading calibration briefing for chromeext...
+  [hybrid-recon] phase 0: loading calibration briefing for browserext...
   [hybrid-recon] phase 1: found 109 source files — sampling key files...
   [hybrid-recon] phase 1: asking free LLM to map attack surface...
   [llm] google/gemma-3-27b-it:free delivered. done.
 [2026-03-20T20:08:14Z] Hybrid recon injected into researcher prompt
 
-[2026-03-20T20:08:14Z] → Starting researcher[chromeext] agent
+[2026-03-20T20:08:14Z] → Starting researcher[browserext] agent
   [  12s] Bash       grep -r "postMessage" src/ --include="*.js"
   [  18s] Read       src/background/messaging.js
   [  34s] Grep       eval( src/
@@ -305,7 +305,7 @@ The pipeline streams every tool call as it happens:
 
   [done] 774s | 87 tool call(s) | $1.2340 | in: 45.2k | out: 8.1k | cache_read: 182.3k | cache_create: 12.4k
 
-[2026-03-20T20:21:22Z] ← researcher[chromeext] agent done in 774s
+[2026-03-20T20:21:22Z] ← researcher[browserext] agent done in 774s
 ```
 
 When the agent is reasoning between tool calls, its reasoning text is printed live:
@@ -531,7 +531,7 @@ Query the data:
 
 ```bash
 # Severity distribution for a given asset type
-node scripts/query-calibration.js --asset chromeext
+node scripts/query-calibration.js --asset browserext
 
 # JSON output (used by hybrid recon and agents)
 node scripts/query-calibration.js --asset webapp --vuln xss --json
@@ -582,7 +582,7 @@ Processes disclosed reports in batches of 30. Skips already-processed reports (i
 ### Query skills
 
 ```bash
-node scripts/query-skills.js --asset chromeext --limit 15
+node scripts/query-skills.js --asset browserext --limit 15
 node scripts/query-skills.js --asset webapp --program hackerone --limit 10
 node scripts/query-skills.js --asset webapp --vuln xss
 node scripts/query-skills.js --asset webapp --json
@@ -753,8 +753,8 @@ Includes: target config, structured scope, local history, skill suggestions, glo
 The agents are Claude Code slash commands. You can invoke them directly inside a Claude Code session:
 
 ```
-/researcher --asset chromeext --mode whitebox ./src
-/triager --asset chromeext
+/researcher --asset browserext --mode whitebox ./src
+/triager --asset browserext
 ```
 
 Optional flags for the Researcher:
@@ -771,8 +771,8 @@ Bypass modules also auto-load on trigger conditions — HTTP 403 loads `waf_evas
 ### Compose prompts manually (Codex)
 
 ```bash
-node scripts/compose-agent-prompt.js researcher --asset chromeext --mode whitebox --target <name>
-node scripts/compose-agent-prompt.js triager --asset chromeext --target <name>
+node scripts/compose-agent-prompt.js researcher --asset browserext --mode whitebox --target <name>
+node scripts/compose-agent-prompt.js triager --asset browserext --target <name>
 ```
 
 ---
@@ -783,7 +783,7 @@ node scripts/compose-agent-prompt.js triager --asset chromeext --target <name>
 
 ```
 meta.schema_version      "2.0"
-meta.asset_type          webapp | mobileapp | chromeext | executable
+meta.asset_type          webapp | mobileapp | browserext | executable
 findings[]
   report_id              WEB-001 / MOB-001 / EXT-001 / EXE-001
   finding_title

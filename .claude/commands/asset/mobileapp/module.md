@@ -151,3 +151,17 @@ ios env
 - [ ] WebView loads external URLs — can attacker inject JS?
 - [ ] Exported activities accept attacker intents
 - [ ] Backup includes sensitive files (adb backup)
+
+---
+
+## ADDITIONAL VULN MODULES
+
+| Technology / Vector | Module path | Invoke with |
+|---|---|---|
+| Deep link / Intent injection | asset/mobileapp/vuln/deep_link.md | --vuln deeplink |
+| Firebase backend (Firestore/Storage) | shared/vuln/firebase.md | --vuln firebase |
+
+Auto-load triggers:
+- If `google-services.json` found in APK resources OR `firebaseio.com`/`firebasestorage` in network traffic or decompiled code → load shared/vuln/firebase.md
+- If `GoogleService-Info.plist` found in IPA OR Firebase SDK imports detected in Swift/ObjC source → load shared/vuln/firebase.md
+- If deep link schemes (`intent://`, custom scheme) in AndroidManifest.xml OR `openURL`/`handleDeepLink` in iOS source → load asset/mobileapp/vuln/deep_link.md

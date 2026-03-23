@@ -772,7 +772,7 @@ class SessionLimitError extends Error {
 async function spawnClaude(prompt, model, logPath) {
   const claudeArgs = [
     "--permission-mode", "bypassPermissions",
-    "--print", prompt,
+    "--print",          // prompt delivered via stdin to avoid ENAMETOOLONG on Windows
     "--output-format", "stream-json",
     "--verbose"
   ];
@@ -784,9 +784,13 @@ async function spawnClaude(prompt, model, logPath) {
 
   return new Promise((resolve, reject) => {
     const proc = spawn(bin, claudeArgs, {
-      stdio: ["inherit", "pipe", "pipe"],  // pipe stderr too so we can scan it
+      stdio: ["pipe", "pipe", "pipe"],  // pipe stdin so we can write the prompt; pipe stderr too
       shell: false
     });
+
+    // Write prompt to stdin and close it — avoids OS argument-length limits (ENAMETOOLONG)
+    proc.stdin.write(prompt, "utf8");
+    proc.stdin.end();
 
     const t0 = Date.now();
     let lineBuffer = "";
@@ -1299,7 +1303,7 @@ async function ensureTargetInitialized(targetRef) {
   await ask("Press Enter when the source is ready...");
 
   // ── Asset detection with interactive review ──────────────────────────────
-  const ASSET_TYPES_LIST = ["webapp", "chromeext", "mobileapp", "executable"];
+  const ASSET_TYPES_LIST = ["webapp", "browserext", "mobileapp", "executable"];
   let detectedAssets = [];
 
   if (fs.existsSync(srcDir) && fs.readdirSync(srcDir).length > 0) {

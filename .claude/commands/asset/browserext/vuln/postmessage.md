@@ -1,5 +1,5 @@
 # VULN MODULE — postMessage (Chrome Extension variant)
-# Asset: chromeext
+# Asset: browserext
 # See also: asset/webapp/vuln/postmessage.md for web app variant
 # Report ID prefix: EXT-PM
 

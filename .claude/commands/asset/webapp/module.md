@@ -21,7 +21,7 @@ who can call what, and whether those checks are enforced server-side.
 5.  Server-Side Request Forgery       CWE-918  — internal network access
 6.  Insecure Deserialization          CWE-502  — object injection
 7.  XML External Entity (XXE)         CWE-611  — XML parser abuse
-8.  Broken Access Control / IDOR      CWE-639  — horizontal/vertical privesc
+8.  Broken Access Control / IDOR      CWE-639  — horizontal/vertical privesc (→ vuln/broken_access_control.md)
 9.  CSRF                              CWE-352  — state-change without user consent
 10. Server-Side Template Injection    CWE-94   — template engine code execution
 11. Path Traversal / LFI              CWE-22   — file system access
@@ -152,6 +152,15 @@ XXE:              <!DOCTYPE x [<!ENTITY t SYSTEM "file:///etc/passwd">]><x>&t;</
 - Session: fixation, parallel sessions, logout invalidation
 - IDOR: increment/decrement IDs, swap UUIDs, change username in body
 
+### Broken Access Control / IDOR checklist
+- HTTP verb bypass: retry 401/403 with GET/PUT/PATCH/DELETE/OPTIONS + X-HTTP-Method-Override
+- HPP: duplicate params (?id=mine&id=victim), null byte, array notation, wildcard, boolean
+- Static keyword: replace /me/, /current/, /self/ with numeric/named IDs; try ?user_id= override
+- Second-order: user-controlled ID forwarded to internal service; path traversal (?id=../admin)
+- Role escalation: POST with role/isAdmin/permissions fields; decode+modify JWT role claim
+- Workflow skip: POST step N directly without completing step N-1; cross-account step interleave
+- Full module: --vuln bac  →  asset/webapp/vuln/broken_access_control.md
+
 ### GraphQL specific
 ```
 # Introspection (should be disabled in production)
@@ -204,6 +213,22 @@ Auto-load triggers (researcher loads these automatically if detected):
 - If lodash/merge/deepmerge found AND Node.js → load prototype_pollution.md
 - If addEventListener message found in JS → load postmessage.md
 - If package.json / requirements.txt present → load supply_chain.md
+- If REST API with numeric/UUID path segments OR hasRole/current_user_can/isAdmin in source → load broken_access_control.md
+- If location.hash/location.search read in JS AND innerHTML=/document.write( found → load dom_xss.md
+- If email verification/registration flow OR SMTP mailer libraries (PHPMailer, SwiftMailer, nodemailer) found → load email_injection.md
+- If IdnaConvert/Net_IDNA/idn_to_ascii found in PHP deps → load email_injection.md (Punycode RCE chain)
+- If Authorization: Bearer tokens OR jsonwebtoken/jose/PyJWT in deps OR /jwks.json endpoint found → load jwt.md
+- If /_next/ paths OR X-Powered-By: Next.js found → load nextjs_ssrf.md
+- If *.firebaseio.com OR firestore.googleapis.com OR firebasestorage found in traffic/JS → load shared/vuln/firebase.md
+- If wkhtmltopdf/puppeteer/playwright/reportlab/dompdf/weasyprint found in deps OR PDF export/invoice/report/certificate endpoints detected → load pdf_ssrf.md
+- If pdflatex/xelatex/lualatex in shell commands OR math/LaTeX rendering endpoints found → load latex_injection.md
+- If XSLTProcessor/TransformerFactory/xsltproc in code OR XML-to-anything conversion endpoint → load xslt_injection.md
+- If Apache SSI (Options Includes) OR ESI-supporting proxy (Varnish/Fastly/Akamai) detected → load ssi_injection.md
+- If DOMPurify + innerHTML OR user-HTML rendering with named elements → load dom_clobbering.md
+- If Django REST Framework FilterSet OR Ransack q[] OR Prisma with user-controlled where/include → load orm_leak.md
+- If PHP with == comparisons on hashes/tokens OR hash_hmac usage → load type_juggling.md
+- If CSV/XLS/XLSX export endpoints with user-controlled field data → load csv_injection.md
+- If archive upload (zip/tar/jar) OR plugin/theme/extension upload feature → load zip_slip.md
 
 ---
 
@@ -234,4 +259,22 @@ All available vuln modules for webapp. Auto-loaded when detected; manually with 
 | vuln/injection_other.md | injection | LDAP/XPath/SMTP/CSS endpoints |
 | vuln/cloud_misconfig.md | cloud | S3/Firebase/actuator endpoints |
 | vuln/mass_assignment.md | mass | ORM create/update with req.body |
+| vuln/broken_access_control.md | bac | REST IDs in paths + hasRole/current_user_can in code |
+| vuln/dom_xss.md | domxss | location.hash/search read in JS OR innerHTML=/document.write( found |
+| vuln/email_injection.md | email | SMTP mailer libs OR email verification flow OR IdnaConvert PHP dep |
+| vuln/jwt.md | jwt | Authorization: Bearer OR jsonwebtoken/jose/PyJWT in deps OR /jwks.json found |
+| vuln/nextjs_ssrf.md | nextjs | /_next/ paths OR X-Powered-By: Next.js OR "next" in package.json |
+| shared/vuln/firebase.md | firebase | *.firebaseio.com OR firestore.googleapis.com OR firebasestorage in traffic/JS |
 | shared/vuln/supply_chain.md | supplychain | package.json/requirements.txt present |
+| vuln/pdf_ssrf.md | pdf | wkhtmltopdf/puppeteer/reportlab in deps OR PDF export/invoice/report endpoints |
+| vuln/latex_injection.md | latex | pdflatex/xelatex/lualatex in shell calls OR LaTeX/math rendering endpoints |
+| vuln/xslt_injection.md | xslt | XSLTProcessor/TransformerFactory/xsltproc in code OR XML transformation endpoints |
+| vuln/ssi_injection.md | ssi | SSI Options Includes in Apache config OR ESI headers in Varnish/Fastly config |
+| vuln/dom_clobbering.md | domclob | DOMPurify usage with innerHTML OR named HTML elements in attacker-controlled HTML |
+| vuln/orm_leak.md | orm | Django REST Framework FilterSet OR Ransack q[] params OR Prisma with user-controlled where/include |
+| vuln/type_juggling.md | juggling | PHP with == comparisons on hashes/tokens OR hash_hmac usage |
+| vuln/hpp.md | hpp | Duplicate parameter handling in any request OR OAuth redirect_uri |
+| vuln/csv_injection.md | csv | CSV/XLS/XLSX export features with user-controlled data |
+| vuln/zip_slip.md | zipslip | Archive upload endpoints (zip/tar/jar) OR plugin/theme upload features |
+| vuln/xs_leak.md | xsleak | State-sensitive search endpoints OR personalized content variations by session |
+| vuln/dns_rebinding.md | dnsrebind | Internal service exposure OR localhost-bound dev services |

@@ -36,17 +36,17 @@ const DEFAULT_TOP_PROGRAMS = 10;
 const CLASSIFICATION_RULES = [
   // --- Chrome Extension specific ---
   {
-    asset_type: "chromeext",
+    asset_type: "browserext",
     vuln_class: "uxss",
     patterns: [/\buxss\b/i, /universal.*xss/i, /cross.?origin.*script/i]
   },
   {
-    asset_type: "chromeext",
+    asset_type: "browserext",
     vuln_class: "privilege_escalation_messages",
     patterns: [/chrome.*extension.*message/i, /postmessage.*extension/i, /extension.*privilege/i, /content.?script.*background/i]
   },
   {
-    asset_type: "chromeext",
+    asset_type: "browserext",
     vuln_class: "extension_data_leak",
     patterns: [/extension.*data.*leak/i, /chrome.*storage.*leak/i]
   },

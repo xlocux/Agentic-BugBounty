@@ -284,7 +284,7 @@ test("persistProgramIntel writes the same intelligence into sqlite and loadProgr
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "bugbounty-db-"));
   const targetConfig = {
     target_name: "DuckDuckGo Privacy Essentials",
-    asset_type: "chromeext",
+    asset_type: "browserext",
     program_url: "https://hackerone.com/duckduckgo"
   };
   const intel = {
@@ -386,7 +386,7 @@ test("persistDisclosedDataset writes global disclosed reports that can be read b
 test("buildResearchBrief prioritizes uncovered assets and merges local plus disclosed signal", () => {
   const config = {
     target_name: "DuckDuckGo Privacy Essentials",
-    asset_type: "chromeext",
+    asset_type: "browserext",
     hackerone: { program_handle: "duckduckgo" }
   };
 

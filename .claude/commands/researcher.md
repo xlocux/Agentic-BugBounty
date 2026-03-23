@@ -1,5 +1,5 @@
 # RESEARCHER AGENT — Entry Point
-# Usage: /researcher --asset [webapp|mobileapp|chromeext|executable] --mode [whitebox|blackbox] [path_or_url]
+# Usage: /researcher --asset [webapp|mobileapp|browserext|executable] --mode [whitebox|blackbox] [path_or_url]
 
 ## STARTUP SEQUENCE
 
@@ -9,7 +9,7 @@ If --asset is missing, ask:
   "Which asset type are you analyzing?
    [1] webapp      (PHP, Node, Python, Java, JSP, Ruby — any web application)
    [2] mobileapp   (Android APK or iOS IPA)
-   [3] chromeext   (Chrome, Firefox, or Edge browser extension)
+   [3] browserext   (Browser extension — Chrome, Firefox, or Edge — MV2/MV3)
    [4] executable  (ELF, PE, Mach-O binary)"
 
 If --mode is missing, ask:
@@ -53,8 +53,32 @@ in addition to the standard asset module:
 | smuggling | asset/webapp/vuln/http_smuggling.md |
 | cors | asset/webapp/vuln/cors.md |
 | supplychain | shared/vuln/supply_chain.md |
+| bac | asset/webapp/vuln/broken_access_control.md |
+| domxss | asset/webapp/vuln/dom_xss.md |
+| email | asset/webapp/vuln/email_injection.md |
+| jwt | asset/webapp/vuln/jwt.md |
+| nextjs | asset/webapp/vuln/nextjs_ssrf.md |
+| firebase | shared/vuln/firebase.md |
+| pdf | asset/webapp/vuln/pdf_ssrf.md |
+| latex | asset/webapp/vuln/latex_injection.md |
+| xslt | asset/webapp/vuln/xslt_injection.md |
+| ssi | asset/webapp/vuln/ssi_injection.md |
+| domclob | asset/webapp/vuln/dom_clobbering.md |
+| orm | asset/webapp/vuln/orm_leak.md |
+| juggling | asset/webapp/vuln/type_juggling.md |
+| hpp | asset/webapp/vuln/hpp.md |
+| csv | asset/webapp/vuln/csv_injection.md |
+| zipslip | asset/webapp/vuln/zip_slip.md |
+| xsleak | asset/webapp/vuln/xs_leak.md |
+| dnsrebind | asset/webapp/vuln/dns_rebinding.md |
 
 Example: /researcher --asset webapp --mode whitebox --vuln graphql ./src
+Example: /researcher --asset webapp --mode whitebox --vuln bac ./src
+Example: /researcher --asset webapp --mode whitebox --vuln domxss ./src
+Example: /researcher --asset webapp --mode blackbox --vuln email https://target.com
+Example: /researcher --asset webapp --mode blackbox --vuln jwt https://target.com
+Example: /researcher --asset webapp --mode blackbox --vuln nextjs https://target.com
+Example: /researcher --asset webapp --mode blackbox --vuln pdf https://target.com
 
 ## OPTIONAL --bypass FLAG
 

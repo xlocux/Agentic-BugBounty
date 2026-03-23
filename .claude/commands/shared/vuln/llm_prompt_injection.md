@@ -1,5 +1,5 @@
 # VULN MODULE — LLM / AI Prompt Injection
-# Asset: webapp | chromeext | mobileapp
+# Asset: webapp | browserext | mobileapp
 # Append to any asset module.md when target integrates an LLM (OpenAI, Anthropic, Gemini,
 #         local models, or LangChain/LlamaIndex pipelines)
 # Report ID prefix: [WEB|EXT|MOB]-LLM
@@ -30,7 +30,7 @@ Key attack paths:
 
 Affected asset types:
 - webapp: AI chat features, LLM-powered search, document summarization, customer support bots
-- chromeext: AI browser extensions that read page content, summarize emails, or operate with
+- browserext: AI browser extensions that read page content, summarize emails, or operate with
              broad host permissions — indirect injection via web page content is critical here
 - mobileapp: AI assistants, on-device LLM features, apps that process external content via LLM
 
@@ -369,7 +369,7 @@ python3 -m http.server 8080  # Log incoming requests with query params
 
 ## ASSET-SPECIFIC NOTES
 
-### Chrome Extension (chromeext)
+### Chrome Extension (browserext)
 - Extensions with `host_permissions: ["<all_urls>"]` that pass page content to LLM APIs
   are prime indirect injection targets: attacker controls any web page content the user visits
 - Check `content_scripts` that extract page text and forward to background service worker

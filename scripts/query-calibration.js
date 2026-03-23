@@ -6,9 +6,9 @@
  *
  * CLI query tool for the calibration dataset.
  * Usable by humans and referenced by agent prompts via:
- *   node scripts/query-calibration.js --asset chromeext --vuln privilege_escalation_messages
+ *   node scripts/query-calibration.js --asset browserext --vuln privilege_escalation_messages
  *   node scripts/query-calibration.js --asset webapp --vuln xss
- *   node scripts/query-calibration.js --asset chromeext
+ *   node scripts/query-calibration.js --asset browserext
  *   node scripts/query-calibration.js --all
  *
  * Output: JSON to stdout (pipe-friendly) or human table (default).
@@ -151,7 +151,7 @@ function main() {
     console.error("  node scripts/query-calibration.js --asset <type> --vuln <class> --behaviors [--limit N] [--json]");
     console.error("  node scripts/query-calibration.js --all [--json]");
     console.error("");
-    console.error("Asset types: webapp, mobileapp, chromeext, executable");
+    console.error("Asset types: webapp, mobileapp, browserext, executable");
     console.error("Vuln classes: xss, sqli, ssrf, idor, csrf, rce, uxss, privilege_escalation_messages, ...");
     console.error("Flags: --behaviors  show real H1 report summaries (researcher/triager behavior examples)");
     process.exit(1);

@@ -29,7 +29,7 @@
     },
     "asset_type": {
       "type": "string",
-      "enum": ["webapp", "mobileapp", "chromeext", "executable"]
+      "enum": ["webapp", "mobileapp", "browserext", "executable"]
     },
     "default_mode": {
       "type": "string",

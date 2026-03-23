@@ -31,16 +31,15 @@ done
 
 ## FIREBASE
 
+For full Firebase testing (Firestore REST API, Storage, privilege escalation, CORS):
+→ Load **shared/vuln/firebase.md** (`--vuln firebase`)
+
+Quick check (unauthenticated Realtime Database):
 ```bash
-# Open Firebase Realtime Database
 curl -s "https://project-name.firebaseio.com/.json"
-# If returns data → unauthenticated access
-
-# Firebase rules check
-curl -s "https://project-name.firebaseio.com/.settings/rules.json"
-
-# Firestore
-curl -s "https://firestore.googleapis.com/v1/projects/PROJECT/databases/(default)/documents/COLLECTION"
+# Returns data → critical unauthenticated read
+curl -s "https://firestore.googleapis.com/v1/projects/PROJECT/databases/(default)/documents/users"
+# 200 without auth → unauthenticated Firestore read
 ```
 
 ## EXPOSED SERVICES

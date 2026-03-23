@@ -168,7 +168,7 @@ function validateBundle(bundle) {
       errors.push(err("meta.generated_at", "must be an ISO8601 UTC timestamp"));
     }
     if (!ASSET_TYPES.has(meta.asset_type)) {
-      errors.push(err("meta.asset_type", "must be one of webapp, mobileapp, chromeext, executable"));
+      errors.push(err("meta.asset_type", "must be one of webapp, mobileapp, browserext, executable"));
     }
     if (!ANALYSIS_MODES.has(meta.analysis_mode)) {
       errors.push(err("meta.analysis_mode", "must be whitebox or blackbox"));

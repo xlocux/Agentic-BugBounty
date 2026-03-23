@@ -23,7 +23,7 @@ Do not add fields. Do not omit required fields.
   "meta": {
     "schema_version": "2.0",
     "generated_at": "ISO8601 timestamp",
-    "asset_type": "webapp | mobileapp | chromeext | executable",
+    "asset_type": "webapp | mobileapp | browserext | executable",
     "analysis_mode": "whitebox | blackbox",
     "target_name": "string",
     "target_version": "string",
@@ -129,22 +129,22 @@ For each (asset_type, vuln_class) combination:
 ### How to query
 ```bash
 # All patterns for a specific asset type
-node scripts/query-calibration.js --asset chromeext
+node scripts/query-calibration.js --asset browserext
 node scripts/query-calibration.js --asset webapp
 
 # Specific asset + vuln class
 node scripts/query-calibration.js --asset webapp --vuln xss
-node scripts/query-calibration.js --asset chromeext --vuln privilege_escalation_messages
+node scripts/query-calibration.js --asset browserext --vuln privilege_escalation_messages
 
 # JSON output (for piping or programmatic use)
-node scripts/query-calibration.js --asset chromeext --json
+node scripts/query-calibration.js --asset browserext --json
 
 # All patterns
 node scripts/query-calibration.js --all
 
 # Real H1 report behavior summaries (how researchers reported, what triage validated)
 node scripts/query-calibration.js --asset webapp --vuln xss --behaviors --limit 5
-node scripts/query-calibration.js --asset chromeext --vuln uxss --behaviors --json
+node scripts/query-calibration.js --asset browserext --vuln uxss --behaviors --json
 ```
 
 ### What the --behaviors flag returns
@@ -157,7 +157,7 @@ Use behaviors to understand:
   - The tone and specificity expected in a submittable report
 
 ### Asset type values
-  webapp, mobileapp, chromeext, executable
+  webapp, mobileapp, browserext, executable
 
 ### Vuln class values (partial list)
   webapp:    xss, sqli, ssrf, idor, csrf, rce, ssti, xxe, file_upload, open_redirect,
@@ -165,7 +165,7 @@ Use behaviors to understand:
              deserialization, race_condition, business_logic, subdomain_takeover,
              information_disclosure, command_injection, host_header, graphql,
              http_smuggling, supply_chain, account_takeover
-  chromeext: uxss, privilege_escalation_messages, extension_data_leak
+  browserext: uxss, privilege_escalation_messages, extension_data_leak
   mobileapp: deep_link_injection, insecure_data_storage, webview_xss, ssl_pinning_bypass, exported_component
   executable: buffer_overflow, memory_corruption, command_injection_native, format_string
 
@@ -210,7 +210,7 @@ For each skill entry:
 ### How to query
 ```bash
 # Global skills for an asset type
-node scripts/query-skills.js --asset chromeext --limit 15
+node scripts/query-skills.js --asset browserext --limit 15
 
 # Program-specific + global (program-specific ranked first)
 node scripts/query-skills.js --asset webapp --program hackerone --limit 10

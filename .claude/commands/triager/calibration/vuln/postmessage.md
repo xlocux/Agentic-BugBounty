@@ -1,5 +1,5 @@
 # TRIAGER CALIBRATION — postMessage
-# Appended to webapp or chromeext calibration module
+# Appended to webapp or browserext calibration module
 
 ## VALIDITY RULES
 
@@ -26,7 +26,7 @@ NOT VALID:
   - Data already public or non-exploitable
 Severity: High (auth token), Medium (non-auth sensitive)
 
-### Extension privilege escalation via postMessage (chromeext)
+### Extension privilege escalation via postMessage (browserext)
 VALID if:
   - PoC demonstrates privileged chrome API call triggered from attacker page
   - Specific API call shown: tabs.create, cookies.get, scripting.executeScript

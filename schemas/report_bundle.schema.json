@@ -35,7 +35,7 @@
         },
         "asset_type": {
           "type": "string",
-          "enum": ["webapp", "mobileapp", "chromeext", "executable"]
+          "enum": ["webapp", "mobileapp", "browserext", "executable"]
         },
         "analysis_mode": {
           "type": "string",

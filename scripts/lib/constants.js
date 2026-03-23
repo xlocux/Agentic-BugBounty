@@ -1,6 +1,6 @@
 "use strict";
 
-const ASSET_TYPES = new Set(["webapp", "mobileapp", "chromeext", "executable"]);
+const ASSET_TYPES = new Set(["webapp", "mobileapp", "browserext", "executable"]);
 const ANALYSIS_MODES = new Set(["whitebox", "blackbox"]);
 const SEVERITIES = ["Informative", "Low", "Medium", "High", "Critical"];
 const TRIAGE_VERDICTS = new Set([
@@ -13,7 +13,7 @@ const TRIAGE_VERDICTS = new Set([
 const REPORT_PREFIX_BY_ASSET = {
   webapp: "WEB",
   mobileapp: "MOB",
-  chromeext: "EXT",
+  browserext: "EXT",
   executable: "EXE"
 };
 

@@ -554,7 +554,7 @@ Rules:
 - Focus on the exact attack vector, what makes it work, and any non-obvious insight.
 - "insight" = the non-obvious part that makes this exploit work (the hacker moment).
 - vuln_class must be one of: xss, sqli, ssrf, xxe, idor, auth_bypass, privilege_escalation, rce, open_redirect, csrf, postmessage, prototype_pollution, race_condition, business_logic, info_disclosure, data_leak, deep_link_injection, supply_chain, deserialization, other
-- asset_type must be one of: webapp, chromeext, mobileapp, executable
+- asset_type must be one of: webapp, browserext, mobileapp, executable
 
 Reports:
 ${reports.map((r, i) =>
@@ -727,7 +727,7 @@ main();
 - [ ] **Step 2: Smoke-test**
 
 ```bash
-node scripts/query-skills.js --asset chromeext --limit 5
+node scripts/query-skills.js --asset browserext --limit 5
 ```
 Expected: "No skills found." message or skill list.
 
@@ -1268,7 +1268,7 @@ Expected: 18 pass.
 - [ ] **Step 5: Verify compose works standalone**
 
 ```bash
-node scripts/compose-agent-prompt.js researcher --asset chromeext --mode whitebox 2>&1 | tail -20
+node scripts/compose-agent-prompt.js researcher --asset browserext --mode whitebox 2>&1 | tail -20
 ```
 Expected: outputs EXECUTION CONTEXT section + optionally INTELLIGENCE BRIEF section.
 
@@ -1568,11 +1568,11 @@ git commit -m "feat: dual researcher — GPT-4.5 second pass + finding merge"
 ## Final Verification Checklist
 
 - [ ] `node --test --test-isolation=none tests/contracts.test.js` → 18 pass
-- [ ] `node scripts/query-skills.js --asset chromeext` → runs without error
+- [ ] `node scripts/query-skills.js --asset browserext` → runs without error
 - [ ] `node scripts/query-cve-intel.js --target okta` → runs without error
 - [ ] `node scripts/extract-skills.js --dry-run` → runs without error
 - [ ] `node scripts/sync-cve-intel.js --target okta --no-analysis` → fetches NVD CVEs
-- [ ] `node scripts/compose-agent-prompt.js researcher --asset chromeext --mode whitebox` → shows EXECUTION CONTEXT + optional INTELLIGENCE BRIEF
+- [ ] `node scripts/compose-agent-prompt.js researcher --asset browserext --mode whitebox` → shows EXECUTION CONTEXT + optional INTELLIGENCE BRIEF
 
 ---
 

@@ -1,5 +1,5 @@
 # TRIAGER AGENT — Entry Point
-# Usage: /triager --asset [webapp|mobileapp|chromeext|executable]
+# Usage: /triager --asset [webapp|mobileapp|browserext|executable]
 
 ## STARTUP SEQUENCE
 
@@ -7,7 +7,7 @@ Parse $ARGUMENTS for --asset flag.
 
 If --asset is missing, ask:
   "Which asset type does the report bundle contain?
-   [1] webapp  [2] mobileapp  [3] chromeext  [4] executable"
+   [1] webapp  [2] mobileapp  [3] browserext  [4] executable"
 
 Verify findings/confirmed/report_bundle.json exists and is valid JSON.
 If missing: "No report bundle found at findings/confirmed/report_bundle.json.

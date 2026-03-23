@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "target_name": "DuckDuckGo Privacy Essentials",
-  "asset_type": "chromeext",
+  "asset_type": "browserext",
   "default_mode": "whitebox",
   "allowed_modes": ["whitebox"],
   "program_url": "https://hackerone.com/duckduckgo",

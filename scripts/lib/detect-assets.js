@@ -5,17 +5,17 @@ const path = require("node:path");
 
 /**
  * Detect asset type from a directory by checking for well-known marker files.
- * Returns one of: "chromeext" | "mobileapp" | "executable" | "webapp"
+ * Returns one of: "browserext" | "mobileapp" | "executable" | "webapp"
  */
 function detectAssetType(dirPath) {
   const entries = safeReaddir(dirPath);
 
   // Chrome/Firefox/Edge extension — manifest.json with manifest_version field
   // Search up to 3 levels deep (some repos put built manifests in browsers/chrome/ etc.)
-  if (findExtensionManifest(dirPath, 3)) return "chromeext";
+  if (findExtensionManifest(dirPath, 3)) return "browserext";
 
   // _locales/ directory is exclusive to browser extensions
-  if (entries.includes("_locales")) return "chromeext";
+  if (entries.includes("_locales")) return "browserext";
 
   // Android — AndroidManifest.xml or build.gradle / build.gradle.kts
   if (
@@ -209,7 +209,7 @@ function describeAsset(dirPath, assetType) {
   const entries = safeReaddir(dirPath);
   const hints = [];
 
-  if (assetType === "chromeext") {
+  if (assetType === "browserext") {
     // Find the manifest and read name/version
     const manifestPath = findManifestPath(dirPath, 3);
     if (manifestPath) {
@@ -244,7 +244,7 @@ function describeAsset(dirPath, assetType) {
     else if (entries.includes("package.json")) hints.push("Node.js");
   }
 
-  const label = { webapp: "Web App", chromeext: "Chrome Extension", mobileapp: "Mobile App", executable: "Executable" }[assetType] || assetType;
+  const label = { webapp: "Web App", browserext: "Chrome Extension", mobileapp: "Mobile App", executable: "Executable" }[assetType] || assetType;
   return hints.length > 0 ? `${label} (${hints.join(", ")})` : label;
 }
 

@@ -25,7 +25,7 @@ Rules:
 - Focus on the exact attack vector, what makes it work, and any non-obvious insight.
 - "insight" = the non-obvious part that makes this exploit work (the hacker moment).
 - vuln_class must be one of: xss, sqli, ssrf, xxe, idor, auth_bypass, privilege_escalation, rce, open_redirect, csrf, postmessage, prototype_pollution, race_condition, business_logic, info_disclosure, data_leak, deep_link_injection, supply_chain, deserialization, other
-- asset_type must be one of: webapp, chromeext, mobileapp, executable
+- asset_type must be one of: webapp, browserext, mobileapp, executable
 
 Reports:
 ${reports.map((r, i) =>

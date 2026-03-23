@@ -64,8 +64,8 @@ require("node:fs").writeFileSync(
 
 ## Invocation
 \`\`\`
-/researcher --asset [webapp|mobileapp|chromeext|executable] --mode [whitebox|blackbox] ./src
-/triager --asset [webapp|mobileapp|chromeext|executable]
+/researcher --asset [webapp|mobileapp|browserext|executable] --mode [whitebox|blackbox] ./src
+/triager --asset [webapp|mobileapp|browserext|executable]
 \`\`\`
 
 ## Target details

