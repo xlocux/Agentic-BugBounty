@@ -40,7 +40,10 @@
     "scope:sync": "node scripts/sync-program-scope.js",
     "interactsh:start": "bash scripts/start-interactsh.sh",
     "interactsh:stop": "bash scripts/stop-interactsh.sh",
-    "interactsh:status": "node -e \"const ix=require('./scripts/lib/interactsh');console.log(ix.status())\""
+    "interactsh:status": "node -e \"const ix=require('./scripts/lib/interactsh');console.log(ix.status())\"",
+    "tools:check":   "node scripts/setup-tools.js --check",
+    "tools:install": "node scripts/setup-tools.js",
+    "tools:update":  "node scripts/setup-tools.js --update"
   },
   "dependencies": {
     "cheerio": "^1.2.0"

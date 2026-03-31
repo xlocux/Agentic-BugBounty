@@ -27,7 +27,7 @@ const readline = require("node:readline");
     if (key && !(key in process.env)) process.env[key] = val;
   }
 })();
-const { spawn, spawnSync } = require("node:child_process");
+const { execSync, spawn, spawnSync } = require("node:child_process");
 const {
   deriveProgramHandle,
   initDatabase,
@@ -1538,6 +1538,17 @@ async function main() {
     process.stdout.write(`    ${C.yellow}4.${C.reset} Triager       — validates findings, NMI rounds if needed\n`);
     process.stdout.write(`    ${C.yellow}5.${C.reset} Reports       — H1-ready markdown reports rendered\n`);
     process.stdout.write(`\n${bar}\n\n`);
+  }
+
+  // Auto-run tool setup on first run (when tool_status.json is absent)
+  const TOOL_STATUS_PATH = path.resolve(__dirname, "../tool_status.json");
+  if (!fs.existsSync(TOOL_STATUS_PATH)) {
+    logEvent(null, "First run detected — checking tool availability...", "info");
+    try {
+      execSync("node scripts/setup-tools.js --check", { stdio: "inherit", cwd: path.resolve(__dirname, "..") });
+    } catch {
+      // Non-fatal — pipeline continues with available tools
+    }
   }
 
   // Only re-sync if this is a fresh run (not resume — intel is already current)
