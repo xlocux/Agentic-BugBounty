@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AttackSurface",
+  "type": "object",
+  "required": ["schema_version", "generated_at", "target", "http_layer", "authentication", "authorization", "input_parsing", "javascript_sinks"],
+  "properties": {
+    "schema_version":   { "type": "integer", "const": 2 },
+    "generated_at":     { "type": "string" },
+    "target":           { "type": "string" },
+    "http_layer":       { "type": "array" },
+    "authentication":   { "type": "array" },
+    "authorization":    { "type": "array" },
+    "input_parsing":    { "type": "array" },
+    "async_ipc":        { "type": "array" },
+    "third_party":      { "type": "array" },
+    "environment":      { "type": "array" },
+    "javascript_sinks": { "type": "array" },
+    "external_domains": { "type": "array" }
+  }
+}
