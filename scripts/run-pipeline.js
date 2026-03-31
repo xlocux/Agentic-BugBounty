@@ -41,9 +41,11 @@ const {
   validateTargetConfig,
   writeJson
 } = require("./lib/contracts");
-const { callResearcherModel } = require("./lib/llm");
+const { callLLMJson, callResearcherModel } = require("./lib/llm");
 const { runHybridRecon, formatReconContextForPrompt } = require("./lib/hybrid-recon");
 const { detectAssetsInSrcDir, describeAsset } = require("./lib/detect-assets");
+const { runFileTriage } = require("./lib/file-triage");
+const { buildEmptySurface, mergeSurface, normalizeSurface, buildSurfacePrompt } = require("./lib/surface-map");
 
 function parseArgs(argv) {
   const parsed = {
@@ -1001,6 +1003,74 @@ function persistSkillsFromBundle(context, bundlePath, logPath) {
   }
 }
 
+async function runStage0FileTriage(context, runLog) {
+  logEvent(runLog, "Stage 0 — File Triage: classifying source files...", "info");
+  const manifestPath = path.join(context.findingsDir, "file_manifest.json");
+
+  // Skip if already done (resume support)
+  if (fs.existsSync(manifestPath)) {
+    logEvent(runLog, "Stage 0 — already complete, using cached manifest", "info");
+    return JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  }
+
+  const manifest = runFileTriage(context.target, context.targetDir);
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
+  logEvent(runLog, `Stage 0 — done: ${manifest.files.length} files classified`, "info");
+  return manifest;
+}
+
+async function runStage1SurfaceMap(context, manifest, runLog) {
+  logEvent(runLog, "Stage 1 — Surface Mapping: building attack surface...", "info");
+  const surfacePath = path.join(context.findingsDir, "attack_surface.json");
+
+  // Skip if already done (resume support)
+  if (fs.existsSync(surfacePath)) {
+    logEvent(runLog, "Stage 1 — already complete, using cached surface", "info");
+    return JSON.parse(fs.readFileSync(surfacePath, "utf8"));
+  }
+
+  // Process files in batches of 10 to stay within cheap model context window
+  const BATCH_SIZE = 10;
+  let surface = buildEmptySurface(context.target);
+  const files = manifest.files.filter(f =>
+    ["auth", "routing", "input", "db", "upload", "async", "template"].includes(f.relevance_tag)
+  );
+
+  logEvent(runLog, `Stage 1 — processing ${files.length} security-relevant files in batches of ${BATCH_SIZE}`, "info");
+
+  for (let i = 0; i < files.length; i += BATCH_SIZE) {
+    const batch    = files.slice(i, i + BATCH_SIZE);
+    const contents = batch.map(f => {
+      try { return fs.readFileSync(path.join(context.targetDir, f.path), "utf8"); }
+      catch { return ""; }
+    });
+
+    const prompt = buildSurfacePrompt(context.target, batch, contents);
+
+    let result;
+    try {
+      result = await callLLMJson(prompt);
+    } catch (e) {
+      logEvent(runLog, `Stage 1 — batch ${Math.floor(i / BATCH_SIZE) + 1} failed: ${e.message} (continuing)`, "warn");
+      continue;
+    }
+
+    if (result && typeof result === "object") {
+      surface = mergeSurface(surface, result);
+    }
+
+    logEvent(runLog, `Stage 1 — batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(files.length / BATCH_SIZE)} done`, "info");
+  }
+
+  try { normalizeSurface(surface); } catch (e) {
+    logEvent(runLog, `Stage 1 — schema validation warning: ${e.message}`, "warn");
+  }
+
+  fs.writeFileSync(surfacePath, JSON.stringify(surface, null, 2), "utf8");
+  logEvent(runLog, `Stage 1 — done: http_layer=${surface.http_layer.length} auth=${surface.authentication.length} sinks=${surface.javascript_sinks.length}`, "info");
+  return surface;
+}
+
 async function runResearcherPhase(cli, assetContext, args, bundlePath, isAdditional, runLog, resumeHint = "") {
   let extraText = isAdditional
     ? `\n\nIMPORTANT: A report_bundle.json already exists from a previous asset pass. APPEND your new findings to it — do NOT remove or overwrite existing entries.`
@@ -1634,6 +1704,12 @@ async function main() {
         `Continue the analysis — do NOT re-analyse findings already in the bundle. ` +
         `Pick up from where you left off.`
       : "";
+
+    // Stage 0 — File Triage (cheap model, deterministic)
+    const manifest = await runStage0FileTriage(assetContext, runLog);
+
+    // Stage 1 — Surface Mapping (cheap model, LLM)
+    const surface = await runStage1SurfaceMap(assetContext, manifest, runLog);
 
     try {
       await runResearcherPhase(args.cli, assetContext, args, bundlePath, index > 0, runLog, resumeHint);
