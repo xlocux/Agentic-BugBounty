@@ -101,6 +101,18 @@ test("extractSurface captures links", () => {
   assert.ok(result.links.some(l => l.href === "/dashboard"));
 });
 
+test("extractSurface excludes comments inside nav and footer", () => {
+  const html = `<html><body>
+    <nav><!-- nav-secret: internal routing --><a>Home</a></nav>
+    <footer><!-- footer-token: abc123 --></footer>
+    <!-- body-comment: visible -->
+  </body></html>`;
+  const result = extractSurface(html);
+  assert.ok(!result.comments.some(c => c.includes("nav-secret")));
+  assert.ok(!result.comments.some(c => c.includes("footer-token")));
+  assert.ok(result.comments.some(c => c.includes("body-comment")));
+});
+
 // ── extractResponse ──────────────────────────────────────────────────────────
 
 test("extractResponse detects internal_path anomaly", () => {
