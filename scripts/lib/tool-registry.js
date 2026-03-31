@@ -65,11 +65,13 @@ function detectPackageManagers() {
 
 // ── Tool availability check ───────────────────────────────────────────────────
 
-function isToolInstalled(binOrCheckCmd) {
+function isToolInstalled(binOrCheckCmd, isFullCmd = false) {
   try {
-    execSync(`${binOrCheckCmd} --version 2>&1`, { stdio: "pipe", timeout: 5000 });
+    const probe = isFullCmd ? binOrCheckCmd : `${binOrCheckCmd} --version 2>&1`;
+    execSync(probe, { stdio: "pipe", timeout: 5000 });
     return true;
   } catch {
+    if (isFullCmd) return false; // compound commands don't fall through to which/where
     try {
       execSync(`which ${binOrCheckCmd} 2>&1`, { stdio: "pipe", timeout: 3000 });
       return true;
@@ -97,7 +99,7 @@ function getToolVersion(bin) {
 function getToolPath(bin) {
   try {
     const cmd = process.platform === "win32" ? `where ${bin}` : `which ${bin}`;
-    return execSync(cmd, { stdio: "pipe", timeout: 3000 }).toString().trim().split("\n")[0];
+    return execSync(cmd, { stdio: "pipe", timeout: 3000 }).toString().split("\n")[0].trim();
   } catch {
     return null;
   }
@@ -108,8 +110,9 @@ function getToolPath(bin) {
 function buildToolStatus() {
   const status = {};
   for (const [name, def] of Object.entries(TOOLS)) {
-    const checkCmd = def.checkCmd || def.bin;
-    const installed = isToolInstalled(checkCmd);
+    const checkCmd  = def.checkCmd || def.bin;
+    const isFullCmd = !!def.checkCmd;
+    const installed = isToolInstalled(checkCmd, isFullCmd);
     status[name] = {
       installed,
       path:    installed ? getToolPath(def.bin) : null,

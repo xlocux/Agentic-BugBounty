@@ -3,25 +3,25 @@
     "installed": true,
     "path": "C:\\Program Files\\nodejs\\node.exe",
     "version": "24.9.0",
-    "action": "skip"
+    "action": "check_only"
   },
   "python3": {
     "installed": true,
     "path": "C:\\Users\\lucac\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe",
     "version": "3.13.12",
-    "action": "skip"
+    "action": "check_only"
   },
   "go": {
     "installed": true,
     "path": "C:\\Program Files\\Go\\bin\\go.exe",
     "version": null,
-    "action": "skip"
+    "action": "check_only"
   },
   "docker": {
     "installed": true,
-    "path": "C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker\r",
+    "path": "C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker",
     "version": "29.2.1",
-    "action": "skip"
+    "action": "check_only"
   },
   "subfinder": {
     "installed": false,
@@ -99,7 +99,7 @@
     "installed": true,
     "path": "C:\\Users\\lucac\\AppData\\Local\\Microsoft\\WindowsApps\\python3.exe",
     "version": "3.13.12",
-    "action": "skip"
+    "action": "check_only"
   },
   "nmap": {
     "installed": false,

@@ -76,13 +76,24 @@ function updateEnvFile(updates) {
   if (!fs.existsSync(envPath)) return;
 
   let content = fs.readFileSync(envPath, "utf8");
+  const toAppend = [];
+
   for (const [key, value] of Object.entries(updates)) {
     if (!value) continue;
     const re = new RegExp(`^(${key}=).*$`, "m");
     if (re.test(content)) {
       content = content.replace(re, `$1${value}`);
+    } else {
+      // Key not yet in .env — append it
+      toAppend.push(`${key}=${value}`);
     }
   }
+
+  if (toAppend.length > 0) {
+    const sep = content.endsWith("\n") ? "" : "\n";
+    content += sep + toAppend.join("\n") + "\n";
+  }
+
   fs.writeFileSync(envPath, content, "utf8");
 }
 
@@ -99,7 +110,22 @@ async function main() {
 
   for (const [name, def] of Object.entries(TOOLS)) {
     const checkCmd  = def.checkCmd || def.bin;
-    const installed = isToolInstalled(checkCmd);
+    const isFullCmd = !!def.checkCmd;
+    const installed = isToolInstalled(checkCmd, isFullCmd);
+
+    if (args.checkOnly) {
+      const pth = installed ? getToolPath(def.bin) : null;
+      const ver = installed ? getToolVersion(def.bin) : null;
+      results[name] = { installed, path: pth, version: ver, action: "check_only" };
+      if (!installed) {
+        const fallback = os === "win32" && def.windowsFallback ? ` (${def.windowsFallback} fallback available)` : "";
+        process.stdout.write(`  ${C.yellow}⚠${C.reset}  ${name.padEnd(14)} ${C.dim}not found${fallback}${C.reset}\n`);
+      } else {
+        process.stdout.write(`  ${C.bgreen}✓${C.reset} ${name.padEnd(14)} ${C.dim}${ver || ""}${C.reset}\n`);
+        if (def.envKey && pth) envUpdates[def.envKey] = pth;
+      }
+      continue;
+    }
 
     if (installed && !args.update) {
       const ver  = getToolVersion(def.bin);
@@ -107,21 +133,6 @@ async function main() {
       results[name] = { installed: true, path: pth, version: ver, action: "skip" };
       if (def.envKey && pth) envUpdates[def.envKey] = pth;
       process.stdout.write(`  ${C.bgreen}✓${C.reset} ${name.padEnd(14)} ${C.dim}${ver || ""}${C.reset}  ${C.gray}(already installed)${C.reset}\n`);
-      continue;
-    }
-
-    if (args.checkOnly) {
-      results[name] = { installed, path: null, version: null, action: "check_only" };
-      if (!installed) {
-        const fallback = os === "win32" && def.windowsFallback ? ` (${def.windowsFallback} fallback available)` : "";
-        process.stdout.write(`  ${C.yellow}⚠${C.reset}  ${name.padEnd(14)} ${C.dim}not found${fallback}${C.reset}\n`);
-      } else {
-        const ver = getToolVersion(def.bin);
-        const pth = getToolPath(def.bin);
-        results[name] = { installed: true, path: pth, version: ver, action: "check_only" };
-        if (def.envKey && pth) envUpdates[def.envKey] = pth;
-        process.stdout.write(`  ${C.bgreen}✓${C.reset} ${name.padEnd(14)} ${C.dim}${ver || ""}${C.reset}\n`);
-      }
       continue;
     }
 
