@@ -41,11 +41,12 @@
     "interactsh:start": "bash scripts/start-interactsh.sh",
     "interactsh:stop": "bash scripts/stop-interactsh.sh",
     "interactsh:status": "node -e \"const ix=require('./scripts/lib/interactsh');console.log(ix.status())\"",
-    "tools:check":   "node scripts/setup-tools.js --check",
+    "tools:check": "node scripts/setup-tools.js --check",
     "tools:install": "node scripts/setup-tools.js",
-    "tools:update":  "node scripts/setup-tools.js --update"
+    "tools:update": "node scripts/setup-tools.js --update"
   },
   "dependencies": {
+    "ajv": "^8.18.0",
     "cheerio": "^1.2.0"
   }
 }
