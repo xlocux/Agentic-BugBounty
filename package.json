@@ -33,6 +33,16 @@
     "calibration:extract-skills": "node scripts/extract-skills.js",
     "skills:query": "node scripts/query-skills.js",
     "cve:sync": "node scripts/sync-cve-intel.js",
-    "cve:query": "node scripts/query-cve-intel.js"
+    "cve:query": "node scripts/query-cve-intel.js",
+    "apis:check": "node scripts/check-apis.js",
+    "apis:check:tier1": "node scripts/check-apis.js --tier 1",
+    "notify:test": "node -e \"require('./scripts/lib/notify').notify('run_completed',{target:'test',run_type:'domains',subdomains_found:42,hosts_live:18,hosts_interesting:5,findings_count:2,duration_s:312}).then(()=>console.log('sent')).catch(e=>console.error(e.message))\"",
+    "scope:sync": "node scripts/sync-program-scope.js",
+    "interactsh:start": "bash scripts/start-interactsh.sh",
+    "interactsh:stop": "bash scripts/stop-interactsh.sh",
+    "interactsh:status": "node -e \"const ix=require('./scripts/lib/interactsh');console.log(ix.status())\""
+  },
+  "dependencies": {
+    "cheerio": "^1.2.0"
   }
 }
