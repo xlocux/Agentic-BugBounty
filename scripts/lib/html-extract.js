@@ -58,7 +58,7 @@ function extractSurface(html) {
   const script_srcs = $("script[src]").map((_, el) => $(el).attr("src")).get()
     .filter(Boolean);
 
-  const comments = _extractComments(html);
+  const comments = _extractComments($.html());
 
   const forms = $("form").map((_, form) => ({
     action: $(form).attr("action") || null,
