@@ -11,7 +11,11 @@ const VALID = {
   authentication:   [],
   authorization:    [],
   input_parsing:    [],
-  javascript_sinks: []
+  async_ipc:        [],
+  third_party:      [],
+  environment:      [],
+  javascript_sinks: [],
+  external_domains: []
 };
 
 test("attack-surface: valid object passes", () => {

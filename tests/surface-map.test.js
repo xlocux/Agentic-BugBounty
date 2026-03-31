@@ -31,7 +31,11 @@ test("mergeSurface combines entries from two surfaces", () => {
 });
 
 test("normalizeSurface passes schema validation", () => {
-  const { validate } = require("../scripts/lib/schema-validator");
   const surface = buildEmptySurface("acme");
-  assert.doesNotThrow(() => validate("attack-surface", surface));
+  const result = normalizeSurface(surface);
+  assert.equal(result, surface);
+});
+
+test("normalizeSurface throws on invalid surface", () => {
+  assert.throws(() => normalizeSurface({ schema_version: 2 }), /validation/i);
 });
