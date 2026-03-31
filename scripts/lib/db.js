@@ -234,7 +234,7 @@ function migrateDatabase(db) {
     );
 
     CREATE INDEX IF NOT EXISTS idx_components_name      ON project_components(name);
-    CREATE INDEX IF NOT EXISTS idx_components_ecosystem ON project_components(name, ecosystem);
+    CREATE INDEX IF NOT EXISTS idx_components_ecosystem ON project_components(target_id, name, ecosystem);
     CREATE INDEX IF NOT EXISTS idx_components_target    ON project_components(target_id);
 
     -- ── endpoints — discovered API surface ───────────────────────────────────
@@ -1486,6 +1486,9 @@ function markCveMatchesNotified(db, ids) {
     .run(...ids);
 }
 
+// version and versionRange use COALESCE: if the new value is non-null it replaces the
+// existing one; if null, the existing value is preserved. This means once a version is
+// set it cannot be cleared by passing null — callers must use a DELETE+INSERT for that.
 function upsertComponent(db, { targetId, name, version, versionRange, ecosystem, sourceFile, directDep }) {
   db.prepare(`
     INSERT INTO project_components

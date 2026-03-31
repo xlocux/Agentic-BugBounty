@@ -553,6 +553,11 @@ test("upsertEndpoint inserts and deduplicates by target+method+path", () => {
   const count = db.prepare("SELECT COUNT(*) as n FROM endpoints WHERE path = '/api/users'").get();
   assert.equal(count.n, 1, "should not duplicate");
 
+  const row = db.prepare("SELECT * FROM endpoints WHERE path = '/api/users'").get();
+  assert.equal(row.source, "crawl", "upsert should update source to latest");
+  const parsedParams = JSON.parse(row.params);
+  assert.equal(parsedParams.length, 3, "upsert should update params");
+
   db.close();
   fs.rmSync(dir, { recursive: true });
 });
