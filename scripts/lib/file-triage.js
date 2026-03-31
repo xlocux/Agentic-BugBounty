@@ -44,7 +44,7 @@ const RELEVANCE_TAGS = {
 };
 
 function detectLanguage(filePath) {
-  const ext = path.extname(filePath).replace(".", "").toLowerCase();
+  const ext = path.extname(filePath).slice(1).toLowerCase();
   if (!ext) {
     const base = path.basename(filePath).toLowerCase();
     if (base === ".env" || base.startsWith(".env.")) return "dotenv";
@@ -71,17 +71,19 @@ function detectRelevanceTag(filePath, language) {
  * Does NOT call any LLM — purely deterministic.
  *
  * @param {string[]} filePaths  relative file paths
+ * @param {string|null} [baseDir]  optional base directory for resolving absolute paths for stat
  * @returns {object[]} filtered + annotated file entries
  */
-function classifyFiles(filePaths) {
+function classifyFiles(filePaths, baseDir = null) {
   return filePaths
     .filter(p => !EXCLUDE_PATTERNS.some(re => re.test(p.replace(/\\/g, "/"))))
     .map(p => {
       const language      = detectLanguage(p);
       const relevance_tag = detectRelevanceTag(p, language);
-      const stat          = (() => { try { return fs.statSync(p); } catch { return null; } })();
+      const fullPath      = baseDir ? path.join(baseDir, p) : p;
+      const stat          = (() => { try { return fs.statSync(fullPath); } catch { return null; } })();
       return {
-        path:          p,
+        path:          p.replace(/\\/g, "/"),
         size_bytes:    stat ? stat.size : null,
         language,
         relevance_tag
@@ -138,14 +140,12 @@ function walkDir(dir, base = dir) {
  * @returns {object} file_manifest.json v2
  */
 function runFileTriage(target, targetDir) {
-  const allFiles = walkDir(targetDir);
-  const classified = classifyFiles(allFiles.map(f => path.join(targetDir, f).replace(/\\/g, "/")));
-  // Normalize back to relative paths for portability
-  const files = classified.map(f => ({
-    ...f,
-    path: path.relative(targetDir, f.path).replace(/\\/g, "/")
-  }));
-  return buildManifest(target, files);
+  if (!fs.existsSync(targetDir)) {
+    throw new Error(`runFileTriage: targetDir does not exist: ${targetDir}`);
+  }
+  const allFiles = walkDir(targetDir);  // already relative
+  const classified = classifyFiles(allFiles, targetDir);  // pass baseDir for stat
+  return buildManifest(target, classified);
 }
 
 module.exports = { classifyFiles, buildManifest, walkDir, runFileTriage, EXCLUDE_PATTERNS };

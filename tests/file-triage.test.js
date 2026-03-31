@@ -68,13 +68,15 @@ test("buildManifest includes target name", () => {
 
 // ── relevance_tag ─────────────────────────────────────────────────────────────
 
-test("classifyFiles returns relevance_tag for each file", () => {
-  const files = ["src/auth.js", "app/user.php"];
+test("classifyFiles returns correct relevance_tag", () => {
+  const files = ["src/auth.js", "app/user.php", "app/routes/api.js"];
   const result = classifyFiles(files);
-  for (const f of result) {
-    assert.ok(typeof f.relevance_tag === "string" && f.relevance_tag.length > 0,
-      `expected non-empty relevance_tag, got: ${f.relevance_tag}`);
-  }
+  const auth  = result.find(f => f.path === "src/auth.js");
+  const php   = result.find(f => f.path === "app/user.php");
+  const route = result.find(f => f.path === "app/routes/api.js");
+  assert.equal(auth.relevance_tag,  "auth");
+  assert.equal(php.relevance_tag,   "routing");
+  assert.equal(route.relevance_tag, "routing");
 });
 
 // ── walkDir ───────────────────────────────────────────────────────────────────
