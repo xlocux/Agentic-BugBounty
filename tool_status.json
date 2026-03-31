@@ -1,0 +1,134 @@
+{
+  "node": {
+    "installed": true,
+    "path": "C:\\Program Files\\nodejs\\node.exe",
+    "version": "24.9.0",
+    "action": "skip"
+  },
+  "python3": {
+    "installed": true,
+    "path": "C:\\Users\\lucac\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe",
+    "version": "3.13.12",
+    "action": "skip"
+  },
+  "go": {
+    "installed": true,
+    "path": "C:\\Program Files\\Go\\bin\\go.exe",
+    "version": null,
+    "action": "skip"
+  },
+  "docker": {
+    "installed": true,
+    "path": "C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker\r",
+    "version": "29.2.1",
+    "action": "skip"
+  },
+  "subfinder": {
+    "installed": false,
+    "path": null,
+    "version": null,
+    "action": "check_only"
+  },
+  "ffuf": {
+    "installed": false,
+    "path": null,
+    "version": null,
+    "action": "check_only"
+  },
+  "httpx": {
+    "installed": false,
+    "path": null,
+    "version": null,
+    "action": "check_only"
+  },
+  "nuclei": {
+    "installed": false,
+    "path": null,
+    "version": null,
+    "action": "check_only"
+  },
+  "gobuster": {
+    "installed": false,
+    "path": null,
+    "version": null,
+    "action": "check_only"
+  },
+  "gitleaks": {
+    "installed": false,
+    "path": null,
+    "version": null,
+    "action": "check_only"
+  },
+  "dalfox": {
+    "installed": false,
+    "path": null,
+    "version": null,
+    "action": "check_only"
+  },
+  "trufflehog": {
+    "installed": false,
+    "path": null,
+    "version": null,
+    "action": "check_only"
+  },
+  "interactsh": {
+    "installed": false,
+    "path": null,
+    "version": null,
+    "action": "check_only"
+  },
+  "sqlmap": {
+    "installed": false,
+    "path": null,
+    "version": null,
+    "action": "check_only"
+  },
+  "ghauri": {
+    "installed": false,
+    "path": null,
+    "version": null,
+    "action": "check_only"
+  },
+  "jwt_tool": {
+    "installed": false,
+    "path": null,
+    "version": null,
+    "action": "check_only"
+  },
+  "brojack": {
+    "installed": true,
+    "path": "C:\\Users\\lucac\\AppData\\Local\\Microsoft\\WindowsApps\\python3.exe",
+    "version": "3.13.12",
+    "action": "skip"
+  },
+  "nmap": {
+    "installed": false,
+    "path": null,
+    "version": null,
+    "action": "check_only"
+  },
+  "whatweb": {
+    "installed": false,
+    "path": null,
+    "version": null,
+    "action": "check_only"
+  },
+  "nikto": {
+    "installed": false,
+    "path": null,
+    "version": null,
+    "action": "check_only"
+  },
+  "feroxbuster": {
+    "installed": false,
+    "path": null,
+    "version": null,
+    "action": "check_only"
+  },
+  "wpscan": {
+    "installed": false,
+    "path": null,
+    "version": null,
+    "action": "check_only"
+  }
+}
