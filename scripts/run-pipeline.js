@@ -43,6 +43,8 @@ const {
 } = require("./lib/contracts");
 const { callLLMJson, callResearcherModel } = require("./lib/llm");
 const { runHybridRecon, formatReconContextForPrompt } = require("./lib/hybrid-recon");
+const { runExplorer } = require("./lib/explorer");
+const { checkpoint1_postExplorer, checkpoint2_postResearcher, checkpoint3_preTriage } = require("./lib/hitl");
 const { detectAssetsInSrcDir, describeAsset } = require("./lib/detect-assets");
 const { runFileTriage } = require("./lib/file-triage");
 const { buildEmptySurface, mergeSurface, normalizeSurface, buildSurfacePrompt } = require("./lib/surface-map");
@@ -66,6 +68,7 @@ function parseArgs(argv) {
     model: process.env.AGENTIC_MODEL || "",
     maxNmiRounds: 2,
     interactive: false,
+    hitl: false,
     resume: false
   };
 
@@ -78,6 +81,7 @@ function parseArgs(argv) {
     else if (value === "--model") parsed.model = argv[++index];
     else if (value === "--max-nmi-rounds") parsed.maxNmiRounds = Number(argv[++index]);
     else if (value === "--interactive") parsed.interactive = true;
+    else if (value === "--hitl") { parsed.hitl = true; parsed.interactive = false; }
     else if (value === "--resume") parsed.resume = true;
     else parsed.target = value;
   }
@@ -1236,7 +1240,123 @@ function formatGitIntelForPrompt(intel) {
   return `\n\n--- STAGE 1.5 GIT INTELLIGENCE (pre-computed) ---\n${parts.join("\n\n")}\n--- END GIT INTELLIGENCE ---`;
 }
 
-async function runResearcherPhase(cli, assetContext, args, bundlePath, isAdditional, runLog, resumeHint = "", gitIntel = null) {
+/**
+ * Analyzes the current report_bundle and detects new recon signals that
+ * emerged during the researcher pass compared to previously seen signals.
+ *
+ * Returns { hasNew: boolean, signals: string[] } where signals is a list
+ * of human-readable observations to inject into the next prompt.
+ *
+ * "Signal" = any information that expands the attack surface relative to
+ * what was known before the pass: new endpoints, stacks, domains,
+ * internal components, partial credentials, or unexpected technologies.
+ */
+function detectReconSignals(bundlePath, prevSignalSet) {
+  if (!fs.existsSync(bundlePath)) return { hasNew: false, signals: [] };
+
+  let bundle;
+  try {
+    bundle = readJson(bundlePath);
+  } catch {
+    return { hasNew: false, signals: [] };
+  }
+
+  const findings = bundle.findings || [];
+  const candidates = bundle.unconfirmed_candidates || [];
+  const all = [...findings, ...candidates];
+
+  const signals = [];
+
+  for (const item of all) {
+    // Endpoint / components not seen before
+    const comp = (item.affected_component || "").trim();
+    if (comp && !prevSignalSet.has(`comp:${comp}`)) {
+      prevSignalSet.add(`comp:${comp}`);
+      signals.push(`New component discovered: ${comp}`);
+    }
+
+    // Tech stacks mentioned in researcher notes
+    const notes = (item.researcher_notes || "") + (item.summary || "");
+    const stackMatches = notes.match(
+      /\b(Laravel|Spring|Django|Rails|Next\.js|Nuxt|Express|FastAPI|Gin|Echo|Fiber|Symfony|CodeIgniter|Struts|Quarkus|Micronaut)\b/gi
+    );
+    if (stackMatches) {
+      for (const tech of stackMatches) {
+        const key = `tech:${tech.toLowerCase()}`;
+        if (!prevSignalSet.has(key)) {
+          prevSignalSet.add(key);
+          signals.push(`Technology identified: ${tech}`);
+        }
+      }
+    }
+
+    // Internal domains / hostnames mentioned
+    const hostMatches = notes.match(/\b([a-z0-9-]+\.(internal|local|corp|intranet|svc|cluster\.local))\b/gi);
+    if (hostMatches) {
+      for (const host of hostMatches) {
+        const key = `host:${host.toLowerCase()}`;
+        if (!prevSignalSet.has(key)) {
+          prevSignalSet.add(key);
+          signals.push(`Internal hostname discovered: ${host}`);
+        }
+      }
+    }
+
+    // High-value vulnerability class found — may open new surfaces
+    const highValueClasses = ["ssrf", "xxe", "deserialization", "rce", "ssti", "prototype_pollution"];
+    const vulnClass = (item.vulnerability_class || "").toLowerCase();
+    if (highValueClasses.some((c) => vulnClass.includes(c))) {
+      const key = `highval:${vulnClass}`;
+      if (!prevSignalSet.has(key)) {
+        prevSignalSet.add(key);
+        signals.push(`High-value finding detected (${item.vulnerability_class}) — check correlated surfaces`);
+      }
+    }
+  }
+
+  return { hasNew: signals.length > 0, signals };
+}
+
+/**
+ * Builds the text to inject into the Researcher prompt
+ * based on new recon signals detected.
+ */
+function buildAdaptiveReconHint(signals, reconUpdatePath) {
+  if (!signals || signals.length === 0) return "";
+
+  // Persist signals to disk for traceability
+  let existing = [];
+  try {
+    if (reconUpdatePath && fs.existsSync(reconUpdatePath)) {
+      existing = readJson(reconUpdatePath) || [];
+    }
+  } catch { /* ignore read errors */ }
+
+  const timestamp = new Date().toISOString();
+  const newEntries = signals.map((s) => ({ signal: s, detected_at: timestamp }));
+  try {
+    if (reconUpdatePath) {
+      fs.writeFileSync(reconUpdatePath, JSON.stringify([...existing, ...newEntries], null, 2), "utf8");
+    }
+  } catch { /* do not block pipeline if write fails */ }
+
+  const signalList = signals.map((s) => `  • ${s}`).join("\n");
+
+  return `
+
+ADAPTIVE RECON UPDATE — new signals detected from previous pass:
+${signalList}
+
+Instructions:
+  1. Consider these signals as new starting points for analysis.
+  2. For each new component/technology/hostname: check if it opens attack
+     surfaces not covered in previous findings.
+  3. For high-value findings: look for variants, bypasses, and correlated
+     secondary vectors (e.g. if SSRF found → check redirect chain, DNS rebinding, etc.)
+  4. Do not duplicate findings already in the bundle. Only add new discoveries.`;
+}
+
+async function runResearcherPhase(cli, assetContext, args, bundlePath, isAdditional, runLog, resumeHint = "", signalSet = null, gitIntel = null) {
   let extraText = isAdditional
     ? `\n\nIMPORTANT: A report_bundle.json already exists from a previous asset pass. APPEND your new findings to it — do NOT remove or overwrite existing entries.`
     : "";
@@ -1248,20 +1368,62 @@ async function runResearcherPhase(cli, assetContext, args, bundlePath, isAdditio
 
   logEvent(runLog, `Starting researcher phase asset=${assetContext.asset} source=${assetContext.target}`);
 
-  // Run Phase 0+1 via free LLM to save Claude tokens — inject result as pre-computed context.
-  // Falls back silently (null) if free LLM is unavailable; Claude handles Phase 0+1 itself.
-  try {
-    logEvent(runLog, "Running hybrid recon (Phase 0+1) via free LLM...");
-    const reconContext = await runHybridRecon(assetContext, path.resolve(__dirname, ".."));
-    const reconText = formatReconContextForPrompt(reconContext);
-    if (reconText) {
-      extraText += reconText;
-      logEvent(runLog, "Hybrid recon injected into researcher prompt", "ok");
-    } else {
-      logEvent(runLog, "Hybrid recon skipped — Claude will handle Phase 0+1", "warn");
+  // Inject adaptive recon hint if signal set is provided
+  if (signalSet) {
+    const reconUpdatePath = assetContext.intelligenceDir
+      ? path.join(assetContext.intelligenceDir, "recon_updates.json")
+      : null;
+
+    // Build hint from already-accumulated signals (for this pass)
+    const hint = buildAdaptiveReconHint(
+      [...signalSet].map((s) => s.replace(/^(comp|tech|host|highval):/, "")),
+      reconUpdatePath
+    );
+    if (hint) {
+      extraText += hint;
+      logEvent(runLog, `Adaptive recon hint injected (${signalSet.size} signals)`);
     }
+  }
+
+  // Run Explorer + Hybrid Recon in parallel — both use free LLM
+  // Explorer: surface mapping (deps, JS endpoints, fingerprinting)
+  // Hybrid Recon: calibration + source inventory (Phase 0+1)
+  let explorerHint = "";
+  let reconText = "";
+
+  try {
+    logEvent(runLog, "Running Explorer + Hybrid Recon in parallel (free LLM)...");
+
+    const [explorerResult, reconResult] = await Promise.allSettled([
+      runExplorer(assetContext, path.resolve(__dirname, "..")),
+      runHybridRecon(assetContext, path.resolve(__dirname, ".."))
+    ]);
+
+    if (explorerResult.status === "fulfilled" && explorerResult.value) {
+      explorerHint = explorerResult.value;
+      logEvent(runLog, "Explorer surface analysis injected into researcher prompt", "ok");
+    } else if (explorerResult.status === "rejected") {
+      logEvent(runLog, `Explorer error: ${explorerResult.reason?.message} — skipped`, "warn");
+    }
+
+    if (reconResult.status === "fulfilled" && reconResult.value) {
+      reconText = formatReconContextForPrompt(reconResult.value) || "";
+      if (reconText) logEvent(runLog, "Hybrid recon injected into researcher prompt", "ok");
+    } else if (reconResult.status === "rejected") {
+      logEvent(runLog, `Hybrid recon error: ${reconResult.reason?.message} — Claude handles Phase 0+1`, "warn");
+    }
+
   } catch (e) {
-    logEvent(runLog, `Hybrid recon error: ${e.message} — Claude handles Phase 0+1`, "warn");
+    logEvent(runLog, `Parallel pre-analysis error: ${e.message} — Claude handles Phase 0+1`, "warn");
+  }
+
+  if (explorerHint) extraText += explorerHint;
+  if (reconText) extraText += reconText;
+
+  // HITL Checkpoint 1 — show surface map, receive focus directives
+  if (args.hitl) {
+    const hitlHint = await checkpoint1_postExplorer(explorerHint, assetContext);
+    if (hitlHint) extraText += hitlHint;
   }
 
   // SessionLimitError propagates to main() — do not catch here
@@ -1771,7 +1933,9 @@ async function main() {
     }
     process.stdout.write(`\n  ${C.cyan}Pipeline phases:${C.reset}\n`);
     process.stdout.write(`    ${C.yellow}1.${C.reset} Intel sync    — bbscope scope, HackerOne history, CVE intel\n`);
-    process.stdout.write(`    ${C.yellow}2.${C.reset} Researcher    — Claude analyses each asset (whitebox/blackbox)\n`);
+    process.stdout.write(`    ${C.yellow}2.${C.reset} Explorer      — ${hasOpenRouter ? `${C.bgreen}enabled${C.reset} (surface mapping: deps, JS endpoints, fingerprinting)` : `${C.gray}disabled${C.reset} (no OPENROUTER_API_KEY set)`}\n`);
+    process.stdout.write(`       ${C.dim}Runs in parallel with Hybrid Recon — feeds surface intel to Researcher${C.reset}\n`);
+    process.stdout.write(`    ${C.yellow}3.${C.reset} Researcher    — Claude analyses each asset (whitebox/blackbox)\n`);
     process.stdout.write(`    ${C.yellow}3.${C.reset} Dual pass     — ${dualResearcherStatus}\n`);
     process.stdout.write(`       ${C.dim}Models tried in order: ${hasOpenRouter ? "researcher_model → free model fallback chain" : "skipped"}${C.reset}\n`);
     process.stdout.write(`       ${C.dim}On 401/429/busy: rotate to next api key, then next model${C.reset}\n`);
@@ -1837,6 +2001,9 @@ async function main() {
     process.stdout.write(`\n${C.yellow}[interrupted]${C.reset} checkpoint saved (phase=${currentPhase} asset=${currentAssetIndex} findings=${findingsCount}). use --resume to continue.\n`);
     process.exit(130);
   });
+
+  // Signal set shared across all asset passes — accumulates during the pipeline
+  const globalSignalSet = new Set();
 
   for (let index = startAssetIndex; !(checkpoint && checkpoint.phase === "triage") && index < allAssets.length; index += 1) {
     currentAssetIndex = index;
@@ -1930,7 +2097,19 @@ async function main() {
     }
 
     try {
-      await runResearcherPhase(args.cli, assetContext, args, bundlePath, index > 0, runLog, resumeHint, gitIntel);
+      await runResearcherPhase(args.cli, assetContext, args, bundlePath, index > 0, runLog, resumeHint, globalSignalSet, gitIntel);
+
+      // Detect new signals from the just-completed pass
+      if (fs.existsSync(bundlePath)) {
+        const { hasNew, signals } = detectReconSignals(bundlePath, globalSignalSet);
+        if (hasNew) {
+          logEvent(runLog, `Adaptive recon: ${signals.length} new signal(s) detected after researcher pass`);
+          process.stdout.write(`  ${C.cyan}[adaptive]${C.reset} ${signals.length} new recon signal(s) — will focus next pass\n`);
+          for (const s of signals) {
+            process.stdout.write(`    ${C.dim}• ${s}${C.reset}\n`);
+          }
+        }
+      }
     } catch (err) {
       if (err.name === "SessionLimitError") {
         const findingsCount = fs.existsSync(bundlePath)
@@ -1996,7 +2175,35 @@ async function main() {
     }
   }
 
+  // HITL Checkpoint 2 — review candidates, guide chain synthesis
+  if (args.hitl && fs.existsSync(bundlePath)) {
+    const unconfirmedPath = path.join(context.findingsDir, "unconfirmed", "candidates.json");
+    const { chainHints } = await checkpoint2_postResearcher(bundlePath, unconfirmedPath);
+    if (chainHints) {
+      // Save chain hints to intelligence dir for dual researcher pass
+      const chainHintPath = context.intelligenceDir
+        ? path.join(context.intelligenceDir, "hitl_chain_hints.txt")
+        : null;
+      if (chainHintPath) {
+        fs.writeFileSync(chainHintPath, chainHints, "utf8");
+        logEvent(runLog, `HITL chain hints saved to ${chainHintPath}`);
+      }
+    }
+  }
+
   runCommand("node", ["scripts/validate-bundle.js", bundlePath]);
+
+  // Adaptive self-check: if the bundle has high-value signals accumulated,
+  // log them before dual researcher pass
+  {
+    const reconUpdatePath = context.intelligenceDir
+      ? path.join(context.intelligenceDir, "recon_updates.json")
+      : null;
+    if (globalSignalSet.size > 0 && reconUpdatePath && fs.existsSync(reconUpdatePath)) {
+      logEvent(runLog, `Adaptive recon: ${globalSignalSet.size} total signal(s) accumulated — injecting into dual pass`);
+    }
+  }
+
   await runDualResearcherPass(context, bundlePath, runLog);
   persistSkillsFromBundle(context, bundlePath, runLog);
 
@@ -2048,8 +2255,10 @@ async function main() {
     logEvent(runLog, `PoC artifact rendering failed: ${err.message}`);
   }
 
-  // Optional manual review before triage
-  if (args.interactive) {
+  // HITL Checkpoint 3 (--hitl) or classic review (--interactive)
+  if (args.hitl) {
+    await checkpoint3_preTriage(bundlePath, runLog);
+  } else if (args.interactive) {
     await reviewFindings(bundlePath, runLog);
   }
 
@@ -2085,6 +2294,25 @@ async function main() {
     : 0;
   printFlavour("pipeline_complete");
   logEvent(runLog, `Pipeline complete with ${readyCount} H1-ready report(s)`, "ok");
+
+  // Auto-export training dataset at the end of every completed pipeline
+  try {
+    const { exportDataset } = require("./lib/dataset");
+    const datasetResult = exportDataset({
+      bundlePath:      bundlePath,
+      triagePath:      triagePath,
+      intelligenceDir: context.intelligenceDir,
+      assetType:       context.asset,
+      outputDir:       path.resolve("data", "training"),
+      append:          true,
+    });
+    if (datasetResult.totalCount > 0) {
+      logEvent(runLog, `Training dataset: +${datasetResult.totalCount} examples exported (A:${datasetResult.surfaceCount} B:${datasetResult.triageCount} C:${datasetResult.chainCount})`, "ok");
+      process.stdout.write(`  ${C.cyan}[dataset]${C.reset} +${datasetResult.totalCount} training examples → data/training/\n`);
+    }
+  } catch (datasetErr) {
+    logEvent(runLog, `Training dataset export failed: ${datasetErr.message}`, "warn");
+  }
 }
 
 main().catch((error) => {
