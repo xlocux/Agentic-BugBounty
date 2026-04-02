@@ -43,7 +43,10 @@
     "interactsh:status": "node -e \"const ix=require('./scripts/lib/interactsh');console.log(ix.status())\"",
     "tools:check": "node scripts/setup-tools.js --check",
     "tools:install": "node scripts/setup-tools.js",
-    "tools:update": "node scripts/setup-tools.js --update"
+    "tools:update": "node scripts/setup-tools.js --update",
+    "dataset:export": "node scripts/export-training-data.js --all",
+    "dataset:export:new": "node scripts/export-training-data.js --all --no-append",
+    "dataset:stats": "node scripts/export-training-data.js --stats"
   },
   "dependencies": {
     "ajv": "^8.18.0",
