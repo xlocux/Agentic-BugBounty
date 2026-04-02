@@ -59,6 +59,70 @@ Hard rule:
 
 ---
 
+## PHASE 2.5 — Chain Synthesis (Black-Box)
+
+Il chain synthesis blackbox gira dopo Phase 2 (Passive Analysis) e prima
+del testing attivo. Non puoi leggere il codice sorgente, ma puoi osservare
+primitivi comportamentali dall'esterno e ragionare su come si combinano.
+
+**Differenza chiave rispetto al whitebox:** scopri i primitivi tramite probing,
+non lettura del codice. Testa ogni ipotesi di primitivo con una probe leggera
+prima di committarti a un PoC completo della chain.
+
+### Step 1 — Lista le osservazioni comportamentali da Phase 2
+
+Per ogni anomalia o comportamento interessante notato in Phase 2, scrivi:
+
+```
+[OBS-N] [cosa hai osservato] [quale primitivo suggerisce]
+```
+
+Esempio:
+
+```
+OBS-01  /logout?next= accetta URL arbitrari senza validazione        → redirect_control
+OBS-02  /api/user/profile restituisce oggetto completo inclusa email → info_leak
+OBS-03  POST /api/settings non ha CSRF token in request o response   → request_forgery candidato
+OBS-04  CORS header: Access-Control-Allow-Origin: * con credentials  → origin_escalation
+OBS-05  /api/webhooks/{id}/url — ID è intero sequenziale             → id_control
+```
+
+### Step 2 — Applica la primitive matrix
+
+Usa la stessa matrice di researcher_wb.md Phase 2.6 Step 3.
+Associa le tue osservazioni OBS-N ai candidati chain.
+
+### Step 3 — Probe leggere per confermare i primitivi
+
+Prima di costruire un PoC completo della chain, conferma ogni primitivo
+con una probe minimale:
+
+- **redirect_control:** il redirect viene effettivamente eseguito? Funziona cross-origin?
+- **request_forgery:** la richiesta state-changing ha successo senza CSRF token?
+  Test: invia la richiesta da un'origine diversa via curl o un form HTML semplice.
+- **origin_escalation:** il server echo `Access-Control-Allow-Origin` per origini
+  arbitrarie? Funziona con `withCredentials: true`?
+- **info_leak:** il dato trapelato (hostname, token, ID) appare consistentemente?
+  È specifico dell'utente o globale?
+- **id_control:** puoi accedere alla risorsa di un altro utente cambiando l'ID?
+  Test con due account che controlli.
+- **sql_injection:** errori SQL visibili? Time-based response? Boolean-based?
+  Test con payload classici (`'`, `"`, `1' AND '1'='1`).
+- **server_request:** l'endpoint accetta URL e fa richieste? Test con collaborator.
+- **file_read:** parametri path? Test con `../../etc/passwd` o `/etc/passwd`.
+- **template_injection:** il server interpreta `{{7*7}}`? La risposta contiene `49`?
+- **command_injection:** test con `;sleep 5`, `|sleep 5`, `$(sleep 5)`.
+
+Se una probe di primitivo fallisce: rimuovilo dai candidati chain. Non assumere.
+
+### Step 4 — Chain PoC
+
+Segui le stesse regole di PoC, scoring e output di researcher_wb.md Phase 2.6
+Steps 4–5. Vincolo blackbox: il PoC deve essere completamente esterno
+(nessun riferimento al codice sorgente).
+
+---
+
 ## PHASE 3 — Active Testing
 
 Use Burp Suite as intercept proxy for all active testing.
