@@ -46,6 +46,15 @@ const { runHybridRecon, formatReconContextForPrompt } = require("./lib/hybrid-re
 const { detectAssetsInSrcDir, describeAsset } = require("./lib/detect-assets");
 const { runFileTriage } = require("./lib/file-triage");
 const { buildEmptySurface, mergeSurface, normalizeSurface, buildSurfacePrompt } = require("./lib/surface-map");
+const {
+  buildEmptyGitIntel, normalizeGitIntel, mergeGitIntel,
+  buildGitIntelPrompt, mineSecurityCommits, runVersionDelta
+} = require("./lib/git-intel");
+const { runSecretScan } = require("./lib/secret-scan");
+const { persistRejectedCandidates } = require("./lib/fp-registry");
+const { redactBundle } = require("./lib/redact");
+const { runPhase0 } = require("./lib/onboarding");
+const { printPipelineBoard, printStageTransition, printDomainBoard, printDomainDone } = require("./lib/status-board");
 
 function parseArgs(argv) {
   const parsed = {
@@ -509,6 +518,17 @@ const FLAVOUR = {
     "fucking swat team called on the results. but we're talking them down. results are still being swatted.",
     "yo bro, the results are still being processed. but they're gonna be lit when they come out.",
     "for the next hour bring me a drink every 10 minutes, because the results are still being processed. but they're gonna be worth it.",
+    // v2 cyberpunk additions
+    "still jacked in. the grid hasn't flatlined yet.",
+    "netrunner breathing. target bleeding. slowly.",
+    "signal strong. ICE holding. for now.",
+    "the data doesn't lie, choom. we're close.",
+    "ghost in the machine. that's us.",
+    "corp thinks they're safe. they always do.",
+    "scanning the void... something's in here.",
+    "the net is dark and full of vulns.",
+    "wake up, neo. the pipeline is still running.",
+    "follow the white rabbit... it leads to /admin.",
   ],
   apk_decompile: [
     "apk in the bag. cracking it open.",
@@ -888,7 +908,9 @@ async function invokeAgent(cli, role, context, args, extraText = "", logPath = n
     const prompt =
       role === "researcher"
         ? `/researcher --asset ${context.asset} --mode ${context.mode} ${context.target}${pathHint}${sourceHint}${extraText}`
-        : `/triager --asset ${context.asset}${pathHint}`;
+        : role === "chain-coordinator"
+          ? `/chain-coordinator --target ${context.target} --findings ${context.findingsDir}${pathHint}${extraText}`
+          : `/triager --asset ${context.asset}${pathHint}`;
     await spawnClaude(prompt, args.model, logPath);
     if (logPath) logEvent(logPath, `← ${label} agent done in ${Math.round((Date.now() - t0) / 1000)}s`);
     return;
@@ -1071,11 +1093,159 @@ async function runStage1SurfaceMap(context, manifest, runLog) {
   return surface;
 }
 
-async function runResearcherPhase(cli, assetContext, args, bundlePath, isAdditional, runLog, resumeHint = "") {
+async function runStage15GitIntel(context, manifest, runLog) {
+  logEvent(runLog, "Stage 1.5 — Git Intelligence: mining commits + scanning secrets...", "info");
+  const intelPath = path.join(context.findingsDir, "git_intelligence.json");
+
+  // Skip if already done (resume support)
+  if (fs.existsSync(intelPath)) {
+    logEvent(runLog, "Stage 1.5 — already complete, using cached intel", "info");
+    return JSON.parse(fs.readFileSync(intelPath, "utf8"));
+  }
+
+  const gitDir      = context.targetDir || context.target;
+  const projectRoot = path.resolve(__dirname, "..");
+  let intel         = buildEmptyGitIntel(context.target);
+
+  // Task 1 — Security commit mining (deterministic)
+  const securityCommits = mineSecurityCommits(gitDir);
+  intel.security_commits = securityCommits;
+  logEvent(runLog, `Stage 1.5 — Task 1: ${securityCommits.length} security-relevant commit(s) found`, "info");
+
+  // Task 2 — Patch bypass analysis via cheap LLM (only if commits found)
+  if (securityCommits.length > 0) {
+    const prompt = buildGitIntelPrompt(context.target, securityCommits);
+    try {
+      const result = await callLLMJson(prompt);
+      if (result && typeof result === "object") {
+        intel = mergeGitIntel(intel, result);
+        logEvent(runLog, `Stage 1.5 — Task 2: ${intel.bypass_vectors.length} bypass vector(s) identified`, "info");
+      }
+    } catch (e) {
+      logEvent(runLog, `Stage 1.5 — Task 2 failed: ${e.message} (continuing)`, "warn");
+    }
+  }
+
+  // Task 3 — Secret scanning (deterministic + gitleaks fallback)
+  try {
+    const secretsFound = runSecretScan(
+      context.targetDir || context.target,
+      manifest.files,
+      gitDir,
+      projectRoot
+    );
+    intel.secrets_found = secretsFound;
+    logEvent(runLog, `Stage 1.5 — Task 3: ${secretsFound.length} potential secret(s) found`, "info");
+  } catch (e) {
+    logEvent(runLog, `Stage 1.5 — Task 3 failed: ${e.message} (continuing)`, "warn");
+  }
+
+  // Task 4 — Version delta (deterministic, only if target.json specifies tested_version)
+  const testedVersion = context.config && context.config.tested_version
+    ? context.config.tested_version
+    : null;
+  if (testedVersion) {
+    const delta = runVersionDelta(gitDir, testedVersion);
+    intel.version_delta = delta;
+    logEvent(runLog, `Stage 1.5 — Task 4: ${delta.length} version-delta commit(s) since ${testedVersion}`, "info");
+  }
+
+  try { normalizeGitIntel(intel); } catch (e) {
+    logEvent(runLog, `Stage 1.5 — schema validation warning: ${e.message}`, "warn");
+  }
+
+  fs.writeFileSync(intelPath, JSON.stringify(intel, null, 2), "utf8");
+  logEvent(runLog,
+    `Stage 1.5 — done: commits=${intel.security_commits.length} bypasses=${intel.bypass_vectors.length} secrets=${intel.secrets_found.length} delta=${intel.version_delta.length}`,
+    "info"
+  );
+  return intel;
+}
+
+/**
+ * Formats git intelligence as a concise context block for the researcher prompt.
+ * @param {object} intel  git_intelligence.json content
+ * @returns {string}
+ */
+async function runStage25ChainCoord(cli, context, args, bundlePath, runLog) {
+  logEvent(runLog, "Stage 2.5 — Chain Coordinator: analyzing cross-agent chains...", "info");
+
+  // Skip if no report bundle exists yet (researcher produced nothing)
+  if (!fs.existsSync(bundlePath)) {
+    logEvent(runLog, "Stage 2.5 — skipped: no report_bundle.json to analyze", "warn");
+    return;
+  }
+
+  // Skip if no chain_candidate entries exist in any shard
+  const { listShards, readShard } = require("./lib/candidates-shard");
+  const shards = listShards(context.findingsDir);
+  const hasChainCandidates = shards.some(agent => {
+    const shard = readShard(context.findingsDir, agent);
+    return shard.candidates.some(c => c.state === "chain_candidate");
+  });
+
+  // Also check candidates.json
+  const candidatesPath = path.join(context.findingsDir, "unconfirmed", "candidates.json");
+  const hasChainInUnconfirmed = fs.existsSync(candidatesPath) &&
+    (JSON.parse(fs.readFileSync(candidatesPath, "utf8")).candidates || []).some(c => c.state === "chain_candidate");
+
+  if (!hasChainCandidates && !hasChainInUnconfirmed) {
+    logEvent(runLog, "Stage 2.5 — skipped: no chain_candidate entries found", "info");
+    return;
+  }
+
+  logEvent(runLog, "Stage 2.5 — chain_candidate entries found, invoking chain coordinator...", "info");
+  try {
+    await invokeAgent(cli, "chain-coordinator", context, args, "", runLog);
+    logEvent(runLog, "Stage 2.5 — chain coordinator complete", "ok");
+  } catch (e) {
+    logEvent(runLog, `Stage 2.5 — chain coordinator failed: ${e.message} (continuing)`, "warn");
+  }
+}
+
+function formatGitIntelForPrompt(intel) {
+  if (!intel) return "";
+  const parts = [];
+
+  if (intel.bypass_vectors && intel.bypass_vectors.length > 0) {
+    const entries = intel.bypass_vectors.slice(0, 10).map(b =>
+      `  - [${b.bypass_priority?.toUpperCase() || "?"}] ${b.commit}: ${b.fix_description}\n` +
+      (b.bypass_vectors || []).slice(0, 3).map(v =>
+        `    → ${v.vector} (${v.plausibility}) ${v.code_path || ""}`
+      ).join("\n")
+    ).join("\n");
+    parts.push(`PATCH BYPASS VECTORS (${intel.bypass_vectors.length} fix(es) analyzed):\n${entries}`);
+  }
+
+  if (intel.secrets_found && intel.secrets_found.length > 0) {
+    const entries = intel.secrets_found.slice(0, 10).map(s =>
+      `  - [${s.severity?.toUpperCase() || "?"}] ${s.name} in ${s.file}${s.line ? `:${s.line}` : ""} (${s.source})`
+    ).join("\n");
+    parts.push(`SECRETS FOUND (${intel.secrets_found.length} potential secret(s)):\n${entries}`);
+  }
+
+  if (intel.version_delta && intel.version_delta.length > 0) {
+    const entries = intel.version_delta.slice(0, 10).map(d =>
+      `  - ${d.commit} ${d.date}: ${d.subject}`
+    ).join("\n");
+    parts.push(`VERSION DELTA (${intel.version_delta.length} commit(s) after tested version):\n${entries}`);
+  }
+
+  if (parts.length === 0) return "";
+
+  return `\n\n--- STAGE 1.5 GIT INTELLIGENCE (pre-computed) ---\n${parts.join("\n\n")}\n--- END GIT INTELLIGENCE ---`;
+}
+
+async function runResearcherPhase(cli, assetContext, args, bundlePath, isAdditional, runLog, resumeHint = "", gitIntel = null) {
   let extraText = isAdditional
     ? `\n\nIMPORTANT: A report_bundle.json already exists from a previous asset pass. APPEND your new findings to it — do NOT remove or overwrite existing entries.`
     : "";
   if (resumeHint) extraText += resumeHint;
+
+  // Inject pre-computed git intelligence if available
+  const gitIntelText = formatGitIntelForPrompt(gitIntel);
+  if (gitIntelText) extraText += gitIntelText;
+
   logEvent(runLog, `Starting researcher phase asset=${assetContext.asset} source=${assetContext.target}`);
 
   // Run Phase 0+1 via free LLM to save Claude tokens — inject result as pre-computed context.
@@ -1621,6 +1791,15 @@ async function main() {
     }
   }
 
+  // Phase 0 — Smart Onboarding (only on fresh runs with --interactive)
+  if (!checkpoint && args.interactive) {
+    try {
+      await runPhase0(context, args, runLog);
+    } catch (e) {
+      logEvent(runLog, `Phase 0 onboarding error (non-fatal): ${e.message}`, "warn");
+    }
+  }
+
   // Only re-sync if this is a fresh run (not resume — intel is already current)
   if (!checkpoint) {
     syncBbscopeIfPossible(context, runLog);
@@ -1698,33 +1877,77 @@ async function main() {
 
     // Build a resume hint if we're starting mid-session after a limit error
     const isResume = checkpoint && checkpoint.phase === "researcher" && index === startAssetIndex;
-    const resumeHint = isResume && checkpoint.findingsCount
-      ? `\n\nSESSION RESUME: Your previous session was interrupted by a usage limit. ` +
-        `${checkpoint.findingsCount} finding(s) are already confirmed in report_bundle.json. ` +
+    let resumeHint = "";
+    if (isResume && checkpoint) {
+      resumeHint =
+        `\n\nSESSION RESUME: Your previous session was interrupted by a usage limit. ` +
+        `${checkpoint.findingsCount ?? 0} finding(s) are already confirmed in report_bundle.json. ` +
         `Continue the analysis — do NOT re-analyse findings already in the bundle. ` +
-        `Pick up from where you left off.`
-      : "";
+        `Pick up from where you left off.`;
+      // v2: tell the researcher which domains have completed shards (skip those)
+      if (Array.isArray(checkpoint.domains_completed) && checkpoint.domains_completed.length > 0) {
+        resumeHint +=
+          `\n\nDOMAINS ALREADY COMPLETE (shard files exist — skip these entirely): ` +
+          checkpoint.domains_completed.map(d => `[${d.toUpperCase()}]`).join(", ") + "." +
+          `\nStart from the first domain NOT in the list above.`;
+      }
+    }
 
     // Stage 0 — File Triage (cheap model, deterministic)
+    printStageTransition("STAGE 0 — File Triage", "classifying all source files");
     const manifest = await runStage0FileTriage(assetContext, runLog);
 
     // Stage 1 — Surface Mapping (cheap model, LLM)
+    printStageTransition("STAGE 1 — Surface Mapping", "building attack surface from manifest");
     const surface = await runStage1SurfaceMap(assetContext, manifest, runLog);
 
+    // Stage 1.5 — Git Intelligence (cheap model + deterministic)
+    printStageTransition("STAGE 1.5 — Git Intelligence", "mining commits + secret scan");
+    const gitIntel = await runStage15GitIntel(assetContext, manifest, runLog);
+
+    // Stage 2 — Domain Research
+    printStageTransition("STAGE 2 — Domain Research", "6 specialist agents: AUTH INJECT CLIENT ACCESS MEDIA INFRA");
+    printDomainBoard({
+      done:       [],
+      running:    null,
+      target:     assetContext.target || assetContext.targetRef || "",
+      candidates: 0,
+      confirmed:  0,
+      elapsed:    "0s"
+    });
+
+    // Notify: secrets found in git history
+    if (gitIntel && gitIntel.secrets_found && gitIntel.secrets_found.length > 0) {
+      const { notify: _notify } = require("./lib/notify");
+      for (const secret of gitIntel.secrets_found.slice(0, 3)) {
+        _notify("secret_found", {
+          secret_type: secret.name || "unknown",
+          file:        secret.file || null,
+          commit:      secret.commit || null,
+          target:      assetContext.target || assetContext.targetRef || ""
+        }).catch(() => {});
+      }
+    }
+
     try {
-      await runResearcherPhase(args.cli, assetContext, args, bundlePath, index > 0, runLog, resumeHint);
+      await runResearcherPhase(args.cli, assetContext, args, bundlePath, index > 0, runLog, resumeHint, gitIntel);
     } catch (err) {
       if (err.name === "SessionLimitError") {
         const findingsCount = fs.existsSync(bundlePath)
           ? (readJson(bundlePath).findings || []).length
           : 0;
+        // v2: record which researcher domains have completed shards
+        const { listShards: _listShards } = require("./lib/candidates-shard");
+        const domainsCompleted = _listShards(assetContext.findingsDir);
         saveCheckpoint(context, {
-          phase: "researcher",
-          assetIndex: index,
-          asset: assetEntry.asset_type,
-          totalAssets: allAssets.length,
+          schema_version:   2,
+          phase:            "researcher",
+          assetIndex:       index,
+          asset:            assetEntry.asset_type,
+          totalAssets:      allAssets.length,
           findingsCount,
-          savedAt: new Date().toISOString()
+          domains_completed: domainsCompleted,
+          savedAt:          new Date().toISOString()
         });
         logEvent(runLog, `SESSION LIMIT: checkpoint saved at asset ${index} (${findingsCount} findings so far)`);
         printFlavour("session_limit");
@@ -1740,9 +1963,65 @@ async function main() {
     return;
   }
 
+  // Stage 2.5 — Chain Coordinator (runs once, after all asset researcher passes)
+  printStageTransition("STAGE 2.5 — Chain Coordinator", "cross-domain kill chain synthesis");
+  {
+    const { notify: _notify } = require("./lib/notify");
+    const _candidates = fs.existsSync(path.join(context.findingsDir, "unconfirmed", "candidates.json"))
+      ? (readJson(path.join(context.findingsDir, "unconfirmed", "candidates.json")).candidates || []).length
+      : 0;
+    _notify("all_agents_completed", {
+      target:     context.target || context.targetRef || "",
+      candidates: _candidates,
+      confirmed:  fs.existsSync(path.join(context.findingsDir, "confirmed", "report_bundle.json"))
+        ? (readJson(path.join(context.findingsDir, "confirmed", "report_bundle.json")).findings || []).length
+        : 0
+    }).catch(() => {});
+  }
+  await runStage25ChainCoord(args.cli, context, args, bundlePath, runLog);
+
+  // Notify: chain findings discovered
+  if (fs.existsSync(bundlePath)) {
+    const { notify: _notify } = require("./lib/notify");
+    const _bundle = readJson(bundlePath);
+    const _chains = (_bundle.findings || []).filter(f => f.chain_id || (f.finding_type || "").toLowerCase().includes("chain"));
+    for (const chain of _chains.slice(0, 3)) {
+      _notify("chain_found", {
+        chain_id:    chain.chain_id || chain.report_id,
+        description: chain.title || chain.description,
+        members:     Array.isArray(chain.chain_members) ? chain.chain_members.join(" → ") : null,
+        severity:    chain.severity,
+        target:      context.target || context.targetRef || ""
+      }).catch(() => {});
+    }
+  }
+
   runCommand("node", ["scripts/validate-bundle.js", bundlePath]);
   await runDualResearcherPass(context, bundlePath, runLog);
   persistSkillsFromBundle(context, bundlePath, runLog);
+
+  // Plan 8 — FP registry: persist all rejected candidates from this run
+  try {
+    const { openDatabase, resolveGlobalDatabasePath } = require("./lib/db");
+    const globalDb = openDatabase(resolveGlobalDatabasePath());
+    const runId = new Date().toISOString();
+    const written = persistRejectedCandidates(globalDb, context.findingsDir, context.target, runId);
+    globalDb.close();
+    if (written > 0) logEvent(runLog, `FP registry: ${written} rejected candidate(s) persisted`, "info");
+  } catch (e) {
+    logEvent(runLog, `FP registry write failed (non-fatal): ${e.message}`, "warn");
+  }
+
+  // Plan 8 — OpSec: redact credentials from report bundle before any downstream read
+  try {
+    const raw = readJson(bundlePath);
+    const redacted = redactBundle(raw);
+    fs.writeFileSync(bundlePath, JSON.stringify(redacted, null, 2), "utf8");
+    logEvent(runLog, "Report bundle redacted (credentials scrubbed)", "info");
+  } catch (e) {
+    logEvent(runLog, `Bundle redaction failed (non-fatal): ${e.message}`, "warn");
+  }
+
   const findingCount = (readJson(bundlePath).findings || []).length;
   logEvent(runLog, `All researcher passes complete with ${findingCount} confirmed finding(s)`, "ok");
 

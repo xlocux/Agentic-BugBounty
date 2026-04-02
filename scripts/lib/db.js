@@ -460,6 +460,23 @@ function initDatabase(db) {
 
     CREATE INDEX IF NOT EXISTS idx_zeroday_notified  ON zeroday_alerts(notified);
     CREATE INDEX IF NOT EXISTS idx_zeroday_component ON zeroday_alerts(component);
+
+    -- ── false_positive_registry — global FP learning store ───────────────────
+    CREATE TABLE IF NOT EXISTS false_positive_registry (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      vuln_class       TEXT    NOT NULL,
+      rejection_reason TEXT    NOT NULL,
+      detail           TEXT,
+      target           TEXT,
+      run_id           TEXT,
+      file             TEXT,
+      line             INTEGER,
+      agent            TEXT,
+      created_at       TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_fp_vuln_class ON false_positive_registry(vuln_class);
+    CREATE INDEX IF NOT EXISTS idx_fp_target     ON false_positive_registry(target);
   `);
 }
 
@@ -1529,6 +1546,63 @@ function upsertEndpoint(db, { targetId, subdomainId, method, path, params, authR
   );
 }
 
+// ── false_positive_registry ───────────────────────────────────────────────────
+
+/**
+ * Writes a single FP entry to the global false_positive_registry.
+ * Call this for every rejected candidate at session end.
+ *
+ * @param {object} db     global DB instance (openDatabase(resolveGlobalDatabasePath(...)))
+ * @param {{
+ *   vuln_class:       string,
+ *   rejection_reason: string,
+ *   detail?:          string,
+ *   target?:          string,
+ *   run_id?:          string,
+ *   file?:            string,
+ *   line?:            number,
+ *   agent?:           string
+ * }} entry
+ */
+function writeFpEntry(db, entry) {
+  db.prepare(`
+    INSERT INTO false_positive_registry
+      (vuln_class, rejection_reason, detail, target, run_id, file, line, agent)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    entry.vuln_class       || "unknown",
+    entry.rejection_reason || "unspecified",
+    entry.detail           ?? null,
+    entry.target           ?? null,
+    entry.run_id           ?? null,
+    entry.file             ?? null,
+    entry.line             ?? null,
+    entry.agent            ?? null
+  );
+}
+
+/**
+ * Reads known FP patterns for a given vuln class.
+ * Used to prime agent context at the start of a session.
+ *
+ * @param {object} db
+ * @param {string} vulnClass   e.g. "sqli", "xss"
+ * @param {number} [limit=20]
+ * @returns {{ rejection_reason: string, detail: string, count: number }[]}
+ */
+function readFpPatterns(db, vulnClass, limit = 20) {
+  return db.prepare(`
+    SELECT   rejection_reason,
+             detail,
+             COUNT(*) AS count
+    FROM     false_positive_registry
+    WHERE    vuln_class = ?
+    GROUP BY rejection_reason, detail
+    ORDER BY count DESC
+    LIMIT    ?
+  `).all(vulnClass, limit);
+}
+
 module.exports = {
   initDatabase,
   openDatabase,
@@ -1579,5 +1653,8 @@ module.exports = {
   markCveMatchesNotified,
   // whitebox analysis layer
   upsertComponent,
-  upsertEndpoint
+  upsertEndpoint,
+  // false positive registry
+  writeFpEntry,
+  readFpPatterns
 };

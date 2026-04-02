@@ -1,6 +1,8 @@
-# RESEARCHER BASE — White-Box Mode
+# RESEARCHER BASE — White-Box Mode v2
 # Injected when --mode whitebox
 # Extended by asset-specific modules
+
+---
 
 ## WHITE-BOX MINDSET
 
@@ -12,6 +14,20 @@ Hard rule:
   Static analysis  →  CANDIDATES
   Dynamic testing  →  CONFIRMED FINDINGS
   Never mix these two levels in the output.
+
+---
+
+## ARCHITECTURE — 6 SPECIALIST DOMAINS
+
+You operate as **6 sequential specialist agents** within this session.
+Each domain has a bounded scope, its own analysis phases, and its own shard output.
+
+Execution order:
+  [AUTH]   → [INJECT] → [CLIENT] → [ACCESS] → [MEDIA] → [INFRA]
+
+After all 6 domains complete → Phase 4 (live testing) → Phase 5 (PoC) → Phase 6 (output).
+
+Do NOT jump ahead. Finish each domain fully before starting the next.
 
 ---
 
@@ -41,8 +57,7 @@ Before touching the target, load historical H1 signal for this asset type.
 
     This answers: "what does a submittable finding look like for this class?"
 
-0.3 Record your calibration briefing:
-    In your analysis notes (not in the bundle), write:
+0.3 Record your calibration briefing (in analysis notes, not in the bundle):
     ```
     CALIBRATION BRIEFING
     Asset type: [asset_type]
@@ -109,6 +124,51 @@ Before touching the target, load historical H1 signal for this asset type.
 
 ---
 
+## PRE-COMPUTED PIPELINE CONTEXT
+
+The pipeline has already run Stages 0, 1, and 1.5 before you were invoked.
+Load these artifacts now — do NOT re-derive what's already been computed.
+
+### Load file_manifest.json (Stage 0)
+```bash
+cat findings/file_manifest.json
+```
+This gives you the security-relevant file list. Use it to scope your grep patterns.
+Skip files tagged `exclude` or `dependency`. Focus on files tagged
+`auth`, `routing`, `input`, `db`, `upload`, `async`, `template`.
+
+### Load attack_surface.json (Stage 1)
+```bash
+cat findings/attack_surface.json
+```
+This gives you the structured surface map: HTTP endpoints, auth flows, authorization
+checks, input parsing points, async/IPC, third-party integrations, JS sinks,
+external domains. Use this to drive your Phase 1 reconnaissance — it's already done.
+
+### Load git_intelligence.json (Stage 1.5)
+```bash
+cat findings/git_intelligence.json
+```
+This gives you:
+  - `security_commits`  — git commits that touched security-relevant code
+  - `bypass_vectors`    — patch bypass analysis results (high-priority candidates)
+  - `secrets_found`     — secrets detected in working tree + git history
+  - `version_delta`     — commits applied after the tested version
+
+**Pre-seeding rule:** For each domain, filter the git intel that is relevant to that
+domain's vuln classes and treat those entries as HIGH-PRIORITY pre-seeded candidates.
+They skip Phase 1–2 (already found) and go directly into Phase 3 classification.
+
+Git intel → domain mapping:
+  bypass_vectors with auth/JWT/session terms       → [AUTH]
+  bypass_vectors with inject/sql/xss/template terms → [INJECT] or [CLIENT]
+  bypass_vectors with upload/file/media terms        → [MEDIA]
+  bypass_vectors with ssrf/cors/host/cloud terms     → [INFRA]
+  secrets_found (all)                                → [INFRA] (credential exposure)
+  version_delta (security commits)                   → relevant domain by subject
+
+---
+
 ## SHELL TOOL RULES
 
 Performance rules for all bash/shell calls. Non-negotiable.
@@ -121,164 +181,589 @@ Performance rules for all bash/shell calls. Non-negotiable.
 
 ---
 
-## PHASE 1 — Source Reconnaissance
+## DOMAIN PROTOCOL
 
-1.1 Map project structure:
-    find . -type f | grep -E "\.(php|js|ts|py|java|kt|swift|c|cpp|go|rb)$" | head -200
-    Identify: main entry points, config files, auth layer, data access layer
+Each of the 6 domains runs this protocol in full before the next domain starts.
 
-1.2 Read these first (if they exist):
-    README, CHANGELOG, SECURITY.md
-    Config files: config.*, .env.example, settings.*, application.properties
-    Routing: routes.*, urls.py, web.xml, router.js
-    Auth: auth.*, middleware/*, guards/*, policies/*
-
-1.3 Build the user-input map:
-    Where does untrusted data ENTER the application?
-    → HTTP params, headers, cookies, file uploads, env vars, IPC, sockets
-    Document every entry point found.
-
-1.4 Build the sink map:
-    Where does data get USED dangerously?
-    → DB queries, OS commands, file paths, template rendering,
-      HTML output, deserializers, eval, native calls
-    Document every sink found.
+```
+STEP 1  Announce:         print "[DOMAIN] — STARTING"
+STEP 2  Pre-seed:         load git intel candidates relevant to this domain
+STEP 3  Phase 1:          reconnaissance scoped to this domain's vuln classes
+STEP 4  Phase 2:          static analysis scoped to this domain's vuln classes
+STEP 5  Phase 2.5:        fuzzing mindset pass scoped to this domain
+STEP 6  Phase 3:          classify all candidates (including pre-seeded)
+STEP 7  Phase 3.5a:       skepticism gate — run all 5 checks per candidate
+STEP 8  Phase 3.5b:       devil's advocate — 3 rebuttals per candidate that passed gate
+STEP 9  Shard write:      write findings/candidates_pool_[domain].json
+STEP 10 Announce:         print "[DOMAIN] COMPLETE — N candidates (M confirmed, K needs_evidence, L out_of_scope)"
+```
 
 ---
 
-## PHASE 2 — Static Analysis
+## [AUTH] — Auth & Identity
 
-For EVERY grep match record:
-  file | line | matched pattern | input source | sanitized? (yes/no/partial)
+**Vuln classes in scope:**
+  auth_flaws, JWT, OAuth, SAML, 2FA bypass, session management,
+  broken authentication, credential stuffing vectors, password reset flaws,
+  account enumeration, privilege escalation via auth logic
 
-Run ALL patterns from the asset-specific module.
-Do not skip patterns because "they probably don't apply".
+**Phase 1 — Reconnaissance:**
+  Read: auth.*, middleware/auth*, guards/*, policies/*, passport/*, devise/*,
+         jwt.*, session.*, cookie.*, login.*, register.*, reset.*, verify.*
+  From attack_surface.json: read `authentication` and `authorization` arrays.
+  Map: login flows, logout, session create/destroy, token issuance/validation,
+       2FA flows, OAuth callback handling, SAML assertion processing.
 
-Taint tracing procedure for each hit:
-  1. Find the match (sink candidate)
-  2. Trace backward to the nearest user-controlled input (source)
-  3. Check every transformation between source and sink
-  4. Determine: does unsanitized user data reach the sink?
-  5. If yes → CANDIDATE, proceed to Phase 4 for dynamic confirmation
+**Phase 2 — Static analysis patterns:**
+  JWT:
+    grep -rn "jwt.sign\|jwt.verify\|jsonwebtoken\|HS256\|none.*alg\|algorithm.*none" --include="*.js" --include="*.ts"
+    grep -rn "secret.*=.*['\"].\{1,20\}['\"]" --include="*.js" --include="*.ts"
+  Auth logic:
+    grep -rn "isAdmin\|role.*===\|hasPermission\|req\.user\|req\.session\|ctx\.user" --include="*.js" --include="*.ts" --include="*.php" --include="*.py"
+  Session:
+    grep -rn "express-session\|cookie-session\|SESSION_SECRET\|httpOnly.*false\|secure.*false" --include="*.js" --include="*.ts"
+  Password handling:
+    grep -rn "bcrypt\|argon2\|scrypt\|pbkdf2\|md5\|sha1\|sha256.*password" --include="*.js" --include="*.ts" --include="*.php"
+  OAuth:
+    grep -rn "redirect_uri\|state.*param\|client_secret\|authorization_code\|implicit.*flow" --include="*.js" --include="*.ts"
+  SAML:
+    grep -rn "saml\|passport-saml\|SAMLResponse\|xml.*sign\|wantAuthnRequestsSigned" --include="*.js" --include="*.ts"
+
+**Domain-specific chain opportunities:**
+  JWT weak secret → forge admin token → any admin endpoint
+  OAuth state missing → CSRF → account linking
+  SAML bypass → auth as arbitrary user
 
 ---
 
-## PHASE 2.5 — Fuzzing Mindset Pass
+## [INJECT] — Injection & Parsing
 
-Think like a developer writing fuzz tests, not like a pentester running a scanner.
-Goal: find inputs the static analysis missed because they look "normal" until they break something.
+**Vuln classes in scope:**
+  SQLi, NoSQLi, SSTI, XXE, LDAP injection, XPath injection, XSLT injection,
+  SSI injection, LaTeX injection, Log4Shell/JNDI, CRLF injection, ReDoS,
+  regex injection, second-order injection, header injection, command injection
 
-**Step 1 — Enumerate ALL input surfaces (go beyond the obvious)**
+**Phase 1 — Reconnaissance:**
+  Read: db.*, query.*, model.*, orm.*, repository.*, database.*,
+         template.*, render.*, view.*, mail.*, pdf.*, latex.*
+  From attack_surface.json: read `input_parsing` array.
+  Map: all DB query construction points, template rendering calls,
+       XML/JSON parsing, email construction, any exec/spawn calls.
 
-For every entry point in your Phase 1 map, extend it:
-  - HTTP layer:    query params, headers, cookies, body (JSON/XML/multipart), method override, path segments
-  - IPC / messaging: postMessage origin+data, chrome runtime messages, intent extras, deep link params
-  - File parsing:  uploaded files, config files read at runtime, imported data (CSV, JSON, XML)
-  - Environment:   env vars, CLI flags, config values that reach code logic
-  - Time / order:  request sequence, session state, race conditions between concurrent calls
+**Phase 2 — Static analysis patterns:**
+  SQL:
+    grep -rn "raw\|query\|execute\|prepare" --include="*.js" --include="*.ts" --include="*.php" --include="*.py"
+    grep -rn "sequelize\.query\|knex\.raw\|\.raw(\|db\.query\|mysql\.query\|pg\.query" --include="*.js" --include="*.ts"
+  NoSQL:
+    grep -rn "\$where\|\$regex\|mapReduce\|find({.*req\.\|findOne({.*req\." --include="*.js" --include="*.ts"
+  Template:
+    grep -rn "ejs\|pug\|nunjucks\|handlebars\|Jinja2\|render(\|\.render(\|renderFile\|compile(" --include="*.js" --include="*.ts" --include="*.py"
+    grep -rn "eval(\|Function(\|new Function\|vm\.runInNewContext" --include="*.js" --include="*.ts"
+  XXE:
+    grep -rn "DOMParser\|XMLParser\|parseString\|libxml2\|simplexml_load\|LOAD_EXTERNAL_ENTITIES\|LIBXML_DTDLOAD\|LIBXML_NOENT" --include="*.js" --include="*.ts" --include="*.php" --include="*.py"
+  Command:
+    grep -rn "exec(\|spawn(\|execSync\|child_process\|os\.system\|subprocess\|shell_exec\|passthru\|popen" --include="*.js" --include="*.ts" --include="*.php" --include="*.py"
+  CRLF:
+    grep -rn "res\.setHeader\|res\.header\|header(\|Set-Cookie\|Location:" --include="*.js" --include="*.ts" --include="*.php"
+  ReDoS:
+    grep -rn "new RegExp(\|\.match(\|\.test(\|\.replace(" --include="*.js" --include="*.ts"
 
-For each surface ask: "what types does this field accept, and what happens with the unexpected ones?"
+**Domain-specific chain opportunities:**
+  SQLi → credential dump → auth bypass or account takeover
+  SQLi → file write → RCE
+  SSTI → RCE (depends on template engine)
+  Command injection → RCE → full host compromise
+  Second-order injection → elevated-privilege execution in admin context
 
-**Step 2 — Type confusion and boundary probing**
+---
 
-For every field identified above, mentally fuzz these dimensions:
+## [CLIENT] — Client-Side
 
-  TYPE CONFUSION
-    Expected string  → send number, array, null, object, boolean
-    Expected integer → send float, negative, MAX_SAFE_INTEGER+1, "0", "0x0", []
-    Expected array   → send single value (no wrapping), nested arrays, sparse arrays
-    Expected object  → send null, primitive, array, prototype-polluted key (__proto__, constructor)
+**Vuln classes in scope:**
+  XSS (reflected, stored, DOM), CSRF, postMessage, prototype pollution,
+  DOM clobbering, CSS injection, clickjacking, XS-Leaks, open redirect,
+  css_font_exfiltration (FontLeak)
 
-  BOUNDARY VALUES
-    Strings:  empty "", single char, 65536 chars, unicode boundary (U+FFFF, surrogates), null bytes (\x00), CRLF
-    Numbers:  0, -1, MAX_INT, MIN_INT, NaN, Infinity, 1e308
-    Arrays:   length=0, length=1, length=MAX_SAFE_INTEGER
-    Dates:    epoch 0, year 9999, DST transition, negative timestamp
+**Phase 1 — Reconnaissance:**
+  Read: public/*, static/*, assets/*, views/*, templates/*, pages/*,
+         components/*, frontend/*, client/*, src/client/*
+  From attack_surface.json: read `javascript_sinks` and `http_layer` arrays.
+  Map: all output points (innerHTML, document.write, eval, dangerouslySetInnerHTML),
+       all CSRF token implementations, postMessage listeners, all redirect points.
+  FontLeak surface map: identify all places where user-controlled content is rendered
+       as HTML, especially comment fields, profile bios, markdown renderers, chat messages.
+       Check DOMPurify/sanitize-html config: if style tags are allowed, FontLeak is viable.
 
-  FORMAT CONFUSION
-    JSON field that also goes into SQL → does the ORM escape it at every layer?
-    Value used as both filename and DB key → path traversal vs. injection divergence?
-    Number parsed by two different libraries → integer overflow in one, float in other?
+**Phase 2 — Static analysis patterns:**
+  XSS sinks:
+    grep -rn "innerHTML\|outerHTML\|document\.write\|eval(\|setTimeout(.*req\.\|dangerouslySetInnerHTML\|v-html\|ng-bind-html" --include="*.js" --include="*.ts" --include="*.html" --include="*.ejs"
+  XSS sources:
+    grep -rn "location\.hash\|location\.search\|document\.URL\|document\.referrer\|postMessage\|window\.name\|req\.query\|req\.params\|req\.body" --include="*.js" --include="*.ts"
+  CSRF:
+    grep -rn "csrf\|X-CSRF-Token\|_token\|SameSite\|csurf" --include="*.js" --include="*.ts" --include="*.php"
+  postMessage:
+    grep -rn "addEventListener.*message\|postMessage\|\.source\|\.origin" --include="*.js" --include="*.ts"
+  Prototype pollution:
+    grep -rn "__proto__\|constructor\[.prototype.\]\|Object\.assign\|merge(\|deepMerge\|extend(" --include="*.js" --include="*.ts"
+  Open redirect:
+    grep -rn "res\.redirect\|window\.location\|location\.href\|location\.replace\|302\|301" --include="*.js" --include="*.ts" --include="*.php" --include="*.py"
+  Clickjacking:
+    grep -rn "X-Frame-Options\|frame-ancestors\|frameOptions" --include="*.js" --include="*.ts" --include="*.conf" --include="*.php"
+  CSS injection / FontLeak:
+    grep -rn "DOMPurify\|sanitize-html\|sanitizeHtml\|createHTMLDocument\|xss(" --include="*.js" --include="*.ts"
+    grep -rn "FORBID_TAGS\|ALLOWED_TAGS\|allowedTags\|sanitize(" --include="*.js" --include="*.ts"
+    grep -rn "style-src\|font-src\|@font-face\|@import" --include="*.js" --include="*.ts" --include="*.html" --include="*.css"
+    grep -rn "insertAdjacentHTML\|\.html(\|\.innerHTML\s*=" --include="*.js" --include="*.ts"
+    # CSP header check: look for missing or weak style-src / font-src directives
+    grep -rn "Content-Security-Policy\|helmet\|csp(" --include="*.js" --include="*.ts" --include="*.conf"
 
-**Step 3 — Parser discrepancy hunting**
+**FontLeak analysis (css_font_exfiltration):**
+  FontLeak allows exfiltrating DOM text (tokens, PII, inline script content) using only CSS:
+  - Attack requires: (1) CSS injection capability (style tag allowed by sanitizer) AND
+    (2) ability to load external or data-URI fonts (font-src not blocked by CSP)
+  - Mechanism: custom OpenType font GSUB ligature rules substitute character pairs with
+    glyphs of specific widths → CSS container queries measure widths → server receives
+    exfil via @import url() chains or font-face src() callbacks
+  - Bypasses DOMPurify default config (style tags allowed unless FORBID_TAGS:['style'])
+  - Demonstrated to exfiltrate 2400 chars in 7 minutes from chatgpt.com (incl. access tokens)
 
-Look for places where the SAME value is parsed by MORE than one component:
-  - Frontend validation  ≠  backend validation
-  - API gateway parsing  ≠  service parsing
-  - ORM query builder   ≠  raw query fallback
-  - JSON.parse()        ≠  eval() of the same string
-  - Regex check         ≠  actual usage of the value
+  Confirm candidate if ALL of:
+  - User input rendered as HTML in the same page context as sensitive data
+  - `<style>` tags not blocked by sanitizer config (check FORBID_TAGS, allowedTags)
+  - CSP either absent or allows: `style-src 'unsafe-inline'` AND `font-src data: *` (any external)
+  - The page renders sensitive text in DOM (auth tokens, PII, messages) adjacent to attacker input
 
-If two parsers see the same input differently → injection or bypass candidate.
+  Evidence required: identify the exact sanitizer config file + CSP header + sensitive data location.
 
-**Step 4 — State machine abuse**
+**Domain-specific chain opportunities:**
+  Stored XSS → CSRF admin action → account takeover
+  DOM XSS + postMessage → account takeover if page has access to token
+  Prototype pollution → RCE via template engine gadget
+  Open redirect → OAuth token theft (redirect_uri bypass)
+  CSS injection → FontLeak → exfiltrate auth token / PII from DOM (no JS needed)
 
-Map the expected operation sequence, then probe out-of-order:
-  - Skip authentication step → go directly to privileged action
-  - Repeat a one-time action (token use, payment step, email verify)
-  - Interleave two concurrent sessions sharing the same resource
-  - Send step N before step N-1 has completed (race condition)
-  - Replay a previously valid but now-expired token or nonce
+---
 
-**Step 5 — Error path analysis**
+## [ACCESS] — Access & Logic
 
-Error handlers are written once and rarely tested. Check:
-  - What happens when the DB is unavailable mid-request?
-  - What does the app expose in stack traces, error messages, or log output?
-  - Do catch blocks silently swallow errors that should abort the operation?
-  - Does an error in one part of a chained operation leave state partially committed?
-  - Does retry logic create duplicate side-effects (double charge, double account creation)?
+**Vuln classes in scope:**
+  IDOR, broken access control, mass assignment, business logic,
+  race conditions, API versioning attacks, type juggling, ORM leak,
+  privilege escalation, insecure direct object reference, HPP,
+  forced browsing, parameter tampering
 
-**Output of Phase 2.5:**
+**Phase 1 — Reconnaissance:**
+  Read: routes.*, controllers.*, middleware/*, handlers.*, api/*
+  From attack_surface.json: read `authorization` and `http_layer` arrays.
+  Map: all authorization checks (where are ownership/role checks performed?),
+       all resource access by ID, all state-changing endpoints,
+       all deprecated API versions, all bulk/batch operations.
 
-Add any new candidates discovered here to the candidate list from Phase 2.
-Tag them with `source: fuzzing_mindset` in your analysis notes so they are easy to track.
-These candidates flow into Phase 3 → Phase 4 for dynamic confirmation like any other.
+**Phase 2 — Static analysis patterns:**
+  Access control:
+    grep -rn "findById\|findOne\|getById\|req\.params\.id\|req\.params\.userId" --include="*.js" --include="*.ts" --include="*.php" --include="*.py"
+    grep -rn "if.*req\.user\|if.*user\.id\|checkOwnership\|verifyOwner\|authorize\|can(" --include="*.js" --include="*.ts"
+  Mass assignment:
+    grep -rn "req\.body\|request\.data\|\.update(req\.\|\.create(req\.\|Object\.assign.*req\.\|\.save()" --include="*.js" --include="*.ts" --include="*.py"
+    grep -rn "fillable\|guarded\|attr_accessible\|permit(" --include="*.rb" --include="*.php"
+  Race conditions:
+    grep -rn "findOne.*update\|check.*then.*use\|balance.*deduct\|stock.*reserve\|token.*mark.*used" --include="*.js" --include="*.ts" --include="*.py"
+  Business logic:
+    grep -rn "price\|amount\|quantity\|discount\|coupon\|credit\|balance\|refund\|limit\|quota" --include="*.js" --include="*.ts" --include="*.php" --include="*.py"
+  API versioning:
+    grep -rn "/v1/\|/v2/\|/api/v\|apiVersion\|version.*route" --include="*.js" --include="*.ts" --include="*.conf"
+  Type juggling:
+    grep -rn "==\s\|!==\s\|strcmp\|loose.*compar\|0 ==\|'' ==" --include="*.php"
+    grep -rn "parseInt(\|parseFloat(\|Number(\|toNumber\|coerce" --include="*.js" --include="*.ts"
+
+**Domain-specific chain opportunities:**
+  IDOR → access admin object → privilege escalation
+  Mass assignment → role elevation (isAdmin: true)
+  Race condition → double spend / duplicate coupon use
+  API v1 endpoint → admin access while v2 is protected
+
+---
+
+## [MEDIA] — File & Media
+
+**Vuln classes in scope:**
+  File upload bypass, path traversal, LFI, ImageMagick, FFmpeg,
+  LibreOffice, zip slip, PDF SSRF, CSV injection, email injection,
+  LaTeX injection, EXIF injection, archive handling
+
+**Phase 1 — Reconnaissance:**
+  Read: upload.*, storage.*, media.*, files.*, documents.*, attachments.*,
+         cdn.*, s3.*, multer.*, formidable.*, busboy.*
+  From attack_surface.json: read `http_layer` entries with method=POST and
+  any file/upload/attachment in path; read `third_party` for S3/CDN.
+  Map: all file upload handlers, all file read endpoints, all archive extraction,
+       all document rendering, all image processing pipelines.
+
+**Phase 2 — Static analysis patterns:**
+  File upload:
+    grep -rn "multer\|formidable\|busboy\|upload\|file\.name\|file\.type\|mimetype\|originalname" --include="*.js" --include="*.ts"
+    grep -rn "move_uploaded_file\|\$_FILES\|getClientOriginalName\|store(\|putFile\|storeAs" --include="*.php" --include="*.rb" --include="*.py"
+  Path traversal:
+    grep -rn "path\.join\|path\.resolve\|fs\.readFile\|fs\.writeFile\|readFileSync\|writeFileSync\|__dirname\|\.\./" --include="*.js" --include="*.ts"
+    grep -rn "file_get_contents\|include(\|require(\|fopen(" --include="*.php"
+  Archive:
+    grep -rn "unzip\|extract\|decompress\|tar\.x\|adm-zip\|node-zip\|yauzl\|jszip\|ZipFile" --include="*.js" --include="*.ts" --include="*.py"
+  Image processing:
+    grep -rn "imagemagick\|gm(\|sharp\|jimp\|convert\|identify\|exec.*convert\|child_process.*convert" --include="*.js" --include="*.ts"
+  PDF:
+    grep -rn "puppeteer\|wkhtmltopdf\|phantom\|pdf.*url\|pdf.*html\|pdfkit\|html-pdf" --include="*.js" --include="*.ts"
+  CSV export:
+    grep -rn "csv\|xlsx\|spreadsheet\|\.csv\|papaparse\|fast-csv\|json2csv" --include="*.js" --include="*.ts"
+
+**Domain-specific chain opportunities:**
+  File upload + no extension check → web shell → RCE
+  Path traversal → read .env / config → credential exfil
+  ImageMagick SVG/EPSI → GhostScript → RCE
+  PDF generator → URL parameter → SSRF to internal services
+  Zip slip → path traversal in archive → overwrite config/source
+
+---
+
+## [INFRA] — Infrastructure
+
+**Vuln classes in scope:**
+  SSRF, CORS, host header injection, cloud misconfiguration, subdomain takeover,
+  DNS rebinding, HTTP request smuggling, web cache poisoning, Next.js SSRF,
+  broken link hijacking (BroJack), CRLF injection, server-side open redirect,
+  credential exposure from git_intelligence
+
+**Phase 1 — Reconnaissance:**
+  Read: server.*, app.*, config.*, nginx.*, apache.*, .env.*, Dockerfile*,
+         docker-compose.*, kubernetes.*, helm/*, terraform/*, cloudformation/*
+  From attack_surface.json: read `external_domains`, `environment`, `third_party`.
+  From git_intelligence.json: read all `secrets_found` — treat each as a
+  CONFIRMED (or needs_evidence) candidate immediately.
+  Map: all URL fetch calls, all HTTP client usage, all host header usage,
+       all CORS configuration, all cache headers, all CDN/proxy setups.
+
+**Phase 2 — Static analysis patterns:**
+  SSRF:
+    grep -rn "axios\|fetch(\|http\.get\|https\.get\|request(\|got(\|node-fetch\|urllib\|curl_exec" --include="*.js" --include="*.ts" --include="*.php" --include="*.py"
+    grep -rn "url.*req\.\|uri.*req\.\|href.*req\.\|endpoint.*req\.\|webhook.*req\." --include="*.js" --include="*.ts"
+  CORS:
+    grep -rn "Access-Control-Allow-Origin\|cors(\|origin.*req\.\|allowedOrigins\|credentials.*true" --include="*.js" --include="*.ts"
+  Host header:
+    grep -rn "req\.headers\.host\|req\.hostname\|X-Forwarded-Host\|X-Host\|Host:\|getHost(" --include="*.js" --include="*.ts" --include="*.php"
+  Cloud / credentials:
+    grep -rn "AWS\|S3\|GCS\|AZURE\|GOOGLE_CLOUD\|FIREBASE\|HEROKU\|DO_TOKEN\|process\.env" --include="*.js" --include="*.ts"
+  Cache:
+    grep -rn "Cache-Control\|Vary:\|X-Cache\|Surrogate-Key\|stale-while-revalidate\|s-maxage" --include="*.js" --include="*.ts" --include="*.conf"
+  HTTP smuggling:
+    grep -rn "Transfer-Encoding\|Content-Length\|TE:\|chunked\|keep-alive\|proxy_pass\|ProxyPass" --include="*.conf" --include="*.nginx"
+  Secrets (from git_intelligence):
+    Read git_intelligence.json secrets_found array — add each entry directly as a
+    candidate with state=needs_evidence (still_active=null until Phase 4 confirms live)
+
+**Domain-specific chain opportunities:**
+  SSRF → AWS metadata endpoint → IAM credentials → cloud takeover
+  CORS wildcard + credentials → XSS → account takeover
+  Host header → password reset link poisoning → account takeover
+  Broken link in external_domains → register domain → persistent XSS
 
 ---
 
 ## PHASE 3 — Candidate Classification
 
-For each candidate, assign:
-  - Vulnerability class (from asset module list)
-  - Preliminary CVSS vector (incomplete until dynamic confirmation)
-  - Attack preconditions: authentication required? specific role? specific config?
-  - Estimated exploitability: trivial / moderate / complex / theoretical
+For each candidate (from static analysis + pre-seeded git intel), assign:
 
-Sort candidates by estimated severity before Phase 4.
-Start dynamic testing with the highest-severity candidates.
+```json
+{
+  "id":        "<sha256_prefix>:<vuln_class>:<component>:<file>:<line>",
+  "state":     "candidate",
+  "agent":     "[domain]",
+  "vuln_class": "sqli",
+  "severity":  "critical|high|medium|low|info",
+  "title":     "SQL injection in search endpoint",
+  "source": {
+    "type":        "static_analysis|patch_bypass|secret_scan|version_delta",
+    "file":        "src/controllers/search.js",
+    "line":        142,
+    "entry_point": "GET /api/search?q="
+  },
+  "sink": {
+    "file":     "src/db/query.js",
+    "line":     87,
+    "function": "rawQuery"
+  },
+  "reachability_path": [
+    "GET /api/search → router.js:34",
+    "→ SearchController.search → search.js:142",
+    "→ db.rawQuery → query.js:87"
+  ],
+  "assumptions":    ["no WAF between client and app"],
+  "impact":         "Full DB read — credential dump, session token exfil",
+  "confidence":     0.8,
+  "chain_id":       null,
+  "cvss_vector":    "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+  "created_at":     "<ISO timestamp>"
+}
+```
+
+Sort candidates by estimated severity before the skepticism gate.
+Start with critical, then high.
 
 ---
 
-## PHASE 4 — Dynamic Confirmation
+## PHASE 3.5a — SKEPTICISM GATE
 
-For each candidate (highest severity first):
+**Mandatory for every candidate before Phase 4.**
+If ANY check fails → move candidate to `needs_evidence` or `out_of_scope` with reason.
+Do NOT skip this gate. Do NOT mark anything confirmed without passing all 5 checks.
 
-4.1 Set up a clean test environment matching production config
-4.2 Build a minimal test case that exercises the vulnerable path
-4.3 Execute the test case
-4.4 Observe the result
+```
+CHECK 1 — Code Path Reachability
+  ✓ At least one HTTP/IPC/file entry point reaches the sink?
+  ✓ Path not protected by disabled feature flag or dead code?
+  ✓ Trace the full call graph: entry point → ... → sink (file:line per hop)
+  ✗ Cannot trace complete path → state: needs_evidence
+     reason: "incomplete_call_graph: [describe gap]"
+
+CHECK 2 — Authentication Context
+  ✓ Attacker can reach the sink without privileged credentials?
+  ✓ If auth required: can attacker obtain it? (public registration, free account, predictable token)
+  ✓ If elevated auth required: does another candidate provide an escalation path?
+     → tag as CHAIN_CANDIDATE (state: chain_candidate, note the upstream link)
+  ✗ Requires admin/internal role with no obtainable escalation
+     → state: needs_evidence, reason: "requires_escalation_vector"
+
+CHECK 3 — Intermediate Defenses
+  ✓ Is there sanitization between source and sink? Analyze each transformation.
+  ✓ If yes: is it bypassable? (encoding trick, alternative type, parser discrepancy)
+  ✗ Defense is solid and no bypass found → state: needs_evidence
+     reason: "defense_not_bypassed: [describe defense at file:line]"
+
+CHECK 4 — H1 Auto-disqualifiers
+  ✗ Requires physical access or social engineering?
+  ✗ Impact limited to authenticated user only (self-XSS, self-CSRF)?
+  ✗ Impact is only "missing header" or purely theoretical without concrete capability?
+  ✗ No impact beyond "information disclosure" of non-sensitive data?
+  → Any YES → state: out_of_scope, reason: "h1_disqualifier: [which rule]"
+
+CHECK 5 — Real Impact
+  ✓ What concrete capability does the attacker gain? (account takeover, RCE, data exfil,
+    privilege escalation, payment fraud)
+  ✓ Does the impact hold in production (not only in a hypothetical test env)?
+  ✗ Impact is only "could potentially be used for..." → state: needs_evidence
+     reason: "impact_not_demonstrated"
+```
+
+Record gate result per candidate:
+```json
+"skepticism_gate": {
+  "check1_reachability":    "pass|fail",
+  "check2_auth_context":    "pass|fail",
+  "check3_defenses":        "pass|fail",
+  "check4_h1_disqualifiers":"pass|fail",
+  "check5_real_impact":     "pass|fail"
+}
+```
+
+Only candidates where ALL 5 checks = "pass" proceed to Phase 3.5b.
+All others: set state accordingly, record reason, include in shard.
+
+---
+
+## PHASE 3.5b — DEVIL'S ADVOCATE
+
+**Only candidates that passed all 5 skepticism checks enter here.**
+
+**Mandatory for XSS (reflected/stored), IDOR, and info disclosure classes** even if all
+5 skepticism checks pass — these classes require extra scrutiny due to high FP rate.
+
+For each candidate, write 3 arguments AGAINST the finding, each with a code reference,
+then rebut each with evidence:
+
+```
+CANDIDATE: [title]
+
+AGAINST 1: [reason it might be a false positive — e.g. "WAF may block the payload"]
+  Evidence: [file:line — the code that supports this counter-argument]
+  REBUTTAL: [why the argument does not hold — cite specific evidence]
+
+AGAINST 2: [different dimension — must cover at least 2 of: reachability, defense, impact]
+  Evidence: [file:line]
+  REBUTTAL: [evidence that rebuts it]
+
+AGAINST 3: [third dimension]
+  Evidence: [file:line]
+  REBUTTAL: [evidence that rebuts it]
+
+VERDICT: PROCEED TO PHASE 4 | DOWNGRADE TO NEEDS_EVIDENCE
+```
+
+Rules:
+- The 3 arguments MUST cover at least 2 of these dimensions:
+    Reachability (is the path actually traversable?)
+    Defense (is there a control I underestimated?)
+    Impact (is the impact actually what I think?)
+- If you cannot rebut all 3 → state: needs_evidence, reason: "devil_advocate_failed"
+- A weak rebuttal ("no evidence of WAF") is not a rebuttal — find positive evidence
+
+Record advocate result:
+```json
+"devil_advocate": {
+  "against": [
+    { "argument": "...", "evidence": "file:line", "rebuttal": "..." },
+    { "argument": "...", "evidence": "file:line", "rebuttal": "..." },
+    { "argument": "...", "evidence": "file:line", "rebuttal": "..." }
+  ],
+  "verdict": "confirmed|needs_evidence"
+}
+```
+
+After devil's advocate:
+- `verdict: confirmed` + all gate checks pass → state: `needs_evidence`
+  (still needs Phase 4 live evidence to become fully `confirmed`)
+- `verdict: needs_evidence` → state: `needs_evidence`, keep all gate/advocate data
+
+---
+
+## SHARD WRITE
+
+After completing all steps for a domain, write the shard:
+
+```bash
+# Read existing shard if resuming (to merge, not overwrite)
+node -e "
+const { readShard, writeShard } = require('./scripts/lib/candidates-shard');
+const findingsDir = '[findings_dir]';
+const agent = '[domain]';  // auth|inject|client|access|media|infra
+const existing = readShard(findingsDir, agent);
+const newCandidates = [PASTE YOUR CANDIDATES JSON ARRAY HERE];
+// Merge: existing + new, deduplicate by id (new wins on conflict)
+const merged = new Map(existing.candidates.map(c => [c.id, c]));
+for (const c of newCandidates) merged.set(c.id, c);
+const pool = {
+  schema_version: 2,
+  generated_at: new Date().toISOString(),
+  target: existing.target || '[target]',
+  candidates: [...merged.values()]
+};
+writeShard(findingsDir, agent, pool);
+console.log('Shard written:', pool.candidates.length, 'candidates');
+"
+```
+
+Or write the shard directly as JSON:
+```bash
+cat > findings/candidates_pool_[domain].json << 'EOF'
+{
+  "schema_version": 2,
+  "generated_at": "[ISO timestamp]",
+  "target": "[target]",
+  "candidates": [
+    ... your candidates array ...
+  ]
+}
+EOF
+```
+
+---
+
+## PHASE 4 — Live Testing + Targeted Fuzzing
+
+Run after ALL 6 domains have completed their shard writes.
+
+### 4.0 Environment Check
+
+Check if a live environment is available:
+```bash
+cat findings/env_meta.json 2>/dev/null || echo "no env"
+```
+
+If no env_meta.json or `setup_verified != "ok"`:
+→ Skip Phase 4.1 and 4.2
+→ All `needs_evidence` candidates remain as `needs_evidence`
+→ Add note: `"phase4_skipped": "no_live_environment"` to each
+
+If live env available, use the base URL from env_meta.json.
+
+### 4.0.1 Environment Setup Rules (only if no env exists yet)
+
+If live env is needed but not set up:
+1. ALWAYS read official installation instructions before generating any setup script:
+   Priority: README.md → INSTALL.md → docs/installation.* → wiki URL in README
+            → existing Dockerfile/docker-compose.yml → Makefile → .github/workflows/*.yml
+2. Never generate docker-compose.yml from scratch without reading official docs
+3. Never assume DB schema or env vars — read them from documentation
+4. Version MUST match exactly the version being tested — use lockfiles
+
+Version identification sources (in order of reliability):
+`package.json → composer.json → go.mod → setup.py / pyproject.toml → CMakeLists.txt → CHANGELOG.md → git tag`
+
+Output: `findings/setup_env.sh`, `findings/teardown_env.sh`, `findings/env_meta.json`
+
+If official instructions are unclear or absent:
+→ `env_meta.json: { "setup_verified": "FAILED: instructions not found" }`
+→ Use static confirmation only → findings remain needs_evidence
+→ Do NOT proceed with an invented setup
+
+### 4.1 Live Confirmation
+
+For each `needs_evidence` candidate (highest severity first):
+1. Build the exact HTTP request with the candidate payload
+2. Execute against the live base URL
+3. Capture: full request + full response (truncate body to 1000 chars)
+4. Verify observed impact
 
 Confirmation criteria:
-  CONFIRMED     → vulnerability triggered, impact demonstrated in test env
-  PARTIAL       → triggered but impact not fully demonstrated (note why)
-  NOT CONFIRMED → could not reproduce (note what was attempted)
-  FALSE POSITIVE → code path not reachable in practice (note why)
+```
+CONFIRMED     → vulnerability triggered, impact demonstrated in live env
+               → set state: confirmed
+               → add evidence: { request, response, tool_output }
 
-Only CONFIRMED findings go into findings/confirmed/report_bundle.json
-Everything else goes into findings/unconfirmed/candidates.json with reason.
+NEEDS_EVIDENCE → triggered but impact not fully demonstrated
+               → keep state: needs_evidence, add partial evidence
+
+REJECTED      → could not reproduce after 3 attempts
+               → set state: rejected
+               → add false_positive_reason: "reproduction_failed: [what was attempted]"
+```
+
+### 4.2 Targeted Fuzzing
+
+Based on attack_surface.json http_layer + authentication:
+
+```bash
+# Endpoint fuzzing
+ffuf -w /usr/share/wordlists/dirb/common.txt -u http://localhost:[PORT]/FUZZ -mc 200,301,302,403
+
+# SQLi (on DB-touching endpoints from attack_surface.json)
+sqlmap -u "http://localhost:[PORT]/[endpoint]?[param]=1" --level 3 --risk 2 --batch
+
+# XSS (on all reflection points from javascript_sinks)
+dalfox url "http://localhost:[PORT]/[endpoint]?[param]=test"
+
+# JWT brute force (if JWT auth found)
+jwt_tool [token] -C -d /usr/share/wordlists/rockyou.txt
+
+# BroJack — broken link hijacking (from external_domains)
+python brojack.py -d http://localhost:[PORT] -t -v --outfile findings/brojack_results.json
+
+# CMS-specific (if CMS detected in file_triage)
+# WordPress: wpscan --url http://localhost:[PORT] --enumerate vp,vt,u
+# Nuclei: nuclei -u http://localhost:[PORT] -t cms/
+```
+
+Merge fuzzing results into the relevant agent shards.
+New findings from fuzzing → go through Phase 3 classification + Phase 3.5 gate.
 
 ---
 
 ## PHASE 5 — PoC Development
 
-For every CONFIRMED finding, build a minimal self-contained PoC:
+For every candidate with state=confirmed (from Phase 4 or static-only confirmation):
 
 Requirements:
   - Works from a clean environment without extra setup
   - Demonstrates REAL impact (not just "parameter is reflected")
   - Shows the worst-case outcome: account takeover, RCE, data exfiltration
-  - Chains vulnerabilities if that is what achieves real impact
+  - Chains vulnerabilities if that achieves real impact
   - Includes: preconditions, exact payload/request, expected result
 
 PoC quality bar:
@@ -287,10 +772,84 @@ PoC quality bar:
         exfiltrates their session cookie to attacker-controlled server,
         demonstrated with a local netcat listener catching the request.
 
+Add to finding:
+```json
+"poc": {
+  "type": "http_request|html_file|script|curl_command|tool_command",
+  "code": "...",
+  "preconditions": ["..."],
+  "expected_result": "..."
+}
+```
+
 ---
 
 ## PHASE 6 — Output
 
-Write findings/confirmed/report_bundle.json using the REPORT_BUNDLE schema from core.md.
-Write findings/unconfirmed/candidates.json for everything not confirmed.
-Print a summary: X candidates found, Y confirmed, Z unconfirmed.
+### 6.1 Merge shards
+
+```bash
+node -e "
+const { mergeShards } = require('./scripts/lib/candidates-shard');
+const fs = require('node:fs');
+const pool = mergeShards('[findings_dir]');
+console.log('Total candidates:', pool.candidates.length);
+console.log('Confirmed:', pool.candidates.filter(c => c.state === 'confirmed').length);
+console.log('Needs evidence:', pool.candidates.filter(c => c.state === 'needs_evidence').length);
+console.log('Rejected:', pool.candidates.filter(c => c.state === 'rejected').length);
+console.log('Out of scope:', pool.candidates.filter(c => c.state === 'out_of_scope').length);
+"
+```
+
+### 6.2 Write report_bundle.json
+
+Only `confirmed` candidates from the merged pool go into report_bundle.json.
+Use the REPORT_BUNDLE schema from core.md.
+
+Write: `findings/confirmed/report_bundle.json`
+
+### 6.3 Write candidates.json
+
+All `needs_evidence`, `chain_candidate`, and `rejected` candidates go into:
+`findings/unconfirmed/candidates.json`
+
+### 6.4 Print summary
+
+```
+═══════════════════════════════════════════════════════
+ RESEARCHER v2 — SESSION COMPLETE
+═══════════════════════════════════════════════════════
+ Target: [target]
+ Domains analyzed: [AUTH] [INJECT] [CLIENT] [ACCESS] [MEDIA] [INFRA]
+
+ Candidates total:   [N]
+   confirmed:        [M]   → report_bundle.json
+   needs_evidence:   [K]   → candidates.json
+   chain_candidate:  [J]   → candidates.json
+   rejected:         [L]   → reason stored
+   out_of_scope:     [P]   → H1 disqualified
+
+ Run /triager to score and prioritize confirmed findings.
+═══════════════════════════════════════════════════════
+```
+
+---
+
+## NEW TECHNIQUE EXTRACTION
+
+If you discover a technique not in the skill library, add `extracted_skill` to the finding:
+
+```json
+"extracted_skill": {
+  "title":            "short title",
+  "technique":        "how it works — specific enough to replicate",
+  "chain_steps":      ["step 1", "step 2"],
+  "insight":          "the non-obvious part",
+  "vuln_class":       "...",
+  "asset_type":       "...",
+  "severity_achieved": "Critical|High|Medium|Low",
+  "bypass_of":        null
+}
+```
+
+The pipeline automatically persists this to the skill library after your session.
