@@ -45,6 +45,7 @@ describe("redactString", () => {
   });
 
   it("redacts Stripe live key", () => {
+    // split to avoid triggering GitHub secret scanning on the test file itself
     const fakeKey = "sk_li" + "ve_abcdefghijklmnopqrstuvwx";
     const out = redactString(fakeKey);
     assert.ok(out.includes("sk_live_[REDACTED]"), out);

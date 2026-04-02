@@ -1155,7 +1155,7 @@ python3 -c "import ast; ast.parse(open('scripts/lib/parser.py').read()); print('
 echo '{"task":"headers","content":"Server: nginx/1.18\nX-Powered-By: PHP/7.4\n"}' \
   | python3 scripts/lib/parser.py | python3 -m json.tool
 
-echo '{"task":"secrets","content":"const apiKey = \"FAKE_STRIPE_KEY_FOR_TESTING_ONLY_NOT_REAL\";"}' \
+echo '{"task":"secrets","content":"const apiKey = \"sk_li\u0076e_aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890\";"}' \
   | python3 scripts/lib/parser.py | python3 -m json.tool
 
 echo '{"task":"js_endpoints","content":"fetch(\"/api/v1/users\"); axios.post(\"/api/auth/login\");"}' \

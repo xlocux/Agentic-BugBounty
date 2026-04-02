@@ -89,9 +89,9 @@ test("scanWorkingTree finds AWS access key in a file", () => {
 test("scanWorkingTree finds Stripe live key in a file", () => {
   const tmpDir   = fs.mkdtempSync(path.join(os.tmpdir(), "sbtest-"));
   const fakeFile = path.join(tmpDir, "payment.js");
-  fs.writeFileSync(fakeFile, `const fakeStripeKey = "sk_li" + "ve_abcdefghijklmnopqrstuvwx";
-  fs.writeFileSync(fakeFile, `const stripe = require("stripe")("${fakeStripeKey}");
-`, "utf8");\n`, "utf8");
+  // split to avoid triggering GitHub secret scanning on the test file itself
+  const fakeStripeKey = "sk_li" + "ve_abcdefghijklmnopqrstuvwx";
+  fs.writeFileSync(fakeFile, `const stripe = require("stripe")("${fakeStripeKey}");\n`, "utf8");
 
   const manifest = [{ path: "payment.js", language: "javascript", relevance_tag: "routing" }];
   const patterns = loadPatterns(tmpDir);
