@@ -7,69 +7,291 @@
 ## Table of Contents
 
 1. [How it works](#how-it-works)
-2. [Analysis modes](#analysis-modes)
-3. [Target workspace](#target-workspace)
-4. [Running the pipeline](#running-the-pipeline)
-5. [Live agent output](#live-agent-output)
-6. [PoC artifacts and summary](#poc-artifacts-and-summary)
-7. [Interactive finding review](#interactive-finding-review)
-8. [Session resume (Claude Pro usage limits)](#session-resume-claude-pro-usage-limits)
-9. [Intelligence sources](#intelligence-sources)
-10. [bbscope](#bbscope)
-11. [HackerOne intelligence](#hackerone-intelligence)
-12. [Skill library](#skill-library)
-13. [CVE intel](#cve-intel)
-14. [Hybrid recon (free LLM pre-pass)](#hybrid-recon-free-llm-pre-pass)
-15. [Dual researcher (second AI pass)](#dual-researcher-second-ai-pass)
-16. [OpenRouter — free models + key rotation](#openrouter--free-models--key-rotation)
-17. [Intel UI](#intel-ui)
-18. [Direct agent invocation](#direct-agent-invocation)
-19. [JSON contracts](#json-contracts)
-20. [Validation](#validation)
-21. [Package scripts reference](#package-scripts-reference)
-22. [Environment variables](#environment-variables)
+2. [Phase 0: Smart Onboarding](#phase-0-smart-onboarding)
+3. [Stage 0: File Triage](#stage-0-file-triage)
+4. [Stage 1: Surface Mapping](#stage-1-surface-mapping)
+5. [Stage 1.5: Git Intelligence](#stage-15-git-intelligence)
+6. [Stage 2: Domain Specialists](#stage-2-domain-specialists)
+7. [Stage 2.5: Chain Coordinator](#stage-25-chain-coordinator)
+8. [Explorer agent](#explorer-agent)
+9. [Adaptive Recon Loop](#adaptive-recon-loop)
+10. [HITL Checkpoints](#hitl-checkpoints)
+11. [FP Registry](#fp-registry)
+12. [Analysis modes](#analysis-modes)
+13. [Target workspace](#target-workspace)
+14. [Running the pipeline](#running-the-pipeline)
+15. [Live agent output](#live-agent-output)
+16. [PoC artifacts and summary](#poc-artifacts-and-summary)
+17. [Session resume (Claude Pro usage limits)](#session-resume-claude-pro-usage-limits)
+18. [Intelligence sources](#intelligence-sources)
+19. [bbscope](#bbscope)
+20. [HackerOne intelligence](#hackerone-intelligence)
+21. [Skill library](#skill-library)
+22. [CVE intel](#cve-intel)
+23. [Training dataset export](#training-dataset-export)
+24. [OpenRouter — free models + key rotation](#openrouter--free-models--key-rotation)
+25. [Intel UI](#intel-ui)
+26. [Direct agent invocation](#direct-agent-invocation)
+27. [JSON contracts](#json-contracts)
+28. [Validation](#validation)
+29. [Package scripts reference](#package-scripts-reference)
+30. [Environment variables](#environment-variables)
 
 ---
 
 ## How it works
 
-The pipeline runs two agents in sequence.
+The v2 pipeline runs seven sequential stages, each purpose-built for one layer of the analysis.
 
 ```mermaid
 flowchart TD
     SRC["Source code (whitebox)\nor target URL (blackbox)"]
-    HR["Hybrid recon\n(free LLM — Phase 0+1)"]
-    R["Researcher (Claude)\nPhase 2–6"]
+    P0["Phase 0: Smart Onboarding\n(--interactive)"]
+    S0["Stage 0: File Triage\n(relevance scoring, language)"]
+    S1["Stage 1: Surface Mapping\n(entry points, sinks, IPC)"]
+    S15["Stage 1.5: Git Intelligence\n(commit mining, secret scan)"]
+    EX["Explorer\n(parallel — dep analysis, JS endpoints)"]
+    S2["Stage 2: Domain Specialists\nAUTH · INJECT · CLIENT\nACCESS · MEDIA · INFRA"]
+    S25["Stage 2.5: Chain Coordinator\n(primitive chaining)"]
     B["report_bundle.json"]
-    DR["Dual researcher\n(OpenRouter free model)"]
     T["Triager"]
     NMI{"NEEDS MORE INFO?"}
     TR["triage_result.json"]
     H1["H1-ready reports"]
 
-    SRC --> HR
-    HR --> R
-    R --> B
-    B --> DR
-    DR --> B
+    SRC --> P0
+    P0 --> S0
+    S0 --> S1
+    S1 --> S15
+    S15 --> EX
+    EX --> S2
+    S2 --> S25
+    S25 --> B
     B --> T
     T --> NMI
-    NMI -- "yes (max 2 rounds)" --> R
+    NMI -- "yes (max 2 rounds)" --> S2
     NMI -- no --> TR
     TR --> H1
 ```
 
-**One command runs everything.** `node scripts/run-pipeline.js` runs hybrid recon, then the Researcher, then the dual researcher pass, then the Triager. You do not need to run them separately unless you want manual control.
+**One command runs everything.** `node scripts/run-pipeline.js` runs all stages in order. You do not need to invoke them separately unless you want manual control.
 
-**Hybrid recon** runs Phase 0 (calibration briefing) and Phase 1 (source reconnaissance) using a free LLM via OpenRouter or Gemini CLI before Claude starts. The output — entry points, sink map, IPC channels, interesting patterns — is injected into the Claude prompt. Claude picks up at Phase 2 (static analysis) with the groundwork already done. If the free LLM is unavailable, Claude handles Phase 0+1 itself — no regression.
+**Phase 0 (Smart Onboarding)** — activated by `--interactive`. Runs a structured Q&A session (scope, target version, research focus, CVE context, credentials, extra notes) and presents a session summary for confirmation before any analysis begins.
 
-**Researcher** operates in whitebox or blackbox mode. It reads source files, traces data flows, confirms every candidate with a working PoC before writing to the bundle. For targets with multiple assets, it runs a separate pass per asset, appending findings to the same bundle. The pipeline pauses between passes.
+**Stage 0 (File Triage)** — deterministic file walk using a cheap LLM pass. Every file in the target gets a `relevance_tag` (config, routing, auth, crypto, etc.) and language detection. The resulting manifest drives all subsequent stages — only relevant files are analysed.
 
-**Dual researcher** runs a second pass after Claude using a different model via OpenRouter. It cross-validates findings and hunts for anything the first pass missed. New findings are merged into the bundle by deduplication on `affected_component + vulnerability_class`.
+**Stage 1 (Surface Mapping)** — LLM-driven extraction of entry points, data sinks (`eval`, `innerHTML`, `exec`, query builders), IPC/messaging channels, external comms, and tech fingerprints. Output is a structured attack surface JSON injected into every domain researcher prompt.
 
-**Triager** runs six checks on every finding: scope, completeness, validity, CVSS reassessment, novelty (duplicate detection), and submission decision. Findings that need clarification get flagged as `NEEDS_MORE_INFO`, which triggers a second Researcher pass. This loops up to `--max-nmi-rounds` times (default 2).
+**Stage 1.5 (Git Intelligence)** — mines the git history for security-relevant commits (auth, fix, secret, cve, patch), maps commit authors by file area, runs a secret scan across the working tree, and extracts removed code from diff bodies.
+
+**Stage 2 (Domain Specialists)** — six parallel-capable researcher agents, each focused on one attack domain. Each agent writes its candidate pool to a separate shard (`candidates_pool_<DOMAIN>.json`) to avoid Windows file-locking on concurrent writes. Agents: AUTH (session, OAuth, JWT), INJECT (SQLi, SSTI, XXE, command injection), CLIENT (XSS, CSRF, postMessage, FontLeak), ACCESS (IDOR, path traversal, SSRF), MEDIA (file upload, path traversal, parser quirks), INFRA (headers, CORS, dependency CVEs).
+
+**Stage 2.5 (Chain Coordinator)** — reads all domain findings and hunts for exploit chains. Uses a primitive matrix of 30+ chain patterns (e.g. SSRF→IDOR→exfil, XSS→CSRF→priv-esc, SQLi→file_read→RCE). Adds `chain_meta` to the bundle for confirmed chains.
+
+**Explorer** — parallel surface mapper launched before Stage 2. Runs dependency analysis, JS endpoint extraction, HTTP fingerprinting, and secret detection using the deterministic Python parser (`parser.py` via `parser-bridge.js`). Output injected into all domain prompts.
+
+**Triager** — runs six checks on every finding: scope, completeness, validity, CVSS reassessment, novelty (duplicate detection), and submission decision. Findings that need clarification get flagged as `NEEDS_MORE_INFO`, which triggers a second Stage 2 pass. This loops up to `--max-nmi-rounds` times (default 2).
 
 **Deterministic fallback**: if the Triager agent fails to write `triage_result.json`, the pipeline runs a local Node.js triage pass with the same six checks.
+
+---
+
+## Phase 0: Smart Onboarding
+
+Activated with `--interactive`. Runs before any file analysis.
+
+```bash
+node scripts/run-pipeline.js --target acme --cli claude --interactive
+```
+
+The onboarding Q&A covers:
+
+| Question | Purpose |
+|----------|---------|
+| Scope restrictions | Constrains agent focus |
+| Target version | Enables CVE matching |
+| Research focus (full / auth / client / inject / …) | Loads matching domain modules |
+| Known CVE / patch to test | Seeds bypass module |
+| Test environment URL | Sets live test base URL |
+| Credentials available? | Unlocks authenticated test paths |
+| Extra context | Free-form notes injected into all prompts |
+
+After the Q&A, the pipeline prints a session summary and waits for confirmation before proceeding. Phase 0 is skipped on `--resume` runs.
+
+---
+
+## Stage 0: File Triage
+
+Runs automatically at the start of every pipeline run. Not user-configurable.
+
+Walks every file in `source_path`, assigns a `relevance_tag` from:
+
+```
+config · routing · auth · crypto · template · upload ·
+serialization · ipc · build · lockfile · test · docs · other
+```
+
+Files tagged `test`, `docs`, or `other` are deprioritised in later stages. The manifest is written to `findings/file_manifest.json` and consumed by Stage 1, the Explorer, and every domain researcher.
+
+---
+
+## Stage 1: Surface Mapping
+
+Uses a cheap LLM pass over the file manifest to produce a structured attack surface.
+
+Output fields:
+
+```
+entry_points[]       URL routes, CLI args, message handlers
+auth_layer           auth mechanism, session storage, token type
+data_sinks[]         eval / innerHTML / exec / query builders / etc.
+ipc_channels[]       postMessage, BroadcastChannel, IPC sockets
+external_comms[]     fetch / XMLHttpRequest / WebSocket targets
+interesting_patterns[] non-obvious patterns worth investigating
+tech_fingerprint     framework, version, major deps
+```
+
+Written to `findings/surface_map.json`. Injected into Explorer and all domain researcher prompts.
+
+---
+
+## Stage 1.5: Git Intelligence
+
+Mines the git history of `source_path` (if it is a git repo).
+
+What it extracts:
+
+- **Security commits** — commits whose message contains: `auth`, `fix`, `secret`, `cve`, `patch`, `vuln`, `bypass`, `sanitiz`, `escap`, `inject`. Sampled and stored with diff body.
+- **Author map** — maps each committer to the files they touch most. Used to surface high-change-rate areas.
+- **Secret scan** — scans the working tree against built-in patterns (AWS keys, Stripe keys, JWTs, generic high-entropy tokens) plus any custom patterns in `scripts/sex/patterns.json`.
+- **Removed code** — extracts deleted lines from security-relevant diffs.
+
+Output written to `findings/git_intel.json`. Findings from the secret scan flow into the bundle as `source: working_tree` entries with `still_active: null` (requiring manual verification).
+
+---
+
+## Stage 2: Domain Specialists
+
+Six researcher agents, each covering one attack domain. Each reads the surface map, git intel, Explorer output, and FP context before starting.
+
+| Domain | Agent | Vuln classes covered |
+|--------|-------|---------------------|
+| AUTH | `researcher_wb.md` AUTH section | Session fixation, OAuth misconfig, JWT alg confusion, SAML bypass, password reset flaws |
+| INJECT | `researcher_wb.md` INJECT section | SQLi, SSTI, XXE, command injection, LDAP injection, prototype pollution |
+| CLIENT | `researcher_wb.md` CLIENT section | XSS (stored/reflected/DOM), CSRF, postMessage origin bypass, css_font_exfiltration (FontLeak) |
+| ACCESS | `researcher_wb.md` ACCESS section | IDOR, path traversal, SSRF, broken object-level auth, mass assignment |
+| MEDIA | `researcher_wb.md` MEDIA section | File upload bypass, archive traversal, image parser quirks, SVG XSS |
+| INFRA | `researcher_wb.md` INFRA section | CORS misconfiguration, security header gaps, dep CVEs, subdomain takeover signals |
+
+Each agent writes candidates to its own shard:
+
+```
+findings/candidates_pool_AUTH.json
+findings/candidates_pool_INJECT.json
+findings/candidates_pool_CLIENT.json
+findings/candidates_pool_ACCESS.json
+findings/candidates_pool_MEDIA.json
+findings/candidates_pool_INFRA.json
+```
+
+Confirmed findings across all shards are merged into `findings/confirmed/report_bundle.json` after Stage 2 completes.
+
+### FontLeak (css_font_exfiltration)
+
+The CLIENT domain includes FontLeak — CSS+OpenType GSUB ligature exfiltration. It requires:
+1. A style tag injection point (CSP `style-src` not `'none'`)
+2. Permissive `font-src` (allows external or `data:` fonts)
+3. Target text rendered in user-controlled font context
+4. A width-measurable container (container query support or JS measurement)
+
+FontLeak bypasses DOMPurify default config (allows `<style>` tags). It is **not** a theoretical finding — a working PoC measuring DOM text width is required before reporting.
+
+---
+
+## Stage 2.5: Chain Coordinator
+
+After all domain agents complete, the chain coordinator reads the full candidate + confirmed pool and hunts for multi-primitive exploit chains.
+
+Primitive matrix (selected patterns):
+
+| Chain | Primitives | Example |
+|-------|-----------|---------|
+| SSRF→IDOR | ssrf + idor | Reach internal API, enumerate objects |
+| XSS→CSRF→priv-esc | xss + csrf | Steal form, escalate via admin action |
+| SQLi→file_read→RCE | sqli + file_read | Read SSH key, achieve code exec |
+| Path-traversal→LFI→SSTI | path_trav + lfi + ssti | Read template, inject expression |
+| CSS injection→FontLeak | css_inject + font_exfil | Exfiltrate DOM text without JS |
+| Upload→parser→RCE | file_upload + parser_quirk | Polyglot triggers server-side exec |
+| JWT confusion→auth bypass | jwt_alg + auth_bypass | Sign with 'none', gain admin |
+| CORS→CSRF | cors_misconfig + csrf | Read credentialed cross-origin response |
+
+Confirmed chains are written to `findings/chains.json` and the `chain_meta` field is added to each participating finding in `report_bundle.json`.
+
+---
+
+## Explorer agent
+
+Runs in parallel with Stage 2 (before domain researchers start). Uses free LLM via OpenRouter or Gemini CLI.
+
+### What it does
+
+1. **Dependency analysis** — reads `package.json`, `requirements.txt`, `go.mod`, etc. and queries for known vulnerable versions via CVE intel.
+2. **JS endpoint extraction** — statically extracts API routes from source files using the deterministic Python parser (`parser.py`). No regex hallucination.
+3. **HTTP fingerprinting** — fires lightweight probes at discovered endpoints when a live URL is configured. Captures response headers, server banner, tech stack.
+4. **Secret detection** — runs the same built-in patterns as the git secret scan, but over the file system (working tree only).
+
+### Deterministic parser
+
+`scripts/lib/parser.py` uses BeautifulSoup for HTML, regex for JS, and Shannon entropy (threshold 3.5 bits/char) for secret detection. Called via `scripts/lib/parser-bridge.js` (Node.js → Python IPC with JSON stdin/stdout). Replaces raw LLM extraction for tasks where hallucination is unacceptable.
+
+### Failure behaviour
+
+If the free LLM is unavailable, the Explorer returns null silently. Domain agents proceed without Explorer context — no regression.
+
+---
+
+## Adaptive Recon Loop
+
+After each domain agent completes, the pipeline scans its output for new surface signals:
+- New endpoints not in the Stage 1 surface map
+- New tech fingerprints (framework versions, server headers)
+- New IPC channels or message handlers
+
+Signals are accumulated in a `globalSignalSet`. Before each subsequent domain agent starts, a `adaptiveReconHint` is injected into its prompt with any signals discovered by earlier agents. This allows later domains to benefit from discoveries made by earlier ones without requiring a full re-run of Stage 1.
+
+---
+
+## HITL Checkpoints
+
+Add `--hitl` to enable three manual review pauses:
+
+```bash
+node scripts/run-pipeline.js --target acme --cli claude --hitl
+```
+
+| Checkpoint | Timing | What you can do |
+|------------|--------|----------------|
+| Post-Explorer | After Explorer completes, before Stage 2 | Confirm surface map, exclude endpoints, adjust domain focus |
+| Post-Researcher | After each domain agent | Review candidates, promote/reject, adjust chain hypothesis |
+| Pre-Triage | Before Triager runs | Approve/reject/downgrade findings; Triager only sees approved set |
+
+HITL mode is interactive — requires a terminal. Prompts appear in the console. Hitting Enter without input accepts the default (proceed as-is).
+
+---
+
+## FP Registry
+
+The FP Registry learns from rejected candidates to avoid repeated false positives.
+
+When a candidate is rejected (by the Triager, or manually via HITL), the pipeline writes its key characteristics to the `false_positive_registry` table in the target's `agentic-bugbounty.db`:
+- `vuln_class`
+- `affected_component`
+- `rejection_reason`
+- `run_id`, `target`
+
+Before each domain agent starts, `buildFpContext(db, vulnClass)` reads the registry and injects a summary of known false positive patterns for that domain into the prompt. This steers the agent away from re-investigating the same dead ends.
+
+The registry is per-target and accumulates across runs.
 
 ---
 
@@ -175,7 +397,17 @@ targets/<name>/
 ├── run.sh / run.cmd                     convenience wrappers
 ├── src/                                 target source code
 ├── findings/
-│   ├── confirmed/report_bundle.json     confirmed findings
+│   ├── file_manifest.json               Stage 0 triage output
+│   ├── surface_map.json                 Stage 1 attack surface
+│   ├── git_intel.json                   Stage 1.5 git intelligence
+│   ├── chains.json                      Stage 2.5 chain findings
+│   ├── candidates_pool_AUTH.json        per-domain candidate shards
+│   ├── candidates_pool_INJECT.json
+│   ├── candidates_pool_CLIENT.json
+│   ├── candidates_pool_ACCESS.json
+│   ├── candidates_pool_MEDIA.json
+│   ├── candidates_pool_INFRA.json
+│   ├── confirmed/report_bundle.json     confirmed findings (merged)
 │   ├── unconfirmed/candidates.json      unconfirmed candidates
 │   ├── triage_result.json               triager verdicts
 │   └── h1_submission_ready/*.md         HackerOne-ready reports
@@ -183,9 +415,11 @@ targets/<name>/
 │   ├── EXT-001_slug.html                extracted PoC files
 │   └── summary.md                       vulnerability summary
 ├── logs/
-│   └── pipeline-*.log
+│   ├── pipeline-*.log                   run log with token usage
+│   ├── agents/                          per-domain status files
+│   └── checkpoint.json                  resume checkpoint (if interrupted)
 └── intelligence/
-    ├── agentic-bugbounty.db
+    ├── agentic-bugbounty.db             SQLite: scope, skills, FP registry
     ├── bbscope_scope_snapshot.json
     ├── h1_scope_snapshot.json
     ├── h1_vulnerability_history.json
@@ -272,7 +506,8 @@ node scripts/run-pipeline.js --target <name> --cli claude
 | `--model <id>` | model default | Override model |
 | `--asset <type>` | from target.json | Override asset type |
 | `--mode whitebox\|blackbox` | from target.json | Override analysis mode |
-| `--interactive` | off | Manual finding review before triage |
+| `--interactive` | off | Enable Phase 0 Smart Onboarding Q&A |
+| `--hitl` | off | Enable HITL checkpoints (post-Explorer, post-Researcher, pre-Triage) |
 | `--max-nmi-rounds <n>` | 2 | Max NEEDS_MORE_INFO feedback loops |
 | `--resume` | off | Resume from checkpoint after session limit |
 
@@ -349,15 +584,17 @@ npm run poc:render
 
 ## Interactive finding review
 
-Add `--interactive` to pause after the Researcher and review each finding before triage:
+`--interactive` enables Phase 0 Smart Onboarding (see above). For manual finding review before triage, use `--hitl` which adds the Pre-Triage checkpoint:
 
 ```bash
-node scripts/run-pipeline.js --target acme --cli claude --interactive
+node scripts/run-pipeline.js --target acme --cli claude --hitl
 ```
+
+At the Pre-Triage checkpoint:
 
 ```
 ────────────────────────────────────────────────────────────────────────
-MANUAL REVIEW — 3 finding(s) to validate before triage
+HITL PRE-TRIAGE — 3 finding(s) to validate
 ────────────────────────────────────────────────────────────────────────
 
 ▶ [EXT-001] Content script postMessage handler lacks origin validation
@@ -365,10 +602,10 @@ MANUAL REVIEW — 3 finding(s) to validate before triage
    Component : background/messaging.js:47
    Summary   : Any frame can dispatch messages to the background page...
    PoC type  : js_console
-   [y] approve  [n] reject  [v] view full PoC →
+   [y] approve  [n] reject  [d] downgrade severity  [v] view full PoC →
 ```
 
-`[v]` expands the full PoC and step list in-place. `[n]` removes the finding from the bundle before the Triager sees it.
+`[v]` expands the full PoC and step list in-place. `[n]` removes the finding from the bundle before the Triager sees it. `[d]` downgrades severity by one level.
 
 ---
 
@@ -432,16 +669,16 @@ flowchart TD
     GDB["Global DB\ndata/global-intelligence/"]
     LDB["Target DB\ntargets/name/intelligence/"]
     BRIEF["research_brief.json"]
-    HR["Hybrid recon\n(free LLM)"]
-    R["Researcher (Claude)"]
+    EX["Explorer\n(free LLM)"]
+    R["Stage 2 Domain Specialists\n(Claude)"]
 
     BBSCOPE -- "bbscope:sync" --> LDB
     H1API -- "h1:bootstrap / h1:disclosed" --> GDB
     H1API -- "h1:sync" --> LDB
     GDB --> BRIEF
     LDB --> BRIEF
-    BRIEF --> HR
-    HR --> R
+    BRIEF --> EX
+    EX --> R
 ```
 
 ---
@@ -632,73 +869,39 @@ Phase 0, step 0.6 — after the skill library query, the Researcher checks CVEs 
 
 ---
 
-## Hybrid recon (free LLM pre-pass)
+## Training dataset export
 
-Before invoking Claude, the pipeline runs Phase 0 and Phase 1 using a free LLM to save Claude tokens for the work that requires deep reasoning.
+The pipeline collects training examples from every run. Export them at any time:
 
-### What it does
-
-**Phase 0** — runs `query-calibration.js` locally and captures the calibration briefing for the asset type. This is synchronous and zero-cost.
-
-**Phase 1** — walks the source tree (up to 300 files), samples key files (manifest, config, auth, routing, entry points), and asks the free LLM to produce a structured recon map:
-- entry points
-- auth layer
-- data sinks (`eval`, `innerHTML`, `exec`, query builders, etc.)
-- IPC / messaging channels
-- external comms
-- interesting patterns worth investigating
-
-The output is injected into the Claude prompt as a pre-computed context block. Claude starts directly at Phase 2 (static analysis) with the groundwork already done.
-
-### Failure behaviour
-
-If the free LLM is unavailable (no keys, all models failing, timeout), the hybrid recon returns null silently. The pipeline logs a warning and Claude handles Phase 0+1 itself — existing behaviour, no regression.
-
-### Token savings
-
-The primary savings are on file listing, structure mapping, and calibration loading — mechanical work that a smaller model handles fine. Claude's token budget goes toward taint tracing, fuzzing mindset analysis, PoC development, and CVSS reasoning.
-
----
-
-## Dual researcher (second AI pass)
-
-After the primary Claude researcher completes, the pipeline runs a second researcher pass using a different model via OpenRouter. This cross-validates findings and hunts for anything the first pass missed.
-
-### How it works
-
-1. Primary Claude researcher runs, produces `report_bundle.json`
-2. Dual researcher is called with context of what Claude already found
-3. It hunts for additional vulnerabilities on different components or attack surfaces
-4. New findings are merged into the bundle — deduplication by `affected_component + vulnerability_class`
-
-### Enable
-
-Set any `OPENROUTER_API_KEY*` in `.env`. The dual pass activates automatically — no flag needed.
-
-The pre-run banner shows its status:
-
-```
-    3. Dual pass     — enabled (6 api key(s) in rotation)
-    3. Dual pass     — disabled (no OPENROUTER_API_KEY set)
+```bash
+npm run dataset:export          # append all sessions — safe to run repeatedly
+npm run dataset:export:new      # fresh export — overwrites dataset/
+npm run dataset:stats           # show example counts per type
 ```
 
-### Configure the model
+### Example types
 
-Edit `config/openrouter.json`:
+| Type | File | Content |
+|------|------|---------|
+| A — Surface extraction | `dataset/surface_extraction.jsonl` | File manifest + surface map pairs |
+| B — Candidate triage | `dataset/candidate_triage.jsonl` | Candidate + triage verdict pairs |
+| C — Chain hypothesis | `dataset/chain_hypothesis.jsonl` | Candidate pool + chain coordinator output |
 
-```json
-{
-  "researcher_model": "google/gemma-3-27b-it:free"
-}
-```
+All examples are exported in ChatML-formatted JSONL (`system` / `user` / `assistant` turns). Suitable for fine-tuning smaller models on domain-specific tasks.
 
-Falls back to the free model chain if the primary model fails on all keys.
+### What gets collected
+
+- Type A: Every `(file_manifest, surface_map)` pair from Stage 0→1 runs
+- Type B: Every `(candidate, triage_verdict)` pair where a verdict was recorded
+- Type C: Every `(candidates_pool, chain_output)` pair from Stage 2.5 runs
+
+Examples are collected automatically — no special flag needed. Run `dataset:export` after accumulating several pipeline runs.
 
 ---
 
 ## OpenRouter — free models + key rotation
 
-Used for: hybrid recon (Phase 0+1), skill extraction, CVE patch analysis, dual researcher pass.
+Used for: Explorer surface mapping, skill extraction, CVE patch analysis.
 
 ### Model selection
 
@@ -784,6 +987,7 @@ node scripts/compose-agent-prompt.js triager --asset browserext --target <name>
 ```
 meta.schema_version      "2.0"
 meta.asset_type          webapp | mobileapp | browserext | executable
+meta.domains_completed[] list of completed domain names (for mid-domain resume)
 findings[]
   report_id              WEB-001 / MOB-001 / EXT-001 / EXE-001
   finding_title
@@ -807,6 +1011,13 @@ findings[]
     snippet              verbatim source lines
     annotation           one sentence: which line is the root cause and why
   attack_flow_diagram    Mermaid sequenceDiagram or flowchart showing attacker→sink chain
+  chain_meta             null | object — populated by Stage 2.5 chain coordinator
+    chain_id             unique chain identifier
+    chain_label          human-readable chain name (e.g. "SSRF→IDOR→exfil")
+    primitives[]         list of vulnerability_class values forming the chain
+    chain_severity       severity of the combined chain (may exceed individual findings)
+    chain_steps[]        ordered exploit steps
+    participating_ids[]  report_ids of all findings in this chain
   researcher_notes
   confirmation_status    confirmed | unconfirmed
 ```
@@ -825,6 +1036,10 @@ results[]
   triage_summary
   nmi_questions[]        populated when verdict = NEEDS_MORE_INFO
   duplicate_of           populated when verdict = DUPLICATE
+  chain_validation       null | object — populated when finding has chain_meta
+    verdict              CHAIN_VALID | CHAIN_PARTIAL | CHAIN_COLLAPSED
+    surviving_chain      chain_label after triage (may differ from claimed)
+    collapsed_reason     explanation if CHAIN_COLLAPSED
   checks{}
     scope_pass
     complete_pass
@@ -943,6 +1158,23 @@ All validation runs automatically during the pipeline. Failures abort the run.
 | `npm run research:brief` | Build researcher intel brief |
 | `npm run research:focus` | Get prioritized research focus suggestions |
 
+### Training dataset
+
+| Command | Description |
+|---------|-------------|
+| `npm run dataset:export` | Append all sessions to dataset/ (idempotent) |
+| `npm run dataset:export:new` | Fresh export — overwrites existing dataset |
+| `npm run dataset:stats` | Show type A/B/C example counts |
+
+### Notifications
+
+| Command | Description |
+|---------|-------------|
+| `npm run notify:test` | Send a test notification to verify webhook config |
+| `npm run interactsh:start` | Start local interactsh server (OAST/SSRF testing) |
+| `npm run interactsh:stop` | Stop local interactsh server |
+| `npm run interactsh:status` | Check interactsh server status |
+
 ### Validation + UI
 
 | Command | Description |
@@ -951,6 +1183,10 @@ All validation runs automatically during the pipeline. Failures abort the run.
 | `npm run validate:triage` | Validate triage_result.json against schema |
 | `npm run validate:target` | Validate target.json against schema |
 | `npm run ui:intel` | Serve local intel UI on port 31337 |
+| `npm run apis:check` | Check all external API endpoints are reachable |
+| `npm run apis:check:tier1` | Check critical API endpoints only |
+| `npm run tools:check` | Check all required external tools are installed |
+| `npm run tools:install` | Install missing external tools |
 
 ---
 

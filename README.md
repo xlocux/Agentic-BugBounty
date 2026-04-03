@@ -2,11 +2,15 @@
 
 Experimental AI-driven security research framework for bug bounty work.
 
-Two agents. One pipeline. No amnesia.
+Seven stages. Six specialist domains. One pipeline.
 
-- **Researcher** — hunts the target, validates candidates, writes evidence
+- **Stage 0** — deterministic file triage (relevance scoring, language detection)
+- **Stage 1** — surface mapping (LLM-driven entry point and sink extraction)
+- **Stage 1.5** — git intelligence (commit mining, author mapping, secret scan)
+- **Stage 2** — six specialist researcher agents: AUTH · INJECT · CLIENT · ACCESS · MEDIA · INFRA
+- **Stage 2.5** — chain coordinator (primitive chaining across domain findings)
+- **Explorer** — parallel surface mapper (dep analysis, JS endpoint extraction, HTTP fingerprinting)
 - **Triager** — challenges every finding, checks scope and plausibility, decides what survives
-- **Dual researcher** — a second model cross-checks the first pass via OpenRouter free models
 
 → [Full documentation](docs/GUIDE.md) · [Blog post](https://www.locu.uk/gui.html#/blog/2026/2026-03-agentic-bugbounty)
 
@@ -16,7 +20,7 @@ Two agents. One pipeline. No amnesia.
 
 - Node.js 24+
 - Claude Code CLI (`claude`)
-- OpenRouter API key(s) — optional, enables dual researcher, hybrid recon, and CVE analysis
+- OpenRouter API key(s) — optional, enables Explorer and CVE analysis
 
 ---
 
@@ -41,6 +45,22 @@ node scripts/run-pipeline.js --target <name> --cli claude
 
 First run launches a setup wizard — creates workspace, detects assets, starts the pipeline.
 
+### Interactive mode (Phase 0 onboarding + HITL review)
+
+```bash
+node scripts/run-pipeline.js --target <name> --cli claude --interactive
+```
+
+Phase 0 runs a structured Q&A session (scope, focus, CVE context, credentials) before the pipeline starts. Add `--hitl` to enable manual review checkpoints after Explorer and after each Researcher pass.
+
+### Human-in-the-loop checkpoints
+
+```bash
+node scripts/run-pipeline.js --target <name> --cli claude --hitl
+```
+
+Pauses at three points: after Explorer surface map, after each Researcher domain, before Triage.
+
 ### Resume after a session limit or Ctrl+C
 
 ```bash
@@ -48,12 +68,6 @@ node scripts/run-pipeline.js --target <name> --cli claude --resume
 ```
 
 Both Claude Pro session limits and manual `Ctrl+C` interruptions save a checkpoint. The pipeline resumes from the interrupted phase — confirmed findings already in `report_bundle.json` are never lost.
-
-### Manual finding review before triage
-
-```bash
-node scripts/run-pipeline.js --target <name> --cli claude --interactive
-```
 
 ### Re-run triage only (existing bundle)
 
@@ -72,6 +86,14 @@ npm run poc:render
 
 ```bash
 node scripts/reset-target.js --target <name>
+```
+
+### Export training dataset
+
+```bash
+npm run dataset:export          # append all sessions to dataset/
+npm run dataset:export:new      # fresh export (overwrites)
+npm run dataset:stats           # show type A/B/C counts
 ```
 
 ---
@@ -97,7 +119,7 @@ node scripts/sync-cve-intel.js --target <name>
 npm run calibration:extract-skills
 ```
 
-### OpenRouter keys (free tier — enables hybrid recon, dual researcher, CVE analysis)
+### OpenRouter keys (free tier — enables Explorer, CVE analysis)
 
 ```bash
 # In .env:
@@ -117,11 +139,20 @@ The framework skips unavailable models (HTTP 404) immediately and rotates to the
 targets/<name>/
   findings/
     confirmed/report_bundle.json   confirmed findings (JSON)
+    unconfirmed/candidates.json    unconfirmed candidates
+    candidates_pool_AUTH.json      per-domain candidate shards
     triage_result.json             triager verdicts
     h1_submission_ready/*.md       HackerOne-ready reports
   poc/
     EXT-001_slug.html              extracted PoC per finding
     summary.md                     full vulnerability summary
+  logs/
+    pipeline-*.log                 run log with token usage
+    agents/                        per-domain status files
+dataset/
+  surface_extraction.jsonl         Type A training examples
+  candidate_triage.jsonl           Type B training examples
+  chain_hypothesis.jsonl           Type C training examples
 ```
 
 ---
