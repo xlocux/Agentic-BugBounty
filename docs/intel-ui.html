@@ -1090,16 +1090,21 @@ async function loadDashboard() {
 }
 
 // Render log lines into a feed div
+// eslint-disable-next-line no-control-regex
+const ANSI_RE = /\x1b\[[0-9;]*[mGKHFABCDJsu]|\x1b\][^\x07]*\x07/g;
+function stripAnsi(s) { return s.replace(ANSI_RE, ""); }
+
 function appendLogLine(feedId, line) {
   const feed = document.getElementById(feedId);
   if (!feed) return;
+  const clean = stripAnsi(line);
   const div = document.createElement("div");
   const ts  = new Date().toTimeString().slice(0, 8);
   let cls   = "log-info";
-  if (line.includes("✓") || line.toLowerCase().includes("confirmed")) cls = "log-find";
-  else if (line.toLowerCase().includes("candidate")) cls = "log-cand";
-  else if (line.toLowerCase().includes("error")) cls = "log-err";
-  div.innerHTML = `<span class="log-ts">[${ts}]</span> <span class="${cls}">${escHtml(line)}</span>`;
+  if (clean.includes("✓") || clean.toLowerCase().includes("confirmed")) cls = "log-find";
+  else if (clean.toLowerCase().includes("candidate")) cls = "log-cand";
+  else if (clean.toLowerCase().includes("error")) cls = "log-err";
+  div.innerHTML = `<span class="log-ts">[${ts}]</span> <span class="${cls}">${escHtml(clean)}</span>`;
   feed.appendChild(div);
   if (feed.children.length > 60) feed.removeChild(feed.firstChild);
   feed.scrollTop = feed.scrollHeight;
@@ -2018,10 +2023,11 @@ function appendTermLine(line, cls) {
   if (termPaused) return;
   const feed = document.getElementById("term-feed");
   if (!feed) return;
+  const clean = stripAnsi(line);
   const div = document.createElement("div");
   const ts  = new Date().toTimeString().slice(0,8);
-  const c   = cls||classifyLog(line);
-  div.innerHTML = `<span style="color:var(--muted)">[${ts}]</span> <span class="${c}">${escHtml(line)}</span>`;
+  const c   = cls||classifyLog(clean);
+  div.innerHTML = `<span style="color:var(--muted)">[${ts}]</span> <span class="${c}">${escHtml(clean)}</span>`;
   feed.appendChild(div);
   if (feed.children.length > 300) feed.removeChild(feed.firstChild);
   feed.scrollTop = feed.scrollHeight;
