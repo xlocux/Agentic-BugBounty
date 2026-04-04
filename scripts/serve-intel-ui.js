@@ -444,6 +444,13 @@ function main() {
       return;
     }
 
+    if (parsedUrl.pathname === "/intel-ui.css") {
+      const cssPath = path.resolve("docs", "intel-ui.css");
+      response.writeHead(200, { "Content-Type": "text/css; charset=utf-8" });
+      response.end(fs.readFileSync(cssPath, "utf8"));
+      return;
+    }
+
     if (parsedUrl.pathname === "/api/target") {
       const globalDataset = loadDisclosedDataset(args.globalDir);
       sendJson(response, {
