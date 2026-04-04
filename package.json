@@ -5,6 +5,7 @@
   "description": "Validation, runtime, and regression tooling for the Bug Bounty Agent Framework.",
   "scripts": {
     "test": "node --test --test-isolation=none tests/contracts.test.js tests/html-extract.test.js tests/setup-tools.test.js tests/model-adapter.test.js tests/candidates-shard.test.js tests/file-triage.test.js tests/surface-map.test.js tests/git-intel.test.js tests/secret-scan.test.js tests/http.test.js tests/fuzzing.test.js tests/redact.test.js tests/fp-registry.test.js tests/ui-jobs.test.js tests/ui-chat.test.js tests/contracts/*.test.js",
+    "ui": "node scripts/serve-intel-ui.js",
     "pipeline": "node scripts/run-pipeline.js --target duckduckgo",
     "target:new": "node scripts/new-target.js",
     "target:reset": "node scripts/reset-target.js",
