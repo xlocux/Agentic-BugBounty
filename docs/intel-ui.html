@@ -619,7 +619,84 @@ body::after {
 
   <!-- SECTION: FINDINGS -->
   <section id="section-findings" class="section">
-    <!-- populated by Task 8 -->
+    <div class="section-header">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <div class="section-title">Findings</div>
+          <div class="section-desc">Browse confirmed findings, triage results, and chains</div>
+        </div>
+        <select class="field-input" id="fn-target-sel" style="width:160px;margin:0;" onchange="loadFindings()">
+          <option value="">— select target —</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Summary row -->
+    <div class="metrics-grid" id="fn-metrics" style="grid-template-columns:repeat(5,1fr);margin-bottom:14px;"></div>
+
+    <!-- Sub-tabs -->
+    <div style="display:flex;gap:4px;margin-bottom:14px;">
+      <button class="btn btn-primary" id="fn-tab-list"   onclick="fnTab('list')">List</button>
+      <button class="btn btn-muted"   id="fn-tab-chain"  onclick="fnTab('chain')">Chain Map</button>
+      <button class="btn btn-muted"   id="fn-tab-maps"   onclick="fnTab('maps')">Maps</button>
+      <button class="btn btn-muted"   id="fn-tab-triage" onclick="fnTab('triage')">Triage</button>
+    </div>
+
+    <div id="fn-view-list">
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+        <select class="field-input" id="fn-filter-sev" style="width:120px;margin:0;" onchange="applyFnFilters()">
+          <option value="">All severities</option>
+          <option>Critical</option><option>High</option><option>Medium</option><option>Low</option>
+        </select>
+        <input class="field-input" id="fn-filter-q" placeholder="Search..." style="width:200px;margin:0;" oninput="applyFnFilters()">
+      </div>
+      <table class="data-table">
+        <thead><tr><th>ID</th><th>Title</th><th>Severity</th><th>Component</th><th>Status</th></tr></thead>
+        <tbody id="fn-table-body"></tbody>
+      </table>
+    </div>
+
+    <div id="fn-view-chain" style="display:none;">
+      <div class="map-container" style="height:400px;">
+        <svg id="map-chains" style="width:100%;height:400px;"></svg>
+      </div>
+    </div>
+
+    <div id="fn-view-maps" style="display:none;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <div style="color:var(--teal);font-size:8px;letter-spacing:1px;margin-bottom:4px;">◈ INPUT MAP</div>
+          <div class="map-container" style="height:280px;">
+            <svg id="map-inputs" style="width:100%;height:280px;"></svg>
+          </div>
+        </div>
+        <div>
+          <div style="color:var(--pink);font-size:8px;letter-spacing:1px;margin-bottom:4px;">◉ SINK MAP</div>
+          <div class="map-container" style="height:280px;">
+            <svg id="map-sinks" style="width:100%;height:280px;"></svg>
+          </div>
+        </div>
+        <div style="grid-column:1/-1;">
+          <div style="color:var(--amber);font-size:8px;letter-spacing:1px;margin-bottom:4px;">⟶ TAINT FLOW — inputs → sinks → findings</div>
+          <div class="map-container" style="height:300px;">
+            <svg id="map-taint" style="width:100%;height:300px;"></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="fn-view-triage" style="display:none;">
+      <table class="data-table">
+        <thead><tr><th>ID</th><th>Verdict</th><th>Analyst Severity</th><th>CVSS</th><th>Summary</th></tr></thead>
+        <tbody id="fn-triage-body"></tbody>
+      </table>
+    </div>
+
+    <!-- Finding detail drawer -->
+    <div id="fn-drawer" style="display:none;position:fixed;top:0;right:0;width:460px;height:100vh;background:var(--surface2);border-left:1px solid var(--border);padding:20px;overflow-y:auto;z-index:1000;">
+      <button class="btn btn-muted" onclick="document.getElementById('fn-drawer').style.display='none'" style="float:right;">✕</button>
+      <div id="fn-drawer-content"></div>
+    </div>
   </section>
 
   <!-- SECTION: INTELLIGENCE -->
@@ -1140,6 +1217,395 @@ async function stopRun(jobId) {
   if (!confirm("Stop this run?")) return;
   await apiPost(`/api/run/stop/${jobId}`, {});
   setTimeout(loadRuns, 800);
+}
+
+// ── FINDINGS ──────────────────────────────────────────────────────────────
+let fnAllFindings = [];
+let fnTriageResults = [];
+
+function fnTab(tab) {
+  ["list","chain","maps","triage"].forEach(t => {
+    document.getElementById(`fn-view-${t}`).style.display = t === tab ? "block" : "none";
+    document.getElementById(`fn-tab-${t}`).className = `btn ${t===tab?"btn-primary":"btn-muted"}`;
+  });
+  if (tab === "chain" && fnAllFindings.length > 0) renderChainMap(fnAllFindings);
+  if (tab === "maps") { renderInputMap(); renderSinkMap(); renderTaintMap(); }
+}
+
+async function loadFindings() {
+  const sel = document.getElementById("fn-target-sel");
+  if (sel.options.length <= 1) {
+    const targets = await api("/api/targets").catch(() => []);
+    targets.forEach(t => {
+      const o = document.createElement("option");
+      o.value = t.name; o.textContent = t.name;
+      sel.appendChild(o);
+    });
+  }
+  const target = sel.value || state.currentTarget;
+  if (!target) return;
+  const data = await api(`/api/findings/${target}`).catch(() => ({}));
+  fnAllFindings   = data.bundle?.findings || [];
+  fnTriageResults = data.triage?.results  || [];
+  const sev = { Critical:0, High:0, Medium:0, Low:0, Informative:0 };
+  fnAllFindings.forEach(f => { if (sev[f.severity_claimed] !== undefined) sev[f.severity_claimed]++; });
+  const metrics = document.getElementById("fn-metrics");
+  metrics.innerHTML = Object.entries(sev).map(([s, n]) => `
+    <div class="metric-card" style="padding:8px 10px;">
+      <div class="metric-value" style="font-size:18px;color:var(--${s==="Critical"?"crit":s==="High"?"high":s==="Medium"?"med":s==="Low"?"low":"cyan"})">${n}</div>
+      <div class="metric-label" style="font-size:7px;">${s.toUpperCase()}</div>
+    </div>`).join("") + `
+    <div class="metric-card" style="padding:8px 10px;">
+      <div class="metric-value" style="font-size:18px;color:var(--amber)">${fnAllFindings.filter(f=>f.chain_meta).length}</div>
+      <div class="metric-label" style="font-size:7px;">CHAINS</div>
+    </div>`;
+  applyFnFilters();
+  renderTriageTable();
+}
+
+function applyFnFilters() {
+  const sev = document.getElementById("fn-filter-sev").value;
+  const q   = document.getElementById("fn-filter-q").value.toLowerCase();
+  const filtered = fnAllFindings.filter(f => {
+    if (sev && f.severity_claimed !== sev) return false;
+    if (q && !JSON.stringify(f).toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const tbody = document.getElementById("fn-table-body");
+  tbody.innerHTML = filtered.length === 0
+    ? `<tr><td colspan="5" style="color:var(--muted);text-align:center;">No findings match filters</td></tr>`
+    : filtered.map(f => `<tr onclick="showFindingDetail('${escHtml(f.report_id)}');" style="cursor:pointer;">
+        <td style="color:var(--cyan)">${f.report_id}</td>
+        <td>${escHtml(f.finding_title || "")}</td>
+        <td>${severityBadge(f.severity_claimed)}</td>
+        <td style="font-size:8px;color:var(--muted)">${escHtml((f.affected_component||"").slice(0,40))}</td>
+        <td><span class="badge badge-low">${f.confirmation_status||"confirmed"}</span></td>
+      </tr>`).join("");
+}
+
+function renderTriageTable() {
+  const tbody = document.getElementById("fn-triage-body");
+  tbody.innerHTML = fnTriageResults.length === 0
+    ? `<tr><td colspan="5" style="color:var(--muted);text-align:center;">No triage results</td></tr>`
+    : fnTriageResults.map(r => `<tr>
+        <td style="color:var(--cyan)">${r.report_id}</td>
+        <td><span class="badge badge-low">${r.triage_verdict}</span></td>
+        <td>${r.analyst_severity || "—"}</td>
+        <td>${r.analyst_cvss_score ?? "—"}</td>
+        <td style="font-size:8px;color:var(--muted)">${escHtml((r.triage_summary||"").slice(0,80))}</td>
+      </tr>`).join("");
+}
+
+function showFindingDetail(id) {
+  const f = fnAllFindings.find(f => f.report_id === id);
+  if (!f) return;
+  const drawer = document.getElementById("fn-drawer");
+  document.getElementById("fn-drawer-content").innerHTML = `
+    <div style="margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:bold;margin-bottom:4px;">${escHtml(f.finding_title||"")}</div>
+      ${severityBadge(f.severity_claimed)}
+      <span style="font-size:8px;color:var(--muted);margin-left:8px;">${f.report_id}</span>
+    </div>
+    <div style="font-size:8px;color:var(--muted);margin-bottom:4px;">COMPONENT</div>
+    <div style="font-size:9px;color:var(--cyan);margin-bottom:12px;">${escHtml(f.affected_component||"")}</div>
+    <div style="font-size:8px;color:var(--muted);margin-bottom:4px;">SUMMARY</div>
+    <div style="font-size:9px;line-height:1.6;margin-bottom:12px;">${escHtml(f.summary||"")}</div>
+    ${f.poc_code ? `
+    <div style="font-size:8px;color:var(--muted);margin-bottom:4px;">POC</div>
+    <pre style="background:var(--surface);border:1px solid var(--border);padding:8px;border-radius:4px;font-size:8px;overflow-x:auto;white-space:pre-wrap;">${escHtml(f.poc_code)}</pre>` : ""}
+    ${f.chain_meta ? `
+    <div style="font-size:8px;color:var(--amber);margin-top:12px;">⛓ CHAIN: ${escHtml(f.chain_meta.chain_label||"")}</div>` : ""}
+    <div style="display:flex;gap:6px;margin-top:14px;">
+      <button class="btn btn-muted" onclick="runScript('reports:render')" style="font-size:8px;">Render H1 Report</button>
+    </div>`;
+  drawer.style.display = "block";
+}
+
+// ── D3 Chain Map ───────────────────────────────────────────────────────────
+function renderChainMap(findings) {
+  const svg  = d3.select("#map-chains");
+  svg.selectAll("*").remove();
+  const W    = svg.node().parentElement.clientWidth || 700;
+  const H    = 400;
+  svg.attr("viewBox", `0 0 ${W} ${H}`);
+  const nodes = findings.map(f => ({
+    id:       f.report_id,
+    label:    (f.finding_title || f.report_id).slice(0, 22),
+    severity: f.severity_claimed,
+    r:        Math.max(8, (f.cvss_score_claimed || 5) * 1.5),
+    chain:    f.chain_meta?.chain_id || null
+  }));
+  const links = [];
+  findings.forEach(f => {
+    if (f.chain_meta?.participating_ids) {
+      f.chain_meta.participating_ids.forEach(tid => {
+        if (tid !== f.report_id) links.push({ source: f.report_id, target: tid });
+      });
+    }
+  });
+  const colorMap = { Critical:"#ff4fd8", High:"#ff6b35", Medium:"#ffd700", Low:"#39ffd4" };
+  const sim = d3.forceSimulation(nodes)
+    .force("link",   d3.forceLink(links).id(d => d.id).distance(90))
+    .force("charge", d3.forceManyBody().strength(-120))
+    .force("center", d3.forceCenter(W/2, H/2))
+    .force("collide", d3.forceCollide(d => d.r + 8));
+  const link = svg.append("g").selectAll("line")
+    .data(links).enter().append("line")
+    .attr("stroke", "var(--teal)").attr("stroke-opacity", 0.5).attr("stroke-width", 1.5);
+  const node = svg.append("g").selectAll("g")
+    .data(nodes).enter().append("g")
+    .call(d3.drag()
+      .on("start", (e, d) => { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx=d.x; d.fy=d.y; })
+      .on("drag",  (e, d) => { d.fx=e.x; d.fy=e.y; })
+      .on("end",   (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
+  node.append("circle")
+    .attr("r", d => d.r)
+    .attr("fill", d => (colorMap[d.severity] || "#8ea0cb") + "33")
+    .attr("stroke", d => colorMap[d.severity] || "#8ea0cb")
+    .attr("stroke-width", 1.5);
+  node.append("text")
+    .attr("text-anchor", "middle").attr("dy", "0.35em")
+    .attr("font-size", 6).attr("fill", "var(--ink)")
+    .text(d => d.label);
+  sim.on("tick", () => {
+    link.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+        .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+    node.attr("transform", d => `translate(${d.x},${d.y})`);
+  });
+  function pulseLinks() {
+    link.transition().duration(1500).attr("stroke-opacity", 0.15)
+      .transition().duration(1500).attr("stroke-opacity", 0.55)
+      .on("end", pulseLinks);
+  }
+  pulseLinks();
+}
+
+async function runScript(script) {
+  await apiPost("/api/script/run", { script });
+  showSection("terminal");
+}
+
+// ── D3 Input Map ──────────────────────────────────────────────────────────
+async function renderInputMap() {
+  const svg = d3.select("#map-inputs");
+  svg.selectAll("*").remove();
+  const W = svg.node().parentElement.clientWidth || 560;
+  const H = 280;
+  svg.attr("viewBox", `0 0 ${W} ${H}`);
+  const target = document.getElementById("fn-target-sel").value || state.currentTarget;
+  if (!target) return;
+  let surface = {};
+  try { surface = await (await fetch(`/browse/targets/${encodeURIComponent(target)}/surface_map.json`)).json(); } catch {}
+  const CAT = { query:"#39ffd4", body:"#ff4fd8", path:"#55c7ff", header:"#a78bfa", cookie:"#ffd700", ipc:"#ff6b35", external:"#8ea0cb" };
+  const cats = { query:new Set(), body:new Set(), path:new Set(), header:new Set(), cookie:new Set(), ipc:new Set(), external:new Set() };
+  (surface.entry_points || []).forEach(ep => {
+    const method = (ep.method || "GET").toUpperCase();
+    const qp = ep.query_params || ep.params || (method === "GET" ? ep.parameters : []) || [];
+    (Array.isArray(qp) ? qp : Object.keys(qp)).forEach(p => cats.query.add(String(p).slice(0,22)));
+    if (["POST","PUT","PATCH"].includes(method)) {
+      const bp = ep.body_params || ep.body_schema || ep.params || ep.parameters || [];
+      (Array.isArray(bp) ? bp : Object.keys(bp)).forEach(p => cats.body.add(String(p).slice(0,22)));
+    }
+    const pathStr = ep.path || ep.url || "";
+    const pathMatches = pathStr.match(/[:{\<]([a-zA-Z_][a-zA-Z0-9_]*)[}\>]?/g) || [];
+    pathMatches.forEach(m => cats.path.add(m.replace(/[:{}/<>]/g,"").slice(0,22)));
+    const hdrs = ep.headers || ep.request_headers || [];
+    (Array.isArray(hdrs) ? hdrs : Object.keys(hdrs)).forEach(h => cats.header.add(String(h).slice(0,22)));
+    const cks = ep.cookies || [];
+    (Array.isArray(cks) ? cks : Object.keys(cks)).forEach(c => cats.cookie.add(String(c).slice(0,22)));
+  });
+  (surface.headers || []).forEach(h => cats.header.add(String(h.name||h).slice(0,22)));
+  (surface.cookies || []).forEach(c => cats.cookie.add(String(c.name||c).slice(0,22)));
+  (surface.ipc_channels || []).forEach(e => cats.ipc.add((e.channel||e.name||"?").slice(0,22)));
+  (surface.external_comms || []).forEach(e => cats.external.add((e.url||e.host||"?").slice(0,30)));
+  const nodes = [{ id:"_root", label: target.slice(0,14), root:true }];
+  const links = [];
+  let li = 0;
+  Object.entries(cats).forEach(([cat, items]) => {
+    if (items.size === 0) return;
+    const gid = `_g_${cat}`;
+    nodes.push({ id:gid, label:cat.toUpperCase(), grp:true, color:CAT[cat] });
+    links.push({ source:"_root", target:gid });
+    [...items].slice(0,16).forEach(label => {
+      const nid = `lf_${li++}`;
+      nodes.push({ id:nid, label, color:CAT[cat] });
+      links.push({ source:gid, target:nid });
+    });
+  });
+  if (nodes.length <= 1) {
+    svg.append("text").attr("x",W/2).attr("y",H/2).attr("text-anchor","middle")
+      .attr("fill","#8ea0cb").attr("font-size","9px").text("No surface map — run Stage 1 first");
+    return;
+  }
+  const g = svg.append("g");
+  svg.call(d3.zoom().scaleExtent([0.3,3]).on("zoom", e => g.attr("transform", e.transform)));
+  const link = g.selectAll("line").data(links).join("line")
+    .attr("stroke","#1e3a5f").attr("stroke-width",1).attr("stroke-opacity",0.7);
+  const node = g.selectAll("g.n").data(nodes).join("g").attr("class","n")
+    .call(d3.drag()
+      .on("start",(e,d)=>{ if(!e.active) sim.alphaTarget(0.3).restart(); d.fx=d.x; d.fy=d.y; })
+      .on("drag", (e,d)=>{ d.fx=e.x; d.fy=e.y; })
+      .on("end",  (e,d)=>{ if(!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
+  node.append("circle")
+    .attr("r", d => d.root?12 : d.grp?8 : 4)
+    .attr("fill", d => d.root?"var(--teal)" : (d.color||"#8ea0cb")+"44")
+    .attr("stroke", d => d.root?"var(--teal)" : d.color||"#8ea0cb")
+    .attr("stroke-width",1.5);
+  node.append("text")
+    .attr("dy", d => d.root?-16 : d.grp?-12 : -8)
+    .attr("text-anchor","middle")
+    .attr("font-size", d => d.root?"9px" : d.grp?"8px" : "6px")
+    .attr("fill", d => d.root?"var(--teal)" : d.color||"#8ea0cb")
+    .text(d => d.label);
+  const sim = d3.forceSimulation(nodes)
+    .force("link",   d3.forceLink(links).id(d=>d.id).distance(d => d.source.root?80:50))
+    .force("charge", d3.forceManyBody().strength(-90))
+    .force("center", d3.forceCenter(W/2, H/2))
+    .on("tick", () => {
+      link.attr("x1",d=>d.source.x).attr("y1",d=>d.source.y)
+          .attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
+      node.attr("transform",d=>`translate(${d.x},${d.y})`);
+    });
+}
+
+// ── D3 Sink Map ───────────────────────────────────────────────────────────
+async function renderSinkMap() {
+  const svg = d3.select("#map-sinks");
+  svg.selectAll("*").remove();
+  const W = svg.node().parentElement.clientWidth || 560;
+  const H = 280;
+  svg.attr("viewBox", `0 0 ${W} ${H}`);
+  const target = document.getElementById("fn-target-sel").value || state.currentTarget;
+  if (!target) return;
+  let candidates = [];
+  try {
+    const raw = await (await fetch(`/browse/targets/${encodeURIComponent(target)}/findings/unconfirmed/candidates.json`)).json();
+    candidates = Array.isArray(raw) ? raw : (raw.candidates || []);
+  } catch {}
+  const sinkColors = { sqli:"#ff4fd8", xss:"#ff6b35", ssti:"#ffd700", ssrf:"#55c7ff", rce:"#ff4fd8", idor:"#a78bfa", lfi:"#ff6b35", other:"#8ea0cb" };
+  const normType = t => { const l=(t||"").toLowerCase(); return Object.keys(sinkColors).find(k=>l.includes(k))||"other"; };
+  const groups = {};
+  candidates.slice(0,80).forEach((c,i) => {
+    const t = normType(c.vuln_type || c.type || "");
+    if (!groups[t]) groups[t] = [];
+    groups[t].push({ id:`snk_${i}`, label:(c.title||c.location||t).slice(0,20), type:t, confirmed:!!c.confirmed });
+  });
+  const nodes = [{ id:"_root", label:"SINKS", root:true }];
+  const links = [];
+  Object.entries(groups).forEach(([type, items]) => {
+    const gid = `_sg_${type}`;
+    nodes.push({ id:gid, label:type.toUpperCase(), grp:true, color:sinkColors[type] });
+    links.push({ source:"_root", target:gid });
+    items.slice(0,12).forEach(m => {
+      nodes.push({ ...m, color:sinkColors[m.type] });
+      links.push({ source:gid, target:m.id });
+    });
+  });
+  if (nodes.length <= 1) {
+    svg.append("text").attr("x",W/2).attr("y",H/2).attr("text-anchor","middle")
+      .attr("fill","#8ea0cb").attr("font-size","9px").text("No candidates — run Stage 2 first");
+    return;
+  }
+  const g = svg.append("g");
+  svg.call(d3.zoom().scaleExtent([0.3,3]).on("zoom", e => g.attr("transform", e.transform)));
+  const link = g.selectAll("line").data(links).join("line")
+    .attr("stroke","#1e3a5f").attr("stroke-width",1).attr("stroke-opacity",0.7);
+  const node = g.selectAll("g.n").data(nodes).join("g").attr("class","n")
+    .call(d3.drag()
+      .on("start",(e,d)=>{ if(!e.active) sim.alphaTarget(0.3).restart(); d.fx=d.x; d.fy=d.y; })
+      .on("drag", (e,d)=>{ d.fx=e.x; d.fy=e.y; })
+      .on("end",  (e,d)=>{ if(!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
+  node.append("circle")
+    .attr("r", d => d.root?12 : d.grp?8 : d.confirmed?6:4)
+    .attr("fill", d => d.root?"#ff4fd8" : (d.color||"#8ea0cb")+"44")
+    .attr("stroke", d => d.confirmed?"var(--teal)" : d.root?"#ff4fd8" : d.color||"#8ea0cb")
+    .attr("stroke-width", d => d.confirmed?2:1.5);
+  node.append("text")
+    .attr("dy", d => d.root?-16 : d.grp?-12 : -8)
+    .attr("text-anchor","middle")
+    .attr("font-size", d => d.root?"9px" : d.grp?"8px" : "6px")
+    .attr("fill", d => d.root?"#ff4fd8" : d.color||"#8ea0cb")
+    .text(d => d.label);
+  const sim = d3.forceSimulation(nodes)
+    .force("link",   d3.forceLink(links).id(d=>d.id).distance(d => d.source.root?80:50))
+    .force("charge", d3.forceManyBody().strength(-90))
+    .force("center", d3.forceCenter(W/2, H/2))
+    .on("tick", () => {
+      link.attr("x1",d=>d.source.x).attr("y1",d=>d.source.y)
+          .attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
+      node.attr("transform",d=>`translate(${d.x},${d.y})`);
+    });
+}
+
+// ── D3 Taint Flow Map ─────────────────────────────────────────────────────
+async function renderTaintMap() {
+  const svg = d3.select("#map-taint");
+  svg.selectAll("*").remove();
+  const W = svg.node().parentElement.clientWidth || 900;
+  const H = 300;
+  svg.attr("viewBox", `0 0 ${W} ${H}`);
+  const target = document.getElementById("fn-target-sel").value || state.currentTarget;
+  if (!target) return;
+  let surface = {}, candidates = [];
+  try { surface = await (await fetch(`/browse/targets/${encodeURIComponent(target)}/surface_map.json`)).json(); } catch {}
+  try {
+    const raw = await (await fetch(`/browse/targets/${encodeURIComponent(target)}/findings/unconfirmed/candidates.json`)).json();
+    candidates = Array.isArray(raw) ? raw : (raw.candidates||[]);
+  } catch {}
+  const sinkColors = { sqli:"#ff4fd8",xss:"#ff6b35",ssti:"#ffd700",ssrf:"#55c7ff",rce:"#ff4fd8",idor:"#a78bfa",other:"#8ea0cb" };
+  const normType = t => { const l=(t||"").toLowerCase(); return Object.keys(sinkColors).find(k=>l.includes(k))||"other"; };
+  const eps       = (surface.entry_points||[]).slice(0,8).map((e,i)=>({ id:`inp_${i}`, col:0, label:(e.path||e.url||"?").slice(-20), color:"#39ffd4", ep:e }));
+  const sinkNodes = candidates.slice(0,8).map((c,i)=>({ id:`snk_${i}`, col:1, label:(c.title||c.location||"?").slice(0,20), color:sinkColors[normType(c.vuln_type||"")], cand:c }));
+  const finNodes  = (fnAllFindings||[]).slice(0,6).map((f,i)=>({ id:`fin_${i}`, col:2, label:(f.finding_title||f.report_id||"?").slice(0,20), color:"#ff4fd8" }));
+  const xPos  = [W*0.12, W*0.50, W*0.88];
+  const nodes = [...eps, ...sinkNodes, ...finNodes];
+  [eps, sinkNodes, finNodes].forEach((col, ci) => {
+    col.forEach((n,i)=>{ n.fx=xPos[ci]; n.fy=H*(0.15+0.7*(i+0.5)/Math.max(col.length,1)); });
+  });
+  const links = [];
+  eps.forEach(ep => {
+    let matched = false;
+    sinkNodes.forEach(s => {
+      const loc = (s.cand.endpoint_path||s.cand.location||"").toLowerCase();
+      const epPath = (ep.ep.path||ep.ep.url||"").toLowerCase().split("/")[1]||"";
+      if (epPath && loc.includes(epPath)) { links.push({ source:ep.id, target:s.id, color:ep.color }); matched=true; }
+    });
+    if (!matched) sinkNodes.slice(0,2).forEach(s=>links.push({ source:ep.id, target:s.id, color:ep.color }));
+  });
+  sinkNodes.forEach(s => finNodes.slice(0,2).forEach(f=>links.push({ source:s.id, target:f.id, color:s.color })));
+  if (nodes.length === 0) {
+    svg.append("text").attr("x",W/2).attr("y",H/2).attr("text-anchor","middle")
+      .attr("fill","#8ea0cb").attr("font-size","9px").text("No data for taint flow — run pipeline first");
+    return;
+  }
+  [["INPUTS","#39ffd4"],["SINKS","#ff6b35"],["FINDINGS","#ff4fd8"]].forEach(([lbl,col],i)=>{
+    svg.append("text").attr("x",xPos[i]).attr("y",12).attr("text-anchor","middle")
+      .attr("font-size","7px").attr("fill",col).attr("letter-spacing","2px").text(lbl);
+  });
+  const nodeById = Object.fromEntries(nodes.map(n=>[n.id,n]));
+  svg.selectAll("path.fl").data(links).join("path").attr("class","fl")
+    .attr("fill","none")
+    .attr("stroke", d=>d.color||"#1e3a5f")
+    .attr("stroke-width",1)
+    .attr("stroke-opacity",0.45)
+    .attr("d", d => {
+      const s=nodeById[d.source], t=nodeById[d.target];
+      if(!s||!t) return "";
+      const mx=(s.fx+t.fx)/2;
+      return `M${s.fx},${s.fy} C${mx},${s.fy} ${mx},${t.fy} ${t.fx},${t.fy}`;
+    });
+  const g = svg.append("g");
+  const node = g.selectAll("g.tn").data(nodes).join("g").attr("class","tn");
+  node.append("circle")
+    .attr("cx",d=>d.fx).attr("cy",d=>d.fy).attr("r",5)
+    .attr("fill",d=>(d.color||"#8ea0cb")+"44")
+    .attr("stroke",d=>d.color||"#8ea0cb").attr("stroke-width",1.5);
+  node.append("text")
+    .attr("x",d=>d.col===0?d.fx-9 : d.col===2?d.fx+9 : d.fx)
+    .attr("y",d=>d.fy).attr("dy","0.35em")
+    .attr("text-anchor",d=>d.col===0?"end":d.col===2?"start":"middle")
+    .attr("font-size","6px").attr("fill",d=>d.color||"#8ea0cb")
+    .text(d=>d.label);
 }
 </script>
 
