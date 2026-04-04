@@ -506,10 +506,13 @@ const state = {
 
 // ── Section router ────────────────────────────────────────────────────────
 function showSection(name) {
+  const sec = document.getElementById(`section-${name}`);
+  const nav = document.querySelector(`[data-section="${name}"]`);
+  if (!sec || !nav) { console.warn(`showSection: unknown section "${name}"`); return; }
   document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
   document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
-  document.getElementById(`section-${name}`).classList.add("active");
-  document.querySelector(`[data-section="${name}"]`).classList.add("active");
+  sec.classList.add("active");
+  nav.classList.add("active");
   state.currentSection = name;
   const loader = window[`load${name.charAt(0).toUpperCase()+name.slice(1)}`];
   if (loader) loader();
@@ -549,15 +552,21 @@ function glitch(el) {
 function animateCount(el, to) {
   const from = parseInt(el.textContent) || 0;
   if (from === to) return;
-  anime({ targets: { v: from }, v: to, round: 1, duration: 700, easing: "easeOutExpo",
-          update(a) { el.textContent = Math.round(a.animations[0].currentValue); } });
+  const obj = { v: from };
+  anime({ targets: obj, v: to, round: 1, duration: 700, easing: "easeOutExpo",
+          update() { el.textContent = obj.v; } });
+}
+
+// ── HTML escape helper ────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
 // ── Badge helper ──────────────────────────────────────────────────────────
 function severityBadge(s) {
   const map = { Critical: "crit", High: "high", Medium: "med", Low: "low" };
   const cls = map[s] || "info";
-  return `<span class="badge badge-${cls}">${s?.toUpperCase() || "?"}</span>`;
+  return `<span class="badge badge-${cls}">${escHtml(s?.toUpperCase() || "?")}</span>`;
 }
 
 // ── Sidebar status update ─────────────────────────────────────────────────
