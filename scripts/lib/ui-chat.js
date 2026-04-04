@@ -74,10 +74,12 @@ function streamChatResponse(message, ctx, onChunk, onDone) {
         } catch {}
       }
     });
-    res.on("end", () => onDone(null));
-    res.on("error", onDone);
+    let called = false;
+    function finish(err) { if (!called) { called = true; onDone(err); } }
+    res.on("end", () => finish(null));
+    res.on("error", finish);
     if (res.statusCode !== 200) {
-      onDone(new Error(`Anthropic API error: ${res.statusCode}`));
+      finish(new Error(`Anthropic API error: ${res.statusCode}`));
     }
   });
 
