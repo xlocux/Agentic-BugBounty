@@ -14,6 +14,7 @@ const {
 } = require("./lib/contracts");
 const { createJob, startJob, stopJob, getJob, listJobs, tailJob } = require("./lib/ui-jobs");
 const { streamChatResponse } = require("./lib/ui-chat");
+const { serveBrowse } = require("./lib/ui-static");
 
 function parseArgs(argv) {
   const parsed = {
@@ -115,126 +116,7 @@ function sendNotFound(response) {
   response.end("Not Found");
 }
 
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
 
-function contentTypeFor(filePath) {
-  const ext = path.extname(filePath).toLowerCase();
-  if (ext === ".json") return "application/json; charset=utf-8";
-  if (ext === ".md") return "text/markdown; charset=utf-8";
-  if (ext === ".html") return "text/html; charset=utf-8";
-  if (ext === ".txt" || ext === ".log") return "text/plain; charset=utf-8";
-  return "application/octet-stream";
-}
-
-function safeResolveWithinRoot(rootDir, requestedPath) {
-  const normalized = String(requestedPath || "")
-    .replaceAll("\\", "/")
-    .replace(/^\/+/, "");
-  const absolute = path.resolve(rootDir, normalized);
-  const rootResolved = path.resolve(rootDir);
-  const relative = path.relative(rootResolved, absolute);
-  if (relative.startsWith("..") || path.isAbsolute(relative)) {
-    return null;
-  }
-  return absolute;
-}
-
-function renderDirectoryPage(title, rootName, relativePath, entries) {
-  const crumbs = relativePath
-    .split("/")
-    .filter(Boolean)
-    .map((segment, index, array) => {
-      const href = `/browse/${rootName}/${array.slice(0, index + 1).join("/")}`;
-      return `<a href="${href}">${escapeHtml(segment)}</a>`;
-    })
-    .join(" / ");
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>${escapeHtml(title)}</title>
-  <style>
-    :root {
-      --bg: #060816;
-      --surface: rgba(12, 18, 38, 0.92);
-      --ink: #e8ecff;
-      --muted: #8ea0cb;
-      --line: rgba(100, 128, 214, 0.26);
-      --teal: #39ffd4;
-      --cyan: #55c7ff;
-      --pink: #ff4fd8;
-      --font-body: "IBM Plex Sans", "Segoe UI", sans-serif;
-      --font-mono: "JetBrains Mono", Consolas, monospace;
-    }
-    * { box-sizing: border-box; }
-    body {
-      font-family: var(--font-body);
-      background:
-        radial-gradient(circle at top left, rgba(57,255,212,.08), transparent 22%),
-        radial-gradient(circle at top right, rgba(255,79,216,.09), transparent 24%),
-        linear-gradient(180deg, #050712, #09101f 55%, #050712);
-      color: var(--ink);
-      margin: 0;
-      padding: 24px;
-      min-height: 100vh;
-    }
-    a { color: var(--cyan); text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    .card {
-      background: linear-gradient(180deg, rgba(16,25,51,.94), rgba(10,15,33,.94));
-      border: 1px solid var(--line);
-      border-radius: 20px;
-      padding: 18px;
-      max-width: 1180px;
-      margin: 0 auto;
-      box-shadow: 0 0 0 1px rgba(85,199,255,.12), 0 0 24px rgba(85,199,255,.08);
-    }
-    table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
-    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
-    th { color: var(--muted); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
-    .muted { color: var(--muted); }
-    h1 { margin: 0 0 10px; font-size: 22px; letter-spacing: .08em; text-transform: uppercase; }
-    .back {
-      display: inline-flex;
-      padding: 8px 14px;
-      border: 1px solid rgba(85,199,255,.25);
-      border-radius: 999px;
-      background: rgba(85,199,255,.08);
-      margin-bottom: 16px;
-    }
-    .path { font-family: var(--font-mono); font-size: 12px; word-break: break-all; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <a class="back" href="/">Back to Intel UI</a>
-    <h1>${escapeHtml(title)}</h1>
-    <p class="muted path">/${escapeHtml(rootName)}${relativePath ? ` / ${crumbs}` : ""}</p>
-    <table>
-      <thead><tr><th>Name</th><th>Type</th><th>Open</th></tr></thead>
-      <tbody>
-        ${relativePath ? `<tr><td>..</td><td>directory</td><td><a href="/browse/${rootName}/${relativePath.split("/").slice(0, -1).join("/")}">Up</a></td></tr>` : ""}
-        ${entries.map((entry) => `
-          <tr>
-            <td>${escapeHtml(entry.name)}</td>
-            <td>${entry.isDirectory ? "directory" : "file"}</td>
-            <td><a href="${entry.href}">${entry.isDirectory ? "Browse" : "Open"}</a></td>
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>
-  </div>
-</body>
-</html>`;
-}
 
 function buildGlobalSummary(globalDataset) {
   if (!globalDataset) {
@@ -383,14 +265,6 @@ function main() {
 
   async function handleRequest(request, response) {
     const parsedUrl = new URL(request.url, `http://${request.headers.host || "127.0.0.1"}`);
-    const decodedPathname = (() => {
-      try {
-        return decodeURIComponent(parsedUrl.pathname);
-      } catch {
-        return parsedUrl.pathname;
-      }
-    })();
-
     const method = request.method;
     const url    = parsedUrl.pathname;
 
@@ -596,65 +470,7 @@ function main() {
       return;
     }
 
-    if (parsedUrl.pathname.startsWith("/browse/")) {
-      const suffix = parsedUrl.pathname.slice("/browse/".length);
-      const [rootName, ...rest] = suffix.split("/");
-      const rootDir = roots[rootName];
-      if (!rootDir) {
-        sendNotFound(response);
-        return;
-      }
-
-      const relativePath = rest.join("/");
-      const absolutePath = safeResolveWithinRoot(rootDir, relativePath);
-      if (!absolutePath || !fs.existsSync(absolutePath)) {
-        sendHtml(
-          response,
-          `<h1>File not found</h1><p>The requested path is not available inside the ${escapeHtml(rootName)} root.</p><p><a href="/browse/${escapeHtml(rootName)}/">Open root</a></p>`,
-          404
-        );
-        return;
-      }
-
-      const stat = fs.statSync(absolutePath);
-      if (stat.isDirectory()) {
-        const entries = fs.readdirSync(absolutePath, { withFileTypes: true })
-          .map((entry) => {
-            const nextRelative = [relativePath, entry.name].filter(Boolean).join("/");
-            return {
-              name: entry.name,
-              isDirectory: entry.isDirectory(),
-              href: entry.isDirectory()
-                ? `/browse/${rootName}/${nextRelative}`
-                : `/browse/${rootName}/${nextRelative}`
-            };
-          })
-          .sort((left, right) => {
-            if (left.isDirectory !== right.isDirectory) {
-              return left.isDirectory ? -1 : 1;
-            }
-            return left.name.localeCompare(right.name);
-          });
-
-        sendHtml(response, renderDirectoryPage(`${rootName} files`, rootName, relativePath, entries));
-        return;
-      }
-
-      response.writeHead(200, { "Content-Type": contentTypeFor(absolutePath) });
-      response.end(fs.readFileSync(absolutePath));
-      return;
-    }
-
-    if (
-      parsedUrl.pathname.includes("global-intelligence") ||
-      parsedUrl.pathname.includes("%5C") ||
-      decodedPathname.includes("\\data") ||
-      decodedPathname.includes("global-intelligence")
-    ) {
-      response.writeHead(302, { Location: "/browse/global/" });
-      response.end();
-      return;
-    }
+    if (serveBrowse(roots, parsedUrl, response)) return;
 
     sendNotFound(response);
   }
