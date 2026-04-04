@@ -12,6 +12,9 @@ const {
   readJson,
   resolveTargetConfigPath
 } = require("./lib/contracts");
+const { execSync } = require("node:child_process");
+const { createJob, startJob, stopJob, getJob, listJobs, tailJob } = require("./lib/ui-jobs");
+const { streamChatResponse } = require("./lib/ui-chat");
 
 function parseArgs(argv) {
   const parsed = {
@@ -47,6 +50,55 @@ function getTargetContext(targetArg) {
     intelligenceDir,
     programHandle
   };
+}
+
+function listTargetDirs() {
+  const targetsBase = path.resolve("targets");
+  if (!fs.existsSync(targetsBase)) return [];
+  return fs.readdirSync(targetsBase)
+    .filter(name => fs.existsSync(path.join(targetsBase, name, "target.json")))
+    .map(name => {
+      const cfgPath  = path.join(targetsBase, name, "target.json");
+      const cfg      = (() => { try { return JSON.parse(fs.readFileSync(cfgPath, "utf8")); } catch { return {}; } })();
+      const bundlePath = path.join(targetsBase, name, "findings", "confirmed", "report_bundle.json");
+      const bundle   = (() => { try { return JSON.parse(fs.readFileSync(bundlePath, "utf8")); } catch { return null; } })();
+      const running  = listJobs().find(j => j.target === name && j.status === "running");
+      return {
+        name,
+        asset_type:     cfg.asset_type || "unknown",
+        default_mode:   cfg.default_mode || "whitebox",
+        finding_count:  bundle?.findings?.length ?? 0,
+        status:         running ? "running" : "idle",
+        active_job_id:  running?.id || null,
+        last_run:       listJobs().find(j => j.target === name)?.started || null
+      };
+    });
+}
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    req.on("data", chunk => { data += chunk; });
+    req.on("end", () => {
+      try { resolve(JSON.parse(data || "{}")); }
+      catch { resolve({}); }
+    });
+    req.on("error", reject);
+  });
+}
+
+function sseStart(res) {
+  res.writeHead(200, {
+    "Content-Type":  "text/event-stream",
+    "Cache-Control": "no-cache",
+    "Connection":    "keep-alive",
+    "Access-Control-Allow-Origin": "*"
+  });
+  res.write(":\n\n");
+}
+
+function sseSend(res, obj) {
+  res.write(`data: ${JSON.stringify(obj)}\n\n`);
 }
 
 function sendJson(response, payload) {
@@ -326,10 +378,11 @@ function main() {
   const targetContext = getTargetContext(args.target);
   const roots = {
     global: args.globalDir,
-    target: targetContext.intelligenceDir
+    target: targetContext.intelligenceDir,
+    targets: path.resolve("targets")
   };
 
-  const server = http.createServer((request, response) => {
+  const server = http.createServer(async (request, response) => {
     const parsedUrl = new URL(request.url, `http://${request.headers.host || "127.0.0.1"}`);
     const decodedPathname = (() => {
       try {
@@ -338,6 +391,167 @@ function main() {
         return parsedUrl.pathname;
       }
     })();
+
+    const method = request.method;
+    const url    = parsedUrl.pathname;
+
+    // ── Targets ────────────────────────────────────────────────────────────
+    if (method === "GET" && url === "/api/targets") {
+      return sendJson(response, listTargetDirs());
+    }
+
+    if (method === "POST" && url === "/api/targets/create") {
+      const body = await readBody(request);
+      const { name, program_url } = body;
+      if (!name) return sendJson(response, { error: "name required" });
+      const job = createJob({
+        target: name,
+        script: "node",
+        args: ["scripts/new-target.js", name, "--program-url", program_url || ""]
+      });
+      startJob(job);
+      return sendJson(response, { job_id: job.id });
+    }
+
+    if (method === "POST" && /^\/api\/targets\/([^/]+)\/reset$/.test(url)) {
+      const name = url.split("/")[3];
+      const job  = createJob({ target: name, script: "node", args: ["scripts/reset-target.js", "--target", name] });
+      startJob(job);
+      return sendJson(response, { job_id: job.id });
+    }
+
+    // ── Run control ────────────────────────────────────────────────────────
+    if (method === "POST" && url === "/api/run/start") {
+      const body   = await readBody(request);
+      const { target, mode, interactive, hitl, resume, skipIntel } = body;
+      if (!target) return sendJson(response, { error: "target required" });
+
+      if (!skipIntel) {
+        const intelJob = createJob({
+          target,
+          script: "node",
+          args: ["scripts/sync-hackerone-intel.js", "--target", target]
+        });
+        startJob(intelJob);
+      }
+
+      const args = ["scripts/run-pipeline.js", "--target", target, "--cli", "claude"];
+      if (mode)        args.push("--mode", mode);
+      if (interactive) args.push("--interactive");
+      if (hitl)        args.push("--hitl");
+      if (resume)      args.push("--resume");
+
+      const runJob = createJob({ target, script: "node", args });
+      startJob(runJob);
+      return sendJson(response, { job_id: runJob.id });
+    }
+
+    if (method === "POST" && /^\/api\/run\/stop\/(.+)$/.test(url)) {
+      const jobId = url.replace("/api/run/stop/", "");
+      stopJob(jobId);
+      return sendJson(response, { ok: true });
+    }
+
+    if (method === "GET" && /^\/api\/run\/status\/(.+)$/.test(url)) {
+      const target = url.replace("/api/run/status/", "");
+      const job    = listJobs().find(j => j.target === target && j.status === "running");
+      const bundlePath = path.resolve("targets", target, "findings", "confirmed", "report_bundle.json");
+      const bundle = (() => { try { return JSON.parse(fs.readFileSync(bundlePath, "utf8")); } catch { return null; } })();
+      return sendJson(response, {
+        running:          !!job,
+        job_id:           job?.id || null,
+        started:          job?.started || null,
+        finding_count:    bundle?.findings?.length ?? 0,
+        domains_completed: bundle?.meta?.domains_completed ?? []
+      });
+    }
+
+    // ── SSE stream ─────────────────────────────────────────────────────────
+    if (method === "GET" && /^\/api\/stream\/(.+)$/.test(url)) {
+      const jobId  = url.replace("/api/stream/", "");
+      const from   = Number(parsedUrl.searchParams.get("from") || 0);
+      const job    = getJob(jobId);
+      if (!job) { response.writeHead(404); response.end("job not found"); return; }
+
+      sseStart(response);
+      sseSend(response, { type: "connected", job_id: jobId });
+
+      const cancel = tailJob(jobId, from, (line, offset) => {
+        const type = line.includes("✓") || line.includes("confirmed") ? "finding"
+                   : line.includes("candidate") ? "candidate"
+                   : line.includes("chain") ? "chain"
+                   : "log";
+        sseSend(response, { type, line, offset, ts: Date.now() });
+      }, ({ exit_code }) => {
+        sseSend(response, { type: "done", exit_code });
+        response.end();
+      });
+
+      request.on("close", cancel);
+      return;
+    }
+
+    // ── Jobs list ──────────────────────────────────────────────────────────
+    if (method === "GET" && url === "/api/jobs") {
+      return sendJson(response, listJobs().slice(0, 50));
+    }
+
+    // ── Findings ───────────────────────────────────────────────────────────
+    if (method === "GET" && /^\/api\/findings\/(.+)$/.test(url)) {
+      const target = url.replace("/api/findings/", "");
+      const base   = path.resolve("targets", target, "findings");
+      const bundle = (() => { try { return JSON.parse(fs.readFileSync(path.join(base, "confirmed", "report_bundle.json"), "utf8")); } catch { return null; } })();
+      const triage = (() => { try { return JSON.parse(fs.readFileSync(path.join(base, "triage_result.json"), "utf8")); } catch { return null; } })();
+      return sendJson(response, { bundle, triage });
+    }
+
+    // ── History ─────────────────────────────────────────────────────────────
+    if (method === "GET" && url === "/api/history") {
+      return sendJson(response, listJobs());
+    }
+
+    if (method === "GET" && /^\/api\/history\/(.+)$/.test(url)) {
+      const target = url.replace("/api/history/", "");
+      return sendJson(response, listJobs().filter(j => j.target === target));
+    }
+
+    // ── Script runner (Tools section) ─────────────────────────────────────
+    if (method === "POST" && url === "/api/script/run") {
+      const body   = await readBody(request);
+      const { script, target } = body;
+      if (!script) return sendJson(response, { error: "script required" });
+      const npmArgs = ["run", script];
+      const job = createJob({ target: target || "global", script: "npm", args: npmArgs });
+      startJob(job);
+      return sendJson(response, { job_id: job.id });
+    }
+
+    // ── AI chat ─────────────────────────────────────────────────────────────
+    if (method === "POST" && url === "/api/chat") {
+      const body = await readBody(request);
+      const { message, target } = body;
+      if (!message) { response.writeHead(400); response.end("message required"); return; }
+
+      const bundlePath = target ? path.resolve("targets", target, "findings", "confirmed", "report_bundle.json") : null;
+      const bundle = bundlePath && fs.existsSync(bundlePath)
+        ? JSON.parse(fs.readFileSync(bundlePath, "utf8")) : null;
+      const runningJob = target ? listJobs().find(j => j.target === target && j.status === "running") : null;
+
+      const ctx = {
+        target:          target || "unknown",
+        asset_type:      bundle?.meta?.asset_type || "unknown",
+        active_run:      runningJob ? { stage: "running", elapsed: "?" } : null,
+        recent_findings: (bundle?.findings || []).slice(-5).map(f => ({ id: f.report_id, title: f.finding_title, severity: f.severity_claimed })),
+        recent_logs:     []
+      };
+
+      sseStart(response);
+      streamChatResponse(message, ctx,
+        (text) => sseSend(response, { type: "chunk", text }),
+        (err)  => { sseSend(response, { type: err ? "error" : "done", error: err?.message }); response.end(); }
+      );
+      return;
+    }
 
     if (parsedUrl.pathname === "/" || parsedUrl.pathname === "/index.html") {
       response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
