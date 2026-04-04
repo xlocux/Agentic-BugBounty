@@ -128,7 +128,7 @@ body::after {
 .nav-icon  { font-size: 15px; color: var(--muted); width: 16px; text-align: center; }
 .nav-item.active .nav-icon { color: var(--teal); }
 .nav-label { font-size: 11px; color: var(--muted); letter-spacing: 0.5px; }
-.nav-sub   { font-size: 9px; color: var(--border); display: block; }
+.nav-sub   { font-size: 9px; color: var(--muted); display: block; }
 
 #sidebar-status {
   padding: 10px 14px;
@@ -188,7 +188,7 @@ body::after {
 }
 .metric-sub {
   font-size: 10px;
-  color: var(--border);
+  color: var(--muted);
   margin-top: 2px;
 }
 
@@ -287,7 +287,7 @@ body::after {
   overflow-y: auto;
   height: 200px;
 }
-.log-ts   { color: var(--border); }
+.log-ts   { color: var(--muted); }
 .log-find { color: var(--teal); }
 .log-cand { color: var(--amber); }
 .log-err  { color: var(--pink); }
@@ -445,9 +445,9 @@ body::after {
 
   <div id="sidebar-status">
     <div><span id="status-dot"></span><span id="status-text" style="color:var(--muted)">No active run</span></div>
-    <div id="status-detail" style="color:var(--border);margin-top:2px;"></div>
+    <div id="status-detail" style="color:var(--muted);margin-top:2px;"></div>
     <div style="margin-top:8px;display:flex;gap:6px;align-items:center;">
-      <button class="btn btn-muted" onclick="toggleTheme()" id="theme-btn" style="padding:3px 7px;font-size:8px;">☾ Dark</button>
+      <button class="btn btn-muted" onclick="toggleTheme()" id="theme-btn" style="padding:3px 7px;font-size:11px;">☾ Dark</button>
     </div>
   </div>
 </nav>
@@ -492,7 +492,7 @@ body::after {
       <!-- Live feed -->
       <div class="panel">
         <div class="panel-title">◉ LIVE FEED</div>
-        <div id="dash-target-badge" style="font-size:8px;color:var(--muted);margin-bottom:6px;">No active run</div>
+        <div id="dash-target-badge" style="font-size:11px;color:var(--muted);margin-bottom:6px;">No active run</div>
         <div class="domain-strip" id="dash-domain-strip">
           <div class="domain-seg" title="AUTH"></div>
           <div class="domain-seg" title="INJECT"></div>
@@ -501,12 +501,12 @@ body::after {
           <div class="domain-seg" title="MEDIA"></div>
           <div class="domain-seg" title="INFRA"></div>
         </div>
-        <div style="font-size:7px;color:var(--border);display:flex;gap:8px;margin-bottom:8px;">
+        <div style="font-size:11px;color:var(--muted);display:flex;gap:8px;margin-bottom:8px;">
           <span>AUTH</span><span>INJECT</span><span>CLIENT</span><span>ACCESS</span><span>MEDIA</span><span>INFRA</span>
         </div>
         <div class="log-feed" id="dash-log-feed"></div>
         <div style="margin-top:8px;" id="dash-launch-area">
-          <button class="btn btn-primary" onclick="showSection('targets')" style="font-size:8px;">▶ Go to Targets to launch a run</button>
+          <button class="btn btn-primary" onclick="showSection('targets')" style="font-size:11px;">▶ Go to Targets to launch a run</button>
         </div>
       </div>
 
@@ -515,7 +515,7 @@ body::after {
         <div class="panel-title">FINDINGS BY SEVERITY</div>
         <canvas id="chart-severity" height="140"></canvas>
         <div class="panel-title" style="margin-top:12px;">RECENT FINDINGS</div>
-        <div id="dash-recent-findings" style="font-size:8px;"></div>
+        <div id="dash-recent-findings" style="font-size:11px;"></div>
       </div>
 
     </div>
@@ -554,7 +554,7 @@ body::after {
           <button class="btn btn-primary" onclick="submitCreateTarget()">Create</button>
           <button class="btn btn-muted" onclick="closeCreateTarget()">Cancel</button>
         </div>
-        <div id="ct-result" style="margin-top:8px;font-size:8px;color:var(--teal);"></div>
+        <div id="ct-result" style="margin-top:8px;font-size:11px;color:var(--teal);"></div>
       </div>
     </div>
 
@@ -580,7 +580,7 @@ body::after {
           <button class="btn btn-primary" onclick="submitLaunch()" style="font-size:10px;padding:7px 18px;">▶ Launch</button>
           <button class="btn btn-muted" onclick="closeLaunchDrawer()">Cancel</button>
         </div>
-        <div id="ld-result" style="margin-top:8px;font-size:8px;color:var(--teal);"></div>
+        <div id="ld-result" style="margin-top:8px;font-size:11px;color:var(--teal);"></div>
       </div>
     </div>
   </section>
@@ -607,7 +607,7 @@ body::after {
           </select>
         </div>
         <button class="btn btn-primary" onclick="quickLaunch()" style="margin-bottom:10px;">▶ Start Run</button>
-        <div id="rl-result" style="font-size:8px;color:var(--teal);margin-bottom:10px;"></div>
+        <div id="rl-result" style="font-size:11px;color:var(--teal);margin-bottom:10px;"></div>
       </div>
     </div>
 
@@ -674,19 +674,19 @@ body::after {
     <div id="fn-view-maps" style="display:none;">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div>
-          <div style="color:var(--teal);font-size:8px;letter-spacing:1px;margin-bottom:4px;">◈ INPUT MAP</div>
+          <div style="color:var(--teal);font-size:11px;letter-spacing:1px;margin-bottom:4px;">◈ INPUT MAP</div>
           <div class="map-container" style="height:280px;">
             <svg id="map-inputs" style="width:100%;height:280px;"></svg>
           </div>
         </div>
         <div>
-          <div style="color:var(--pink);font-size:8px;letter-spacing:1px;margin-bottom:4px;">◉ SINK MAP</div>
+          <div style="color:var(--pink);font-size:11px;letter-spacing:1px;margin-bottom:4px;">◉ SINK MAP</div>
           <div class="map-container" style="height:280px;">
             <svg id="map-sinks" style="width:100%;height:280px;"></svg>
           </div>
         </div>
         <div style="grid-column:1/-1;">
-          <div style="color:var(--amber);font-size:8px;letter-spacing:1px;margin-bottom:4px;">⟶ TAINT FLOW — inputs → sinks → findings</div>
+          <div style="color:var(--amber);font-size:11px;letter-spacing:1px;margin-bottom:4px;">⟶ TAINT FLOW — inputs → sinks → findings</div>
           <div class="map-container" style="height:300px;">
             <svg id="map-taint" style="width:100%;height:300px;"></svg>
           </div>
@@ -717,9 +717,9 @@ body::after {
           <div class="section-desc">Scope, history, skills, CVE intel, global DB</div>
         </div>
         <div style="display:flex;gap:6px;">
-          <button class="btn btn-muted" onclick="intelSync('h1')" style="font-size:8px;">Sync H1</button>
-          <button class="btn btn-muted" onclick="intelSync('bbscope')" style="font-size:8px;">Sync bbscope</button>
-          <button class="btn btn-muted" onclick="intelSync('cve')" style="font-size:8px;">Sync CVE</button>
+          <button class="btn btn-muted" onclick="intelSync('h1')" style="font-size:11px;">Sync H1</button>
+          <button class="btn btn-muted" onclick="intelSync('bbscope')" style="font-size:11px;">Sync bbscope</button>
+          <button class="btn btn-muted" onclick="intelSync('cve')" style="font-size:11px;">Sync CVE</button>
         </div>
       </div>
     </div>
@@ -737,7 +737,7 @@ body::after {
       <div class="two-col" style="margin-top:12px;">
         <div class="panel">
           <div class="panel-title">SUGGESTED FOCUS</div>
-          <div id="intel-skills" style="font-size:8px;line-height:2;"></div>
+          <div id="intel-skills" style="font-size:11px;line-height:2;"></div>
         </div>
         <div class="panel">
           <div class="panel-title">LOCAL TARGET HISTORY</div>
@@ -775,7 +775,7 @@ body::after {
         <button class="btn btn-primary" onclick="loadGlobalPage(1)">Search</button>
       </div>
       <div id="global-results"></div>
-      <div id="global-pagination" style="margin-top:10px;display:flex;gap:6px;font-size:8px;"></div>
+      <div id="global-pagination" style="margin-top:10px;display:flex;gap:6px;font-size:11px;"></div>
     </div>
   </section>
 
@@ -812,14 +812,14 @@ body::after {
           <select class="field-input" id="term-job-sel" style="width:220px;margin:0;" onchange="switchTermJob()">
             <option value="all">All jobs (live)</option>
           </select>
-          <button class="btn btn-muted" onclick="clearTerminal()" style="font-size:8px;">Clear</button>
-          <button class="btn btn-muted" id="term-pause-btn" onclick="toggleTermPause()" style="font-size:8px;">⏸ Pause</button>
+          <button class="btn btn-muted" onclick="clearTerminal()" style="font-size:11px;">Clear</button>
+          <button class="btn btn-muted" id="term-pause-btn" onclick="toggleTermPause()" style="font-size:11px;">⏸ Pause</button>
         </div>
       </div>
     </div>
 
-    <div class="panel" style="background:#020510;border-color:var(--border);">
-      <div id="term-feed" style="font-family:var(--font-mono);font-size:8px;line-height:1.8;height:480px;overflow-y:auto;color:#8ea0cb;"></div>
+    <div class="panel" style="background:var(--surface2);border-color:var(--border);">
+      <div id="term-feed" style="font-family:var(--font-mono);font-size:11px;line-height:1.8;height:480px;overflow-y:auto;color:var(--muted);"></div>
     </div>
 
     <div style="display:flex;gap:8px;margin-top:8px;">
@@ -840,15 +840,15 @@ body::after {
     <div class="two-col" style="align-items:flex-start;">
       <div class="panel" style="display:flex;flex-direction:column;height:500px;padding:0;">
         <div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-size:8px;color:var(--teal);letter-spacing:1px;">CLAUDE // SECURITY ANALYST</span>
+          <span style="font-size:11px;color:var(--teal);letter-spacing:1px;">CLAUDE // SECURITY ANALYST</span>
           <div style="display:flex;gap:6px;align-items:center;">
-            <select class="field-input" id="ai-target" style="width:130px;margin:0;font-size:8px;" onchange="state.currentTarget=this.value"></select>
-            <button class="btn btn-muted" onclick="clearChat()" style="font-size:7px;padding:2px 6px;">Clear</button>
+            <select class="field-input" id="ai-target" style="width:130px;margin:0;font-size:11px;" onchange="state.currentTarget=this.value"></select>
+            <button class="btn btn-muted" onclick="clearChat()" style="font-size:11px;padding:2px 6px;">Clear</button>
           </div>
         </div>
         <div class="chat-messages" id="chat-messages">
           <div class="chat-bubble ai" style="align-self:flex-start;">
-            <div style="color:var(--teal);font-size:7px;margin-bottom:4px;">CLAUDE</div>
+            <div style="color:var(--teal);font-size:11px;margin-bottom:4px;">CLAUDE</div>
             Select a target and ask me anything. I can summarize findings, suggest next investigation steps, explain vulnerabilities, or help you think through exploit chains.
           </div>
         </div>
@@ -862,18 +862,18 @@ body::after {
         <div class="panel">
           <div class="panel-title">QUICK PROMPTS</div>
           <div style="display:flex;flex-direction:column;gap:5px;">
-            <button class="btn btn-muted" onclick="quickChat('Summarize the current findings and their impact')" style="text-align:left;font-size:8px;">Summarize findings</button>
-            <button class="btn btn-muted" onclick="quickChat('What should I investigate next based on the current findings?')" style="text-align:left;font-size:8px;">What to investigate next?</button>
-            <button class="btn btn-muted" onclick="quickChat('Are there any obvious exploit chains between these findings?')" style="text-align:left;font-size:8px;">Identify exploit chains</button>
-            <button class="btn btn-muted" onclick="quickChat('Explain the most critical finding in detail')" style="text-align:left;font-size:8px;">Explain critical finding</button>
-            <button class="btn btn-muted" onclick="quickChat('What scope areas have not been covered yet?')" style="text-align:left;font-size:8px;">Coverage gaps?</button>
-            <button class="btn btn-muted" onclick="quickChat('Suggest CVSS scores for each finding based on context')" style="text-align:left;font-size:8px;">Review CVSS scores</button>
+            <button class="btn btn-muted" onclick="quickChat('Summarize the current findings and their impact')" style="text-align:left;font-size:11px;">Summarize findings</button>
+            <button class="btn btn-muted" onclick="quickChat('What should I investigate next based on the current findings?')" style="text-align:left;font-size:11px;">What to investigate next?</button>
+            <button class="btn btn-muted" onclick="quickChat('Are there any obvious exploit chains between these findings?')" style="text-align:left;font-size:11px;">Identify exploit chains</button>
+            <button class="btn btn-muted" onclick="quickChat('Explain the most critical finding in detail')" style="text-align:left;font-size:11px;">Explain critical finding</button>
+            <button class="btn btn-muted" onclick="quickChat('What scope areas have not been covered yet?')" style="text-align:left;font-size:11px;">Coverage gaps?</button>
+            <button class="btn btn-muted" onclick="quickChat('Suggest CVSS scores for each finding based on context')" style="text-align:left;font-size:11px;">Review CVSS scores</button>
           </div>
         </div>
-        <div class="panel" style="font-size:8px;color:var(--muted);">
+        <div class="panel" style="font-size:11px;color:var(--muted);">
           <div class="panel-title">MODEL</div>
           <div id="ai-model-info">claude-haiku-4-5 (fast)</div>
-          <div style="margin-top:6px;font-size:7px;">Context injected automatically:<br>· Target + asset type<br>· Active run status<br>· Last 5 findings<br>· Recent log lines</div>
+          <div style="margin-top:6px;font-size:11px;">Context injected automatically:<br>· Target + asset type<br>· Active run status<br>· Last 5 findings<br>· Recent log lines</div>
         </div>
       </div>
     </div>
@@ -1224,11 +1224,11 @@ async function loadTargets() {
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
           <div>
             <div style="font-size:11px;font-weight:bold;color:var(--ink)">${escHtml(t.name)}</div>
-            <div style="font-size:8px;color:var(--muted);margin-top:2px;">${escHtml(t.asset_type)} · ${escHtml(t.default_mode)}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">${escHtml(t.asset_type)} · ${escHtml(t.default_mode)}</div>
           </div>
           <span class="badge ${t.status==="running"?"badge-low":"badge-info"}">${escHtml(t.status.toUpperCase())}</span>
         </div>
-        <div style="display:flex;gap:6px;font-size:8px;color:var(--muted);margin-bottom:10px;">
+        <div style="display:flex;gap:6px;font-size:11px;color:var(--muted);margin-bottom:10px;">
           <span>${t.finding_count} finding${t.finding_count!==1?"s":""}</span>
           ${t.last_run ? `<span>· last: ${new Date(t.last_run).toLocaleDateString()}</span>` : ""}
         </div>
@@ -1317,14 +1317,14 @@ async function loadRuns() {
   const active   = jobs.filter(j => j.status === "running");
   const activeEl = document.getElementById("runs-active");
   if (active.length === 0) {
-    activeEl.innerHTML = `<div style="color:var(--muted);font-size:8px;margin-bottom:8px;">No active runs.</div>`;
+    activeEl.innerHTML = `<div style="color:var(--muted);font-size:11px;margin-bottom:8px;">No active runs.</div>`;
   } else {
     activeEl.innerHTML = active.map(job => `
       <div class="panel" style="border-color:var(--teal);margin-bottom:10px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
           <div>
             <span class="panel-title" style="color:var(--teal)">▶ ${escHtml(job.target)}</span>
-            <span style="font-size:7px;color:var(--muted);margin-left:8px;">${escHtml(job.id)}</span>
+            <span style="font-size:11px;color:var(--muted);margin-left:8px;">${escHtml(job.id)}</span>
           </div>
           <button class="btn btn-danger" onclick="stopRun('${escHtml(job.id)}')">■ Stop</button>
         </div>
@@ -1359,7 +1359,7 @@ async function loadRuns() {
           <td>${escHtml(dur)}</td>
           <td>${statusBadge}</td>
           <td>—</td>
-          <td><button class="btn btn-muted" onclick="openLaunchDrawer('${escHtml(j.target)}','whitebox')" style="font-size:7px;padding:2px 6px;">Re-run</button></td>
+          <td><button class="btn btn-muted" onclick="openLaunchDrawer('${escHtml(j.target)}','whitebox')" style="font-size:11px;padding:2px 6px;">Re-run</button></td>
         </tr>`;
       }).join("");
 }
@@ -1418,11 +1418,11 @@ async function loadFindings() {
   metrics.innerHTML = Object.entries(sev).map(([s, n]) => `
     <div class="metric-card" style="padding:8px 10px;">
       <div class="metric-value" style="font-size:18px;color:var(--${s==="Critical"?"crit":s==="High"?"high":s==="Medium"?"med":s==="Low"?"low":"cyan"})">${n}</div>
-      <div class="metric-label" style="font-size:7px;">${s.toUpperCase()}</div>
+      <div class="metric-label" style="font-size:11px;">${s.toUpperCase()}</div>
     </div>`).join("") + `
     <div class="metric-card" style="padding:8px 10px;">
       <div class="metric-value" style="font-size:18px;color:var(--amber)">${fnAllFindings.filter(f=>f.chain_meta).length}</div>
-      <div class="metric-label" style="font-size:7px;">CHAINS</div>
+      <div class="metric-label" style="font-size:11px;">CHAINS</div>
     </div>`;
   applyFnFilters();
   renderTriageTable();
@@ -1443,7 +1443,7 @@ function applyFnFilters() {
         <td style="color:var(--cyan)">${escHtml(f.report_id)}</td>
         <td>${escHtml(f.finding_title || "")}</td>
         <td>${severityBadge(f.severity_claimed)}</td>
-        <td style="font-size:8px;color:var(--muted)">${escHtml((f.affected_component||"").slice(0,40))}</td>
+        <td style="font-size:11px;color:var(--muted)">${escHtml((f.affected_component||"").slice(0,40))}</td>
         <td><span class="badge badge-low">${escHtml(f.confirmation_status||"confirmed")}</span></td>
       </tr>`).join("");
 }
@@ -1457,7 +1457,7 @@ function renderTriageTable() {
         <td><span class="badge badge-low">${escHtml(r.triage_verdict)}</span></td>
         <td>${escHtml(r.analyst_severity || "—")}</td>
         <td>${r.analyst_cvss_score ?? "—"}</td>
-        <td style="font-size:8px;color:var(--muted)">${escHtml((r.triage_summary||"").slice(0,80))}</td>
+        <td style="font-size:11px;color:var(--muted)">${escHtml((r.triage_summary||"").slice(0,80))}</td>
       </tr>`).join("");
 }
 
@@ -1469,19 +1469,19 @@ function showFindingDetail(id) {
     <div style="margin-bottom:14px;">
       <div style="font-size:12px;font-weight:bold;margin-bottom:4px;">${escHtml(f.finding_title||"")}</div>
       ${severityBadge(f.severity_claimed)}
-      <span style="font-size:8px;color:var(--muted);margin-left:8px;">${escHtml(f.report_id)}</span>
+      <span style="font-size:11px;color:var(--muted);margin-left:8px;">${escHtml(f.report_id)}</span>
     </div>
-    <div style="font-size:8px;color:var(--muted);margin-bottom:4px;">COMPONENT</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">COMPONENT</div>
     <div style="font-size:9px;color:var(--cyan);margin-bottom:12px;">${escHtml(f.affected_component||"")}</div>
-    <div style="font-size:8px;color:var(--muted);margin-bottom:4px;">SUMMARY</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">SUMMARY</div>
     <div style="font-size:9px;line-height:1.6;margin-bottom:12px;">${escHtml(f.summary||"")}</div>
     ${f.poc_code ? `
-    <div style="font-size:8px;color:var(--muted);margin-bottom:4px;">POC</div>
-    <pre style="background:var(--surface);border:1px solid var(--border);padding:8px;border-radius:4px;font-size:8px;overflow-x:auto;white-space:pre-wrap;">${escHtml(f.poc_code)}</pre>` : ""}
+    <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">POC</div>
+    <pre style="background:var(--surface);border:1px solid var(--border);padding:8px;border-radius:4px;font-size:11px;overflow-x:auto;white-space:pre-wrap;">${escHtml(f.poc_code)}</pre>` : ""}
     ${f.chain_meta ? `
-    <div style="font-size:8px;color:var(--amber);margin-top:12px;">⛓ CHAIN: ${escHtml(f.chain_meta.chain_label||"")}</div>` : ""}
+    <div style="font-size:11px;color:var(--amber);margin-top:12px;">⛓ CHAIN: ${escHtml(f.chain_meta.chain_label||"")}</div>` : ""}
     <div style="display:flex;gap:6px;margin-top:14px;">
-      <button class="btn btn-muted" onclick="runScript('reports:render')" style="font-size:8px;">Render H1 Report</button>
+      <button class="btn btn-muted" onclick="runScript('reports:render')" style="font-size:11px;">Render H1 Report</button>
     </div>`;
   drawer.style.display = "block";
 }
@@ -1814,8 +1814,8 @@ async function loadIntelligence() {
   document.getElementById("intel-hist-body").innerHTML = hist.length === 0
     ? `<tr><td colspan="3" style="color:var(--muted)">No history</td></tr>`
     : hist.map(h => `<tr>
-        <td style="font-size:8px;">${escHtml((h.title||"").slice(0,50))}</td>
-        <td style="font-size:8px;color:var(--muted)">${escHtml(h.weakness||"—")}</td>
+        <td style="font-size:11px;">${escHtml((h.title||"").slice(0,50))}</td>
+        <td style="font-size:11px;color:var(--muted)">${escHtml(h.weakness||"—")}</td>
         <td>${severityBadge(h.severity_rating)}</td>
       </tr>`).join("");
 
@@ -1823,10 +1823,10 @@ async function loadIntelligence() {
   document.getElementById("intel-scope-body").innerHTML = scps.length === 0
     ? `<tr><td colspan="4" style="color:var(--muted)">No scope data</td></tr>`
     : scps.slice(0, 50).map(s => `<tr>
-        <td style="color:var(--cyan);font-size:8px;">${escHtml(s.asset_identifier||"")}</td>
-        <td style="font-size:8px;">${escHtml(s.asset_type||"")}</td>
+        <td style="color:var(--cyan);font-size:11px;">${escHtml(s.asset_identifier||"")}</td>
+        <td style="font-size:11px;">${escHtml(s.asset_type||"")}</td>
         <td><span class="badge ${s.eligible_for_submission?"badge-low":"badge-high"}">${s.eligible_for_submission?"YES":"NO"}</span></td>
-        <td style="font-size:8px;">${escHtml(s.max_severity||"—")}</td>
+        <td style="font-size:11px;">${escHtml(s.max_severity||"—")}</td>
       </tr>`).join("");
 }
 
@@ -1858,14 +1858,14 @@ async function loadGlobalPage(page) {
 
   const items = data.items || [];
   document.getElementById("global-results").innerHTML = items.length === 0
-    ? `<div style="color:var(--muted);font-size:8px;">No results</div>`
+    ? `<div style="color:var(--muted);font-size:11px;">No results</div>`
     : `<table class="data-table"><thead><tr><th>Program</th><th>Title</th><th>Weakness</th><th>Severity</th><th>Date</th></tr></thead><tbody>`
     + items.map(r => `<tr>
-        <td style="font-size:8px;color:var(--muted)">${escHtml(r.program_handle||"")}</td>
-        <td style="font-size:8px;"><a href="${escHtml(r.url||"")}" target="_blank" style="color:var(--cyan);text-decoration:none;">${escHtml((r.title||"").slice(0,60))}</a></td>
-        <td style="font-size:8px;color:var(--muted)">${escHtml(r.weakness||"—")}</td>
+        <td style="font-size:11px;color:var(--muted)">${escHtml(r.program_handle||"")}</td>
+        <td style="font-size:11px;"><a href="${escHtml(r.url||"")}" target="_blank" style="color:var(--cyan);text-decoration:none;">${escHtml((r.title||"").slice(0,60))}</a></td>
+        <td style="font-size:11px;color:var(--muted)">${escHtml(r.weakness||"—")}</td>
         <td>${severityBadge(r.severity_rating)}</td>
-        <td style="font-size:8px;color:var(--border)">${escHtml((r.disclosed_at||"").slice(0,10))}</td>
+        <td style="font-size:11px;color:var(--muted)">${escHtml((r.disclosed_at||"").slice(0,10))}</td>
       </tr>`).join("")
     + `</tbody></table>`;
 
@@ -1984,13 +1984,13 @@ async function loadHistory() {
           :`<span class="badge badge-high">${escHtml(j.status.toUpperCase())}</span>`;
         return `<tr>
           <td style="color:var(--cyan)">${escHtml(j.target)}</td>
-          <td style="font-size:7px;color:var(--muted)">${escHtml(j.script||"")} ${escHtml((j.args||[]).join(" "))}</td>
-          <td style="font-size:8px;">${escHtml(started)}</td>
-          <td style="font-size:8px;">${escHtml(dur)}</td>
+          <td style="font-size:11px;color:var(--muted)">${escHtml(j.script||"")} ${escHtml((j.args||[]).join(" "))}</td>
+          <td style="font-size:11px;">${escHtml(started)}</td>
+          <td style="font-size:11px;">${escHtml(dur)}</td>
           <td>${badge}</td>
           <td>
-            <button class="btn btn-muted" onclick="openLaunchDrawer('${escHtml(j.target)}','whitebox');showSection('targets')" style="font-size:7px;padding:2px 6px;">Re-run</button>
-            <button class="btn btn-muted" onclick="viewJobLog('${escHtml(j.id)}')" style="font-size:7px;padding:2px 6px;">Log</button>
+            <button class="btn btn-muted" onclick="openLaunchDrawer('${escHtml(j.target)}','whitebox');showSection('targets')" style="font-size:11px;padding:2px 6px;">Re-run</button>
+            <button class="btn btn-muted" onclick="viewJobLog('${escHtml(j.id)}')" style="font-size:11px;padding:2px 6px;">Log</button>
           </td>
         </tr>`;
       }).join("");
@@ -2012,7 +2012,7 @@ function appendTermLine(line, cls) {
   const div = document.createElement("div");
   const ts  = new Date().toTimeString().slice(0,8);
   const c   = cls||classifyLog(line);
-  div.innerHTML = `<span style="color:var(--border)">[${ts}]</span> <span class="${c}">${escHtml(line)}</span>`;
+  div.innerHTML = `<span style="color:var(--muted)">[${ts}]</span> <span class="${c}">${escHtml(line)}</span>`;
   feed.appendChild(div);
   if (feed.children.length > 300) feed.removeChild(feed.firstChild);
   feed.scrollTop = feed.scrollHeight;
@@ -2122,7 +2122,7 @@ async function loadAssistant() {
 
 function clearChat() {
   const el = document.getElementById("chat-messages");
-  el.innerHTML = `<div class="chat-bubble ai"><div style="color:var(--teal);font-size:7px;margin-bottom:4px;">CLAUDE</div>Chat cleared. Ask me anything about your findings.</div>`;
+  el.innerHTML = `<div class="chat-bubble ai"><div style="color:var(--teal);font-size:11px;margin-bottom:4px;">CLAUDE</div>Chat cleared. Ask me anything about your findings.</div>`;
 }
 
 function quickChat(msg) {
@@ -2144,7 +2144,7 @@ async function sendChat() {
   messages.scrollTop = messages.scrollHeight;
   const aiBubble = document.createElement("div");
   aiBubble.className = "chat-bubble ai";
-  aiBubble.innerHTML = `<div style="color:var(--teal);font-size:7px;margin-bottom:4px;">CLAUDE</div><span id="ai-cursor">▋</span>`;
+  aiBubble.innerHTML = `<div style="color:var(--teal);font-size:11px;margin-bottom:4px;">CLAUDE</div><span id="ai-cursor">▋</span>`;
   messages.appendChild(aiBubble);
   messages.scrollTop = messages.scrollHeight;
   let text = "";
@@ -2170,7 +2170,7 @@ async function sendChat() {
           const evt = JSON.parse(line.slice(6));
           if (evt.type === "chunk" && evt.text) {
             text += evt.text;
-            aiBubble.innerHTML = `<div style="color:var(--teal);font-size:7px;margin-bottom:4px;">CLAUDE</div>${markdownToHtml(text)}<span>▋</span>`;
+            aiBubble.innerHTML = `<div style="color:var(--teal);font-size:11px;margin-bottom:4px;">CLAUDE</div>${markdownToHtml(text)}<span>▋</span>`;
             messages.scrollTop = messages.scrollHeight;
           }
           if (evt.type === "error") {
@@ -2179,7 +2179,7 @@ async function sendChat() {
         } catch {}
       }
     }
-    aiBubble.innerHTML = `<div style="color:var(--teal);font-size:7px;margin-bottom:4px;">CLAUDE</div>${markdownToHtml(text)}`;
+    aiBubble.innerHTML = `<div style="color:var(--teal);font-size:11px;margin-bottom:4px;">CLAUDE</div>${markdownToHtml(text)}`;
   } catch (e) {
     aiBubble.innerHTML = `<div style="color:var(--pink)">Failed to reach AI: ${escHtml(e.message)}</div>`;
   }
@@ -2189,7 +2189,7 @@ async function sendChat() {
 function markdownToHtml(md) {
   return md
     .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
-    .replace(/`([^`]+)`/g, `<code style="background:var(--surface);padding:1px 4px;border-radius:2px;font-size:8px;">$1</code>`)
+    .replace(/`([^`]+)`/g, `<code style="background:var(--surface);padding:1px 4px;border-radius:2px;font-size:11px;">$1</code>`)
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/^- (.+)$/gm, `<div style="padding-left:10px;">· $1</div>`)
     .replace(/\n/g, "<br>");
