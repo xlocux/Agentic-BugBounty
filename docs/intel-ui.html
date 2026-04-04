@@ -448,7 +448,76 @@ body::after {
 
   <!-- SECTION: DASHBOARD -->
   <section id="section-dashboard" class="section active">
-    <!-- populated by Task 5 -->
+    <div class="section-header">
+      <div class="section-title">System Overview</div>
+      <div id="dash-subtitle" class="section-desc"></div>
+    </div>
+
+    <!-- Metric cards -->
+    <div class="metrics-grid" id="dash-metrics">
+      <div class="metric-card">
+        <div class="metric-value" id="m-targets" style="color:var(--pink)">0</div>
+        <div class="metric-label">TARGETS</div>
+        <div class="metric-sub" id="m-targets-sub">—</div>
+      </div>
+      <div class="metric-card" id="mc-runs" style="border-color:var(--border)">
+        <div class="metric-value" id="m-runs" style="color:var(--teal)">0</div>
+        <div class="metric-label">ACTIVE RUNS</div>
+        <div class="metric-sub" id="m-runs-sub">—</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value" id="m-findings" style="color:var(--cyan)">0</div>
+        <div class="metric-label">TOTAL FINDINGS</div>
+        <div class="metric-sub" id="m-findings-sub">—</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value" id="m-chains" style="color:var(--amber)">0</div>
+        <div class="metric-label">CHAINS</div>
+        <div class="metric-sub">across all targets</div>
+      </div>
+    </div>
+
+    <!-- Two col: live feed + chart -->
+    <div class="two-col" style="margin-bottom:16px;">
+
+      <!-- Live feed -->
+      <div class="panel">
+        <div class="panel-title">◉ LIVE FEED</div>
+        <div id="dash-target-badge" style="font-size:8px;color:var(--muted);margin-bottom:6px;">No active run</div>
+        <div class="domain-strip" id="dash-domain-strip">
+          <div class="domain-seg" title="AUTH"></div>
+          <div class="domain-seg" title="INJECT"></div>
+          <div class="domain-seg" title="CLIENT"></div>
+          <div class="domain-seg" title="ACCESS"></div>
+          <div class="domain-seg" title="MEDIA"></div>
+          <div class="domain-seg" title="INFRA"></div>
+        </div>
+        <div style="font-size:7px;color:var(--border);display:flex;gap:8px;margin-bottom:8px;">
+          <span>AUTH</span><span>INJECT</span><span>CLIENT</span><span>ACCESS</span><span>MEDIA</span><span>INFRA</span>
+        </div>
+        <div class="log-feed" id="dash-log-feed"></div>
+        <div style="margin-top:8px;" id="dash-launch-area">
+          <button class="btn btn-primary" onclick="showSection('targets')" style="font-size:8px;">▶ Go to Targets to launch a run</button>
+        </div>
+      </div>
+
+      <!-- Severity chart -->
+      <div class="panel">
+        <div class="panel-title">FINDINGS BY SEVERITY</div>
+        <canvas id="chart-severity" height="140"></canvas>
+        <div class="panel-title" style="margin-top:12px;">RECENT FINDINGS</div>
+        <div id="dash-recent-findings" style="font-size:8px;"></div>
+      </div>
+
+    </div>
+
+    <!-- Domain mindmap -->
+    <div class="panel" id="dash-mindmap-panel">
+      <div class="panel-title">◈ DOMAIN MINDMAP</div>
+      <div class="map-container">
+        <svg id="map-mindmap" height="220"></svg>
+      </div>
+    </div>
   </section>
 
   <!-- SECTION: TARGETS -->
@@ -610,6 +679,207 @@ function updateSidebarStatus(jobs) {
   // Load initial section
   showSection("dashboard");
 })();
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────
+let dashSseCancel = null;
+
+async function loadDashboard() {
+  // Typed.js subtitle
+  if (window.Typed && !window._typedDash) {
+    window._typedDash = new Typed("#dash-subtitle", {
+      strings: ["SYSTEM ONLINE · ALL AGENTS READY", "BUG BOUNTY CONTROL CENTER v2"],
+      typeSpeed: 40, backSpeed: 20, loop: true, backDelay: 3000
+    });
+  }
+
+  // Fetch targets + jobs
+  const [targets, jobs] = await Promise.all([
+    api("/api/targets").catch(() => []),
+    api("/api/jobs").catch(() => [])
+  ]);
+
+  // Metrics
+  animateCount(document.getElementById("m-targets"), targets.length);
+  const running = jobs.filter(j => j.status === "running");
+  animateCount(document.getElementById("m-runs"), running.length);
+
+  const mcRuns = document.getElementById("mc-runs");
+  if (running.length > 0) {
+    mcRuns.style.borderColor = "var(--teal)";
+    glitch(document.getElementById("m-runs"));
+  } else {
+    mcRuns.style.borderColor = "var(--border)";
+  }
+
+  document.getElementById("m-targets-sub").textContent =
+    targets.filter(t => t.default_mode === "whitebox").length + " whitebox";
+  document.getElementById("m-runs-sub").textContent =
+    running.length > 0 ? running[0].target : "idle";
+
+  // Sum findings across all targets
+  const totalFindings = targets.reduce((s, t) => s + (t.finding_count || 0), 0);
+  animateCount(document.getElementById("m-findings"), totalFindings);
+  document.getElementById("m-findings-sub").textContent = totalFindings > 0 ? "see Findings section" : "none yet";
+
+  // Live feed — attach to first running job
+  if (dashSseCancel) dashSseCancel();
+  const activeJob = running[0];
+  if (activeJob) {
+    document.getElementById("dash-target-badge").textContent =
+      `▶ ${activeJob.target} · ${activeJob.id}`;
+    dashSseCancel = startSseFeed(activeJob.id, "dash-log-feed", (evt) => {
+      updateDomainStrip(evt, "dash-domain-strip");
+    });
+  } else {
+    document.getElementById("dash-target-badge").textContent = "No active run";
+  }
+
+  // Severity chart
+  const allFindings = [];
+  for (const t of targets) {
+    if (t.finding_count > 0) {
+      try {
+        const data = await api(`/api/findings/${t.name}`);
+        if (data.bundle?.findings) allFindings.push(...data.bundle.findings);
+      } catch {}
+    }
+  }
+  renderSeverityChart(allFindings);
+  renderRecentFindings(allFindings.slice(-5).reverse());
+
+  // Domain mindmap
+  renderMindmap(allFindings, targets);
+}
+
+// Render log lines into a feed div
+function appendLogLine(feedId, line) {
+  const feed = document.getElementById(feedId);
+  if (!feed) return;
+  const div = document.createElement("div");
+  const ts  = new Date().toTimeString().slice(0, 8);
+  let cls   = "log-info";
+  if (line.includes("✓") || line.toLowerCase().includes("confirmed")) cls = "log-find";
+  else if (line.toLowerCase().includes("candidate")) cls = "log-cand";
+  else if (line.toLowerCase().includes("error")) cls = "log-err";
+  div.innerHTML = `<span class="log-ts">[${ts}]</span> <span class="${cls}">${escHtml(line)}</span>`;
+  feed.appendChild(div);
+  if (feed.children.length > 60) feed.removeChild(feed.firstChild);
+  feed.scrollTop = feed.scrollHeight;
+}
+
+// Start SSE stream for a job, returns cancel fn
+function startSseFeed(jobId, feedId, onEvt) {
+  const es = new EventSource(`/api/stream/${jobId}`);
+  es.onmessage = (e) => {
+    const evt = JSON.parse(e.data);
+    if (evt.type === "log" && evt.line) appendLogLine(feedId, evt.line);
+    if (onEvt) onEvt(evt);
+  };
+  es.onerror = () => es.close();
+  state.sseStreams[jobId] = es;
+  return () => { es.close(); delete state.sseStreams[jobId]; };
+}
+
+// Update domain progress strip based on log content
+function updateDomainStrip(evt, stripId) {
+  const strip  = document.getElementById(stripId);
+  if (!strip) return;
+  const segs   = strip.querySelectorAll(".domain-seg");
+  const domains = ["AUTH","INJECT","CLIENT","ACCESS","MEDIA","INFRA"];
+  if (evt.type === "status" && evt.domain) {
+    const idx = domains.indexOf(evt.domain);
+    if (idx >= 0) {
+      segs.forEach(s => s.classList.remove("running"));
+      for (let i = 0; i < idx; i++) segs[i].classList.add("done");
+      segs[idx].classList.add("running");
+    }
+  }
+  if (evt.type === "done") segs.forEach(s => { s.classList.remove("running"); s.classList.add("done"); });
+}
+
+function renderSeverityChart(findings) {
+  const counts = { Critical: 0, High: 0, Medium: 0, Low: 0, Informative: 0 };
+  for (const f of findings) {
+    const s = f.severity_claimed;
+    if (counts[s] !== undefined) counts[s]++;
+  }
+  const ctx = document.getElementById("chart-severity");
+  if (!ctx || !window.Chart) return;
+  if (state.charts.severity) state.charts.severity.destroy();
+  state.charts.severity = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: Object.keys(counts),
+      datasets: [{
+        data: Object.values(counts),
+        backgroundColor: ["rgba(255,79,216,0.6)","rgba(255,107,53,0.6)","rgba(255,215,0,0.6)","rgba(57,255,212,0.6)","rgba(85,199,255,0.6)"],
+        borderColor:     ["#ff4fd8","#ff6b35","#ffd700","#39ffd4","#55c7ff"],
+        borderWidth: 1
+      }]
+    },
+    options: { indexAxis: "y", plugins: { legend: { display: false } }, scales: {
+      x: { ticks: { color: "#8ea0cb" }, grid: { color: "#1e3a5f" } },
+      y: { ticks: { color: "#8ea0cb" }, grid: { display: false } }
+    }}
+  });
+}
+
+function renderRecentFindings(findings) {
+  const el = document.getElementById("dash-recent-findings");
+  if (!el) return;
+  el.innerHTML = findings.length === 0
+    ? `<div style="color:var(--muted)">No findings yet</div>`
+    : findings.map(f => `
+      <div style="display:flex;justify-content:space-between;padding:4px 6px;background:var(--surface);border-radius:3px;margin-bottom:3px;">
+        <span style="color:var(--ink)">${escHtml(f.finding_title || "")}</span>
+        ${severityBadge(f.severity_claimed)}
+      </div>`).join("");
+}
+
+// ── D3 Domain Mindmap ─────────────────────────────────────────────────────
+function renderMindmap(findings, targets) {
+  const svg   = d3.select("#map-mindmap");
+  svg.selectAll("*").remove();
+  const W = svg.node().parentElement.clientWidth || 700;
+  const H = 220;
+  svg.attr("viewBox", `0 0 ${W} ${H}`);
+
+  const domains = ["AUTH","INJECT","CLIENT","ACCESS","MEDIA","INFRA"];
+  const colors  = ["#55c7ff","#ff4fd8","#ffd700","#39ffd4","#ff6b35","#8ea0cb"];
+  const cx = W / 2, cy = H / 2, R = 80;
+
+  // Center node
+  svg.append("circle").attr("cx",cx).attr("cy",cy).attr("r",18)
+    .attr("fill","var(--surface)").attr("stroke","var(--teal)").attr("stroke-width",1.5);
+  svg.append("text").attr("x",cx).attr("y",cy+3).attr("text-anchor","middle")
+    .attr("font-size",7).attr("fill","var(--teal)").text("TARGET");
+
+  domains.forEach((d, i) => {
+    const angle  = (i / domains.length) * Math.PI * 2 - Math.PI / 2;
+    const dx     = cx + R * Math.cos(angle);
+    const dy     = cy + R * Math.sin(angle);
+    const count  = findings.filter(f => f.domain === d || (f.vulnerability_class || "").includes(d.toLowerCase())).length;
+    const color  = colors[i];
+
+    // Link
+    svg.append("line").attr("x1",cx).attr("y1",cy).attr("x2",dx).attr("y2",dy)
+      .attr("stroke",color).attr("stroke-opacity",0.4).attr("stroke-width",1);
+
+    // Domain node
+    const g = svg.append("g").attr("transform",`translate(${dx},${dy})`)
+      .style("opacity",0).style("transform",`translate(${dx}px,${dy}px) scale(0)`);
+    g.append("circle").attr("r",12).attr("fill","var(--surface)").attr("stroke",color).attr("stroke-width",1.5);
+    g.append("text").attr("y",3).attr("text-anchor","middle").attr("font-size",5.5).attr("fill",color).text(d);
+    if (count > 0) {
+      g.append("circle").attr("cx",10).attr("cy",-10).attr("r",6).attr("fill",color).attr("fill-opacity",0.9);
+      g.append("text").attr("x",10).attr("y",-8).attr("text-anchor","middle").attr("font-size",6).attr("fill","#060816").text(count);
+    }
+
+    // Animate in with delay
+    anime({ targets: g.node(), opacity: [0,1], scale: [0,1], delay: i * 120,
+            duration: 600, easing: "easeOutBack" });
+  });
+}
 </script>
 
 </body>
