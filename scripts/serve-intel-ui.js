@@ -12,7 +12,6 @@ const {
   readJson,
   resolveTargetConfigPath
 } = require("./lib/contracts");
-const { execSync } = require("node:child_process");
 const { createJob, startJob, stopJob, getJob, listJobs, tailJob } = require("./lib/ui-jobs");
 const { streamChatResponse } = require("./lib/ui-chat");
 
@@ -382,7 +381,7 @@ function main() {
     targets: path.resolve("targets")
   };
 
-  const server = http.createServer(async (request, response) => {
+  async function handleRequest(request, response) {
     const parsedUrl = new URL(request.url, `http://${request.headers.host || "127.0.0.1"}`);
     const decodedPathname = (() => {
       try {
@@ -454,6 +453,9 @@ function main() {
 
     if (method === "GET" && /^\/api\/run\/status\/(.+)$/.test(url)) {
       const target = url.replace("/api/run/status/", "");
+      if (target.includes("/") || target.includes("..") || target.includes("\\")) {
+        response.writeHead(400); response.end("invalid target name"); return;
+      }
       const job    = listJobs().find(j => j.target === target && j.status === "running");
       const bundlePath = path.resolve("targets", target, "findings", "confirmed", "report_bundle.json");
       const bundle = (() => { try { return JSON.parse(fs.readFileSync(bundlePath, "utf8")); } catch { return null; } })();
@@ -499,6 +501,9 @@ function main() {
     // ── Findings ───────────────────────────────────────────────────────────
     if (method === "GET" && /^\/api\/findings\/(.+)$/.test(url)) {
       const target = url.replace("/api/findings/", "");
+      if (target.includes("/") || target.includes("..") || target.includes("\\")) {
+        response.writeHead(400); response.end("invalid target name"); return;
+      }
       const base   = path.resolve("targets", target, "findings");
       const bundle = (() => { try { return JSON.parse(fs.readFileSync(path.join(base, "confirmed", "report_bundle.json"), "utf8")); } catch { return null; } })();
       const triage = (() => { try { return JSON.parse(fs.readFileSync(path.join(base, "triage_result.json"), "utf8")); } catch { return null; } })();
@@ -512,6 +517,9 @@ function main() {
 
     if (method === "GET" && /^\/api\/history\/(.+)$/.test(url)) {
       const target = url.replace("/api/history/", "");
+      if (target.includes("/") || target.includes("..") || target.includes("\\")) {
+        response.writeHead(400); response.end("invalid target name"); return;
+      }
       return sendJson(response, listJobs().filter(j => j.target === target));
     }
 
@@ -531,6 +539,9 @@ function main() {
       const body = await readBody(request);
       const { message, target } = body;
       if (!message) { response.writeHead(400); response.end("message required"); return; }
+      if (target && (target.includes("/") || target.includes("..") || target.includes("\\"))) {
+        response.writeHead(400); response.end("invalid target name"); return;
+      }
 
       const bundlePath = target ? path.resolve("targets", target, "findings", "confirmed", "report_bundle.json") : null;
       const bundle = bundlePath && fs.existsSync(bundlePath)
@@ -646,6 +657,16 @@ function main() {
     }
 
     sendNotFound(response);
+  }
+
+  const server = http.createServer((request, response) => {
+    handleRequest(request, response).catch((err) => {
+      console.error("[serve-intel-ui] unhandled error:", err);
+      if (!response.headersSent) {
+        response.writeHead(500);
+        response.end("Internal Server Error");
+      }
+    });
   });
 
   listenWithFallback(server, args.port)
