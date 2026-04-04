@@ -2251,12 +2251,12 @@ function loadTools() {
         ${g.scripts.map(s => `
           <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 6px;background:var(--bg);border-radius:3px;">
             <div>
-              <span style="color:var(--cyan);font-size:8px;font-family:var(--font-mono);">${escHtml(s.name)}</span>
-              <span style="color:var(--muted);font-size:7px;margin-left:8px;">${escHtml(s.desc)}</span>
+              <span style="color:var(--cyan);font-size:11px;font-family:var(--font-mono);">${escHtml(s.name)}</span>
+              <span style="color:var(--muted);font-size:10px;margin-left:8px;">${escHtml(s.desc)}</span>
             </div>
-            <button class="btn btn-muted" onclick="runToolScript('${escHtml(s.name)}')" style="font-size:7px;padding:3px 8px;">▶ Run</button>
+            <button class="btn btn-muted" onclick="runToolScript('${escHtml(s.name)}')">▶ Run</button>
           </div>
-          <div id="tool-result-${escHtml(s.name.replace(/[:]/g,'-'))}" style="display:none;padding:3px 6px;font-size:7px;color:var(--teal);background:var(--surface);border-radius:3px;"></div>
+          <div id="tool-result-${escHtml(s.name.replace(/[:]/g,'-'))}" style="display:none;padding:3px 6px;font-size:10px;color:var(--teal);background:var(--surface);border-radius:3px;"></div>
         `).join("")}
       </div>
     </div>`).join("");
