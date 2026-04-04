@@ -100,8 +100,9 @@ body::after {
 #sidebar-logo {
   color: var(--teal);
   font-size: 13px;
-  font-weight: bold;
-  letter-spacing: 3px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-shadow: 0 0 12px rgba(57,255,212,0.6);
 }
 
 #sidebar-sub {
@@ -127,8 +128,9 @@ body::after {
 }
 .nav-item:hover { background: rgba(57,255,212,0.05); }
 .nav-item.active {
-  background: rgba(57,255,212,0.08);
+  background: linear-gradient(90deg, rgba(57,255,212,0.12), rgba(57,255,212,0.02));
   border-left-color: var(--teal);
+  box-shadow: inset 0 0 20px rgba(57,255,212,0.04);
 }
 .nav-item.active .nav-label { color: var(--teal); }
 .nav-icon  { font-size: 15px; color: var(--muted); width: 16px; text-align: center; }
@@ -176,15 +178,33 @@ body::after {
   margin-bottom: 16px;
 }
 .metric-card {
-  background: var(--surface);
+  background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 12px 14px;
+  border-radius: 10px;
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.25s, box-shadow 0.25s;
+  cursor: default;
+}
+.metric-card::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--teal), transparent);
+  opacity: 0.7;
+}
+.metric-card:hover {
+  border-color: rgba(57,255,212,0.35);
+  box-shadow: 0 4px 24px rgba(57,255,212,0.08);
 }
 .metric-value {
-  font-size: 22px;
-  font-weight: bold;
+  font-size: 28px;
+  font-weight: 700;
   line-height: 1;
+  background: linear-gradient(120deg, var(--ink) 40%, var(--teal));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 .metric-label {
   font-size: 11px;
@@ -212,11 +232,13 @@ body::after {
 
 /* ── Card panel ── */
 .panel {
-  background: var(--surface2);
+  background: linear-gradient(160deg, var(--surface) 0%, var(--surface2) 100%);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 12px;
+  border-radius: 10px;
+  padding: 14px;
+  transition: border-color 0.2s;
 }
+.panel:hover { border-color: rgba(57,255,212,0.2); }
 .panel-title {
   font-size: 11px;
   color: var(--teal);
@@ -246,17 +268,19 @@ body::after {
 /* ── Severity badges ── */
 .badge {
   display: inline-block;
-  padding: 2px 7px;
-  border-radius: 3px;
+  padding: 3px 9px;
+  border-radius: 999px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.3px;
+  border: 1px solid currentColor;
+  opacity: 0.9;
 }
-.badge-crit   { background: rgba(255,79,216,0.15); color: var(--crit); }
-.badge-high   { background: rgba(255,107,53,0.15); color: var(--high); }
-.badge-med    { background: rgba(255,215,0,0.15);  color: var(--med); }
-.badge-low    { background: rgba(57,255,212,0.15); color: var(--low); }
-.badge-info   { background: rgba(85,199,255,0.15); color: var(--cyan); }
+.badge-crit { background: rgba(255,79,216,0.12);  color: var(--crit); }
+.badge-high { background: rgba(255,107,53,0.12);  color: var(--high); }
+.badge-med  { background: rgba(255,215,0,0.12);   color: var(--med);  }
+.badge-low  { background: rgba(57,255,212,0.12);  color: var(--low);  }
+.badge-info { background: rgba(85,199,255,0.12);  color: var(--cyan); }
 
 /* ── Buttons ── */
 .btn {
@@ -276,17 +300,19 @@ body::after {
   border-color: var(--teal);
   color: var(--teal);
 }
-.btn-primary:hover { box-shadow: 0 0 8px rgba(57,255,212,0.4); }
+.btn-primary:hover { box-shadow: 0 0 14px rgba(57,255,212,0.55), 0 0 28px rgba(57,255,212,0.15); background: rgba(57,255,212,0.18); }
 .btn-danger {
   background: rgba(255,79,216,0.1);
   border-color: var(--pink);
   color: var(--pink);
 }
+.btn-danger:hover { box-shadow: 0 0 14px rgba(255,79,216,0.45); }
 .btn-muted {
   background: transparent;
   border-color: var(--border);
   color: var(--muted);
 }
+.btn-muted:hover { border-color: var(--muted); color: var(--ink); }
 
 /* ── Log feed ── */
 .log-feed {
@@ -371,8 +397,8 @@ body::after {
   border-radius: 4px;
   padding: 6px 8px;
   color: var(--ink);
-  font-family: var(--font-mono);
-  font-size: 11px;
+  font-family: var(--font-ui);
+  font-size: 14px;
 }
 .chat-input:focus { outline: none; border-color: var(--teal); }
 
@@ -381,9 +407,16 @@ body::after {
   margin-bottom: 18px;
 }
 .section-title {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 20px;
+  font-weight: 700;
   color: var(--ink);
+  letter-spacing: 0.3px;
+}
+.section-title::after {
+  content: "";
+  display: block; width: 36px; height: 2px;
+  background: linear-gradient(90deg, var(--teal), transparent);
+  margin-top: 7px; border-radius: 1px;
 }
 .section-desc {
   font-size: 13px;
@@ -402,6 +435,54 @@ body::after {
 .map-container svg text { font-family: var(--font-mono); fill: var(--muted); }
 .map-container svg .node circle { stroke-width: 1.5; }
 .map-container svg .link { stroke: var(--border); stroke-opacity: 0.6; }
+
+/* ── Custom scrollbars ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--surface2); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; transition: background 0.2s; }
+::-webkit-scrollbar-thumb:hover { background: var(--teal); box-shadow: 0 0 6px var(--teal); }
+* { scrollbar-width: thin; scrollbar-color: var(--border) var(--surface2); }
+
+/* ── Modal ── */
+#modal-overlay {
+  display: none; position: fixed; inset: 0; z-index: 10000;
+  background: rgba(4,6,18,0.88); backdrop-filter: blur(6px);
+  align-items: center; justify-content: center;
+}
+#modal-overlay.open { display: flex; }
+#modal-box {
+  background: linear-gradient(160deg, var(--surface), var(--surface2));
+  border: 1px solid var(--teal);
+  border-radius: 12px; padding: 32px 36px; max-width: 420px; width: 90%;
+  box-shadow: 0 0 40px rgba(57,255,212,0.18), 0 0 80px rgba(57,255,212,0.05);
+  animation: modal-in 0.18s ease;
+}
+@keyframes modal-in {
+  from { opacity: 0; transform: scale(0.95) translateY(-10px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+#modal-title {
+  font-size: 15px; font-weight: 600; color: var(--teal);
+  letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px;
+}
+#modal-body { font-size: 14px; color: var(--muted); line-height: 1.6; margin-bottom: 24px; }
+#modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+/* ── Responsive ── */
+@media (max-width: 860px) {
+  :root { --sidebar-w: 56px; }
+  #sidebar-logo, #sidebar-sub, .nav-label, .nav-sub, #sidebar-status { display: none; }
+  .nav-icon { width: 100%; font-size: 18px; }
+  .nav-item { justify-content: center; padding: 10px 0; }
+  .metrics-grid { grid-template-columns: 1fr 1fr; }
+  .two-col, .three-col { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  :root { --sidebar-w: 0px; }
+  #sidebar { display: none; }
+  .metrics-grid { grid-template-columns: 1fr; }
+  #main { padding: 12px; }
+}
 </style>
 </head>
 <body>
@@ -901,6 +982,26 @@ body::after {
 </main>
 
 <script>
+// ── Modal system ──────────────────────────────────────────────────────────
+let _modalResolve = null;
+function showModal(title, body, confirmLabel = "Confirm", danger = true) {
+  document.getElementById("modal-title").textContent = title;
+  document.getElementById("modal-body").textContent = body;
+  const btn = document.getElementById("modal-confirm-btn");
+  btn.textContent = confirmLabel;
+  btn.className = `btn ${danger ? "btn-danger" : "btn-primary"}`;
+  document.getElementById("modal-overlay").classList.add("open");
+  return new Promise(resolve => { _modalResolve = resolve; });
+}
+function modalConfirm() {
+  document.getElementById("modal-overlay").classList.remove("open");
+  if (_modalResolve) { _modalResolve(true); _modalResolve = null; }
+}
+function modalCancel() {
+  document.getElementById("modal-overlay").classList.remove("open");
+  if (_modalResolve) { _modalResolve(false); _modalResolve = null; }
+}
+
 // ── Global state ──────────────────────────────────────────────────────────
 const state = {
   currentSection: "dashboard",
@@ -1314,7 +1415,7 @@ async function submitLaunch() {
 }
 
 async function resetTarget(name) {
-  if (!confirm(`Reset target "${name}"? This will wipe findings and logs.`)) return;
+  if (!await showModal("Reset Target", `Reset target "${name}"? This will wipe all findings and logs.`, "Reset", true)) return;
   await apiPost(`/api/targets/${name}/reset`, {});
   setTimeout(loadTargets, 1500);
 }
@@ -1393,7 +1494,7 @@ async function quickLaunch() {
 }
 
 async function stopRun(jobId) {
-  if (!confirm("Stop this run?")) return;
+  if (!await showModal("Stop Run", "Stop this run? The current pipeline step will be interrupted.", "Stop", true)) return;
   await apiPost(`/api/run/stop/${jobId}`, {});
   setTimeout(loadRuns, 800);
 }
@@ -2290,6 +2391,18 @@ async function runToolScript(script) {
   }
 }
 </script>
+
+<!-- ── MODAL ── -->
+<div id="modal-overlay" onclick="modalCancel()">
+  <div id="modal-box" onclick="event.stopPropagation()">
+    <div id="modal-title"></div>
+    <div id="modal-body"></div>
+    <div id="modal-actions">
+      <button class="btn btn-muted" onclick="modalCancel()">Cancel</button>
+      <button class="btn btn-danger" id="modal-confirm-btn" onclick="modalConfirm()">Confirm</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
