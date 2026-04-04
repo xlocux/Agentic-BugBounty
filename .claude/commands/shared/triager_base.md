@@ -108,6 +108,33 @@ or is it intended behavior / low-risk design choice / theoretical issue?"
 
     If THEORETICAL → downgrade severity by 2 levels minimum
 
+3.1.5 Gestione dei chain finding:
+    Se il finding ha chain_meta.is_chain = true:
+
+    a) Verifica ogni step in chain_meta.chain_steps indipendentemente:
+       - Il componente referenziato in ogni step esiste effettivamente?
+       - Il primitive_provided è coerente con la vulnerabilità a quello step?
+       - La precondizione dello step N è soddisfacibile dato l'output dello step N-1?
+
+    b) Verifica il PoC della chain end-to-end:
+       - Il PoC deve dimostrare l'impatto FINALE, non solo lo step 1
+       - PoC parziale (dimostra solo step 1) → NEEDS_MORE_INFO, non TRIAGED
+       - Se uno step intermedio fallisce → la chain collassa a finding individuali
+         Rivaluta ogni absorbed_finding_id indipendentemente alla sua severity originale
+
+    c) Validazione severity della chain:
+       - La severity della chain deve essere maggiore di QUALSIASI step singolo
+       - Se la severity della chain è uguale allo step più alto → downgrade a quella severity
+         (la chain non aggiunge valore di escalation)
+       - Se la severity è giustificata dall'impatto finale → accetta il CVSS del researcher
+         ma verifica il metrico AC usando le chain CVSS scoring rules in researcher_wb.md Phase 2.6 Step 5
+
+    d) Credit policy per chain novel:
+       - Un PoC chain funzionante tra due finding Low/Medium è ALTO valore
+       - NON fare downgrade di un chain finding perché i pezzi singoli sembrano di bassa severity
+       - NON richiedere al researcher di sottomettere i finding individuali separatamente
+       - Il chain report sostituisce completamente i finding individuali
+
 3.2 Impact verification:
     Compare claimed impact against what the PoC actually demonstrates.
 
@@ -294,6 +321,7 @@ Write findings/triage_result.json:
       "severity_delta": 0.0,
       "nmi_questions": [],
       "key_discrepancies": [],
+      "chain_validation": null,
       "ready_to_submit": true,
       "triage_summary": "string (full text if TRIAGED)",
       "response_to_researcher": "string (for all verdicts)"
@@ -301,6 +329,70 @@ Write findings/triage_result.json:
   ]
 }
 ```
+
+### chain_validation — solo quando il finding ha chain_meta.is_chain = true
+
+```json
+"chain_validation": {
+  "steps_verified": [
+    {
+      "step": 1,
+      "component_exists": true,
+      "primitive_confirmed": true,
+      "precondition_satisfiable": true,
+      "notes": ""
+    }
+  ],
+  "chain_poc_verified": true,
+  "chain_collapses_to": null,
+  "severity_escalation_justified": true,
+  "chain_verdict": "CHAIN_VALID | CHAIN_PARTIAL | CHAIN_COLLAPSED"
+}
+```
+
+`chain_collapses_to`: se chain_verdict = CHAIN_COLLAPSED, elenca gli ID dei
+finding individuali da rivalutare con la loro severity standalone.
+
+Verdetti:
+- `CHAIN_VALID` → PoC chain completo verificato, severity accettata
+- `CHAIN_PARTIAL` → step 1 confermato ma chain completa non dimostrata → NEEDS_MORE_INFO
+- `CHAIN_COLLAPSED` → almeno uno step intermedio è fallito → rivaluta le parti individualmente
+
+3.1.6 Validazione primitivi specializzati per chain:
+    Per chain che coinvolgono primitivi complessi, verifica con questi criteri:
+
+    sql_injection:
+      - Il PoC dimostra estrazione dati? O solo error-based inference?
+      - La chain richiede out-of-band? (DNS/HTTP exfiltration confermata con collaborator)
+      - Per chain con INTO OUTFILE: il file è effettivamente scritto? Path accessibile via web?
+
+    file_read:
+      - Il path è controllabile dall'attaccante? Ci sono filtri (WAF, allowlist)?
+      - Il PoC legge un file di prova (es. /etc/passwd o WEB-INF/web.xml)
+      - Per chain con file_read → code_exec: il codice letto contiene gadget utilizzabili?
+
+    template_injection:
+      - Il contesto è template engine (Jinja2, Freemarker, Twig, Thymeleaf, ERB)?
+      - Il PoC dimostra execution (es. {{config}} in Flask, ${7*7} in Freemarker)
+      - La chain verso RCE richiede gadget specifici? Sono presenti nel contesto?
+
+    deserialization:
+      - È confermato il gadget chain? (ysoserial, PHPGGC, etc.)
+      - Il PoC dimostra execution (ping, sleep, DNS callback) o solo crash/error?
+      - Per chain con SSRF: il gadget chain supporta richieste HTTP verso interno?
+
+    race_condition:
+      - Il PoC dimostra la window di tempo con richieste concorrenti (es. 10–50 thread)?
+      - Il race produce uno stato inconsistente verificabile (es. doppio redeem)?
+      - Il PoC include timing measurement per dimostrare la condizione?
+
+    xxe:
+      - Il PoC utilizza external entity? Funziona con file://? Funziona con HTTP?
+      - Per chain con SSRF: l'endpoint target risponde? C'è out-of-band detection?
+
+    command_injection:
+      - Il PoC dimostra execution con comando innocuo (sleep, ping, DNS lookup)?
+      - La chain verso RCE è diretta o richiede bypass (WAF, character restrictions)?
 
 For every finding with ready_to_submit = true,
 also write findings/h1_submission_ready/[report_id].md

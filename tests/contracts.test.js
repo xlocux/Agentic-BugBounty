@@ -456,3 +456,108 @@ test("buildResearchBrief prioritizes uncovered assets and merges local plus disc
   assert.equal(brief.same_program_disclosed_top_weaknesses[0].label, "Origin Validation Error");
   assert.equal(brief.priority_bug_families[0].module_hint, "xss_filter_evasion");
 });
+
+// ── DB schema v2 ─────────────────────────────────────────────────────────────
+
+test("project_components table is created with correct schema", () => {
+  const dir  = fs.mkdtempSync(path.join(os.tmpdir(), "bb-test-"));
+  const db   = openDatabase(path.join(dir, "test.db"));
+  const cols = db.prepare("PRAGMA table_info(project_components)").all().map(c => c.name);
+  assert.ok(cols.includes("target_id"));
+  assert.ok(cols.includes("name"));
+  assert.ok(cols.includes("version"));
+  assert.ok(cols.includes("ecosystem"));
+  assert.ok(cols.includes("source_file"));
+  assert.ok(cols.includes("direct_dep"));
+  db.close();
+  fs.rmSync(dir, { recursive: true });
+});
+
+test("endpoints table is created with correct schema", () => {
+  const dir  = fs.mkdtempSync(path.join(os.tmpdir(), "bb-test-"));
+  const db   = openDatabase(path.join(dir, "test.db"));
+  const cols = db.prepare("PRAGMA table_info(endpoints)").all().map(c => c.name);
+  assert.ok(cols.includes("target_id"));
+  assert.ok(cols.includes("method"));
+  assert.ok(cols.includes("path"));
+  assert.ok(cols.includes("params"));
+  assert.ok(cols.includes("auth_required"));
+  assert.ok(cols.includes("auth_type"));
+  assert.ok(cols.includes("source"));
+  db.close();
+  fs.rmSync(dir, { recursive: true });
+});
+
+test("findings_history table is created with correct schema", () => {
+  const dir  = fs.mkdtempSync(path.join(os.tmpdir(), "bb-test-"));
+  const db   = openDatabase(path.join(dir, "test.db"));
+  const cols = db.prepare("PRAGMA table_info(findings_history)").all().map(c => c.name);
+  assert.ok(cols.includes("target_id"));
+  assert.ok(cols.includes("report_id"));
+  assert.ok(cols.includes("vuln_class"));
+  assert.ok(cols.includes("severity"));
+  assert.ok(cols.includes("status"));
+  assert.ok(cols.includes("h1_submitted"));
+  assert.ok(cols.includes("chain_id"));
+  db.close();
+  fs.rmSync(dir, { recursive: true });
+});
+
+test("zeroday_alerts table is created in global DB", () => {
+  const dir    = fs.mkdtempSync(path.join(os.tmpdir(), "bb-test-"));
+  const dbPath = resolveGlobalDatabasePath(dir);
+  const db     = openDatabase(dbPath);
+  const cols   = db.prepare("PRAGMA table_info(zeroday_alerts)").all().map(c => c.name);
+  assert.ok(cols.includes("cve_id"));
+  assert.ok(cols.includes("component"));
+  assert.ok(cols.includes("affected_targets"));
+  assert.ok(cols.includes("notified"));
+  db.close();
+  fs.rmSync(dir, { recursive: true });
+});
+
+test("upsertComponent inserts and deduplicates by target+name+ecosystem", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bb-test-"));
+  const db  = openDatabase(path.join(dir, "test.db"));
+
+  // Insert a fake target first
+  db.prepare(
+    "INSERT INTO targets_registry (handle, platform) VALUES (?, ?)"
+  ).run("acme", "hackerone");
+  const targetId = db.prepare("SELECT id FROM targets_registry WHERE handle = ?").get("acme").id;
+
+  const { upsertComponent } = require("../scripts/lib/db");
+  upsertComponent(db, { targetId, name: "lodash", version: "4.17.20", ecosystem: "npm", sourceFile: "package.json", directDep: 1 });
+  upsertComponent(db, { targetId, name: "lodash", version: "4.17.21", ecosystem: "npm", sourceFile: "package-lock.json", directDep: 1 });
+
+  const row = db.prepare("SELECT * FROM project_components WHERE name = 'lodash'").get();
+  assert.equal(row.version, "4.17.21", "upsert should update version to latest");
+  const count = db.prepare("SELECT COUNT(*) as n FROM project_components WHERE name = 'lodash'").get();
+  assert.equal(count.n, 1, "should not duplicate");
+
+  db.close();
+  fs.rmSync(dir, { recursive: true });
+});
+
+test("upsertEndpoint inserts and deduplicates by target+method+path", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bb-test-"));
+  const db  = openDatabase(path.join(dir, "test.db"));
+
+  db.prepare("INSERT INTO targets_registry (handle) VALUES (?)").run("acme");
+  const targetId = db.prepare("SELECT id FROM targets_registry WHERE handle = ?").get("acme").id;
+
+  const { upsertEndpoint } = require("../scripts/lib/db");
+  upsertEndpoint(db, { targetId, method: "GET", path: "/api/users", params: ["page", "limit"], authRequired: 1, authType: "jwt", source: "surface_map" });
+  upsertEndpoint(db, { targetId, method: "GET", path: "/api/users", params: ["page", "limit", "filter"], authRequired: 1, authType: "jwt", source: "crawl" });
+
+  const count = db.prepare("SELECT COUNT(*) as n FROM endpoints WHERE path = '/api/users'").get();
+  assert.equal(count.n, 1, "should not duplicate");
+
+  const row = db.prepare("SELECT * FROM endpoints WHERE path = '/api/users'").get();
+  assert.equal(row.source, "crawl", "upsert should update source to latest");
+  const parsedParams = JSON.parse(row.params);
+  assert.equal(parsedParams.length, 3, "upsert should update params");
+
+  db.close();
+  fs.rmSync(dir, { recursive: true });
+});

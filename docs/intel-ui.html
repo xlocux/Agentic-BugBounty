@@ -1,664 +1,2295 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Agentic BugBounty Intel UI</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NETRUNNER // Control Center</title>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- CDN libs -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/typed.js@2/dist/typed.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tsparticles-slim@2/tsparticles.slim.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/animejs@3/lib/anime.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+
 <style>
+/* ── CSS Variables — Dark theme (default) ── */
 :root {
-  --bg: #060816;
-  --bg-2: #0a0f21;
-  --surface: rgba(12, 18, 38, 0.88);
-  --surface-2: rgba(16, 25, 51, 0.92);
-  --ink: #e8ecff;
-  --muted: #8ea0cb;
-  --line: rgba(100, 128, 214, 0.26);
-  --teal: #39ffd4;
-  --cyan: #55c7ff;
-  --pink: #ff4fd8;
-  --amber: #ffb84d;
-  --danger: #ff6b81;
-  --glow: 0 0 0 1px rgba(85,199,255,.12), 0 0 24px rgba(85,199,255,.08);
-  --font-body: "IBM Plex Sans", "Segoe UI", sans-serif;
-  --font-mono: "JetBrains Mono", Consolas, monospace;
+  --bg:       #060816;
+  --surface:  #0d1530;
+  --surface2: #080e1c;
+  --ink:      #e8ecff;
+  --muted:    #8ea0cb;
+  --border:   #1e3a5f;
+  --teal:     #39ffd4;
+  --cyan:     #55c7ff;
+  --pink:     #ff4fd8;
+  --amber:    #ffd700;
+  --orange:   #ff6b35;
+  --crit:     #ff4fd8;
+  --high:     #ff6b35;
+  --med:      #ffd700;
+  --low:      #39ffd4;
+  --sidebar-w: 210px;
+  --font-ui:   'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
 }
-* { box-sizing: border-box; }
+
+/* ── Light theme ── */
+[data-theme="light"] {
+  --bg:       #f0f4ff;
+  --surface:  #ffffff;
+  --surface2: #e8eeff;
+  --ink:      #0d1530;
+  --muted:    #3a4a70;
+  --border:   #c5d0e8;
+  --teal:     #007a68;
+  --cyan:     #0070a8;
+  --pink:     #b0108a;
+  --amber:    #926800;
+  --orange:   #b04000;
+  --crit:     #b0108a;
+  --high:     #b04000;
+  --med:      #926800;
+  --low:      #007a68;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
 body {
-  margin: 0;
-  color: var(--ink);
-  font-family: var(--font-body);
-  background:
-    radial-gradient(circle at top left, rgba(57,255,212,.08), transparent 22%),
-    radial-gradient(circle at top right, rgba(255,79,216,.09), transparent 24%),
-    radial-gradient(circle at bottom center, rgba(85,199,255,.10), transparent 28%),
-    linear-gradient(180deg, #050712, #09101f 55%, #050712);
-  min-height: 100vh;
-}
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(255,255,255,.015) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,.015) 1px, transparent 1px);
-  background-size: 30px 30px;
-  pointer-events: none;
-  opacity: .35;
-}
-header {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  backdrop-filter: blur(16px);
-  background: rgba(6, 8, 22, .78);
-  border-bottom: 1px solid var(--line);
-}
-.header-inner {
-  max-width: 1360px;
-  margin: 0 auto;
-  padding: 28px 22px 18px;
-}
-h1 {
-  margin: 0;
-  font-size: 30px;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-}
-.lede {
-  margin: 10px 0 0;
-  color: var(--muted);
-  max-width: 920px;
-  line-height: 1.6;
-}
-.lede strong { color: var(--teal); }
-main {
-  max-width: 1360px;
-  margin: 0 auto;
-  padding: 24px 18px 48px;
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  gap: 18px;
-}
-.card {
-  background: linear-gradient(180deg, rgba(16,25,51,.94), rgba(10,15,33,.94));
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  padding: 18px;
-  box-shadow: var(--glow);
-}
-.span-12 { grid-column: span 12; }
-.span-8 { grid-column: span 8; }
-.span-7 { grid-column: span 7; }
-.span-6 { grid-column: span 6; }
-.span-5 { grid-column: span 5; }
-.span-4 { grid-column: span 4; }
-h2 {
-  margin: 0 0 10px;
-  font-size: 18px;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-}
-h3 {
-  margin: 18px 0 8px;
+  font-family: var(--font-ui);
   font-size: 14px;
-  color: var(--cyan);
-  text-transform: uppercase;
-  letter-spacing: .08em;
+  background: var(--bg);
+  color: var(--ink);
+  height: 100vh;
+  display: flex;
+  overflow: hidden;
 }
-.subtle { color: var(--muted); font-size: 13px; line-height: 1.55; }
-.metric-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
-  margin-top: 14px;
+
+/* ── Scanlines overlay ── */
+body::after {
+  content: "";
+  position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 2px,
+    rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px
+  );
 }
-.metric {
+[data-theme="light"] body::after { opacity: 0.3; }
+
+/* ── Sidebar ── */
+#sidebar {
+  width: var(--sidebar-w);
+  background: var(--surface2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+#sidebar-header {
   padding: 14px;
-  border: 1px solid rgba(85,199,255,.18);
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(14,26,54,.9), rgba(9,18,39,.9));
+  border-bottom: 1px solid var(--border);
 }
-.metric strong {
-  display: block;
-  font-size: 28px;
+
+#sidebar-logo {
+  color: var(--teal);
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 3px;
+}
+
+#sidebar-sub {
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+#sidebar-nav {
+  flex: 1;
+  padding: 8px 0;
+  overflow-y: auto;
+}
+
+.nav-item {
+  padding: 7px 14px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+.nav-item:hover { background: rgba(57,255,212,0.05); }
+.nav-item.active {
+  background: rgba(57,255,212,0.08);
+  border-left-color: var(--teal);
+}
+.nav-item.active .nav-label { color: var(--teal); }
+.nav-icon  { font-size: 15px; color: var(--muted); width: 16px; text-align: center; }
+.nav-item.active .nav-icon { color: var(--teal); }
+.nav-label { font-size: 13px; color: var(--muted); letter-spacing: 0.3px; }
+.nav-sub   { font-size: 11px; color: var(--muted); display: block; }
+
+#sidebar-status {
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+
+#status-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+  margin-right: 5px;
+  vertical-align: middle;
+}
+#status-dot.running {
+  background: var(--teal);
+  box-shadow: 0 0 6px var(--teal);
+  animation: neon-pulse 1.5s ease-in-out infinite;
+}
+
+/* ── Main content ── */
+#main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  position: relative;
+}
+
+/* ── Sections (hidden by default) ── */
+.section { display: none; }
+.section.active { display: block; }
+
+/* ── Metric cards ── */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.metric-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+.metric-value {
+  font-size: 22px;
+  font-weight: bold;
   line-height: 1;
+}
+.metric-label {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.8px;
+  margin-top: 4px;
+}
+.metric-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* ── Two-col layout ── */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.three-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+/* ── Card panel ── */
+.panel {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+}
+.panel-title {
+  font-size: 11px;
+  color: var(--teal);
+  letter-spacing: 1px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+/* ── Tables ── */
+.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.data-table th {
+  text-align: left;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.data-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink);
+}
+.data-table tr:hover td { background: rgba(57,255,212,0.04); }
+
+/* ── Severity badges ── */
+.badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.badge-crit   { background: rgba(255,79,216,0.15); color: var(--crit); }
+.badge-high   { background: rgba(255,107,53,0.15); color: var(--high); }
+.badge-med    { background: rgba(255,215,0,0.15);  color: var(--med); }
+.badge-low    { background: rgba(57,255,212,0.15); color: var(--low); }
+.badge-info   { background: rgba(85,199,255,0.15); color: var(--cyan); }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid;
+  letter-spacing: 0.2px;
+  transition: box-shadow 0.2s;
+}
+.btn-primary {
+  background: rgba(57,255,212,0.1);
+  border-color: var(--teal);
   color: var(--teal);
 }
-.label {
-  display: block;
-  margin-bottom: 8px;
+.btn-primary:hover { box-shadow: 0 0 8px rgba(57,255,212,0.4); }
+.btn-danger {
+  background: rgba(255,79,216,0.1);
+  border-color: var(--pink);
+  color: var(--pink);
+}
+.btn-muted {
+  background: transparent;
+  border-color: var(--border);
   color: var(--muted);
-  font-size: 11px;
-  letter-spacing: .12em;
-  text-transform: uppercase;
 }
-.toolbar, .filter-grid {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.toolbar { margin-top: 14px; }
-.pill-link, .pager-btn, button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 38px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(85,199,255,.25);
-  background: rgba(85,199,255,.08);
-  color: var(--ink);
-  text-decoration: none;
-  cursor: pointer;
-}
-.pill-link:hover, .pager-btn:hover, button:hover {
-  background: rgba(85,199,255,.16);
-}
-pre {
-  margin: 0;
-  padding: 14px;
-  overflow-x: auto;
-  border-radius: 14px;
-  border: 1px solid rgba(85,199,255,.12);
-  background: rgba(5, 10, 24, .88);
-  color: #bfe5ff;
-  font: 12px/1.6 var(--font-mono);
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 10px;
-  font-size: 13px;
-}
-th, td {
-  padding: 10px 8px;
-  border-bottom: 1px solid rgba(100,128,214,.18);
-  text-align: left;
-  vertical-align: top;
-}
-th {
-  color: var(--muted);
-  font-size: 11px;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-}
-.code {
+
+/* ── Log feed ── */
+.log-feed {
   font-family: var(--font-mono);
   font-size: 12px;
+  line-height: 1.8;
+  overflow-y: auto;
+  height: 200px;
 }
-.empty {
-  margin-top: 12px;
-  padding: 14px;
-  border: 1px dashed rgba(100,128,214,.25);
-  border-radius: 14px;
-  color: var(--muted);
-}
-.tags {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.tag {
-  display: inline-flex;
-  padding: 5px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  border: 1px solid rgba(255,79,216,.25);
-  background: rgba(255,79,216,.08);
-  color: #ffc4f4;
-}
-.bar-list {
-  display: grid;
-  gap: 10px;
-  margin-top: 10px;
-}
-.bar-row {
-  display: grid;
-  grid-template-columns: minmax(160px, 1.6fr) 4fr 60px;
-  align-items: center;
-  gap: 10px;
-}
-.bar-label {
-  font-size: 12px;
-  color: var(--ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.bar-track {
-  height: 10px;
-  border-radius: 999px;
-  background: rgba(255,255,255,.06);
-  overflow: hidden;
-}
-.bar-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--pink), var(--cyan), var(--teal));
-  box-shadow: 0 0 14px rgba(85,199,255,.34);
-}
-.bar-value {
-  text-align: right;
-  color: var(--muted);
-  font-size: 12px;
-}
-.filter-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 14px;
-}
-.filter-grid input, .filter-grid select {
+.log-ts   { color: var(--muted); }
+.log-find { color: var(--teal); }
+.log-cand { color: var(--amber); }
+.log-err  { color: var(--pink); }
+.log-info { color: var(--muted); }
+
+/* ── Input / form ── */
+.field-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; display: block; font-weight: 500; }
+.field-input {
   width: 100%;
-  min-height: 42px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(100,128,214,.22);
-  background: rgba(7, 13, 29, .92);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 7px 10px;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+.field-input:focus { outline: none; border-color: var(--teal); }
+
+/* ── Domain progress strip ── */
+.domain-strip { display: flex; gap: 3px; height: 5px; border-radius: 3px; overflow: hidden; margin: 8px 0; }
+.domain-seg {
+  flex: 1;
+  background: var(--border);
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+}
+.domain-seg.done     { background: var(--teal); }
+.domain-seg.running  { background: var(--cyan); }
+.domain-seg.running::after {
+  content: "";
+  position: absolute;
+  top: 0; left: -100%; right: 100%; bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: flow 1.2s linear infinite;
+}
+@keyframes flow { to { left: 200%; right: -100%; } }
+
+/* ── Animations ── */
+@keyframes neon-pulse {
+  0%, 100% { box-shadow: 0 0 4px var(--teal), 0 0 8px var(--teal); }
+  50%       { box-shadow: 0 0 8px var(--teal), 0 0 20px var(--teal), 0 0 40px rgba(57,255,212,0.2); }
+}
+@keyframes glitch {
+  0%   { text-shadow: 2px 0 var(--pink), -2px 0 var(--teal); transform: translate(0); }
+  25%  { text-shadow: -2px 0 var(--pink), 2px 0 var(--teal);  transform: translate(-1px, 1px); }
+  50%  { text-shadow: 2px 2px var(--cyan), -2px -2px var(--pink); transform: translate(1px, -1px); }
+  75%  { text-shadow: -1px 0 var(--teal), 1px 0 var(--pink); transform: translate(-1px, 0); }
+  100% { text-shadow: none; transform: translate(0); }
+}
+.glitch { animation: glitch 0.4s steps(2) forwards; }
+
+@keyframes flicker {
+  0%, 90%, 100% { opacity: 0.6; }
+  92% { opacity: 0.15; }
+  96% { opacity: 0.3; }
+}
+.flicker { animation: flicker 8s infinite; }
+
+/* ── Chat ── */
+.chat-messages { height: 340px; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.chat-bubble { max-width: 80%; padding: 10px 13px; border-radius: 6px; font-size: 14px; line-height: 1.6; }
+.chat-bubble.user { align-self: flex-end; background: rgba(57,255,212,0.1); border: 1px solid var(--teal); color: var(--ink); }
+.chat-bubble.ai   { align-self: flex-start; background: var(--surface); border: 1px solid var(--border); color: var(--ink); }
+.chat-input-row { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--border); }
+.chat-input {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.chat-input:focus { outline: none; border-color: var(--teal); }
+
+/* ── Section headings ── */
+.section-header {
+  margin-bottom: 18px;
+}
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
   color: var(--ink);
 }
-.filter-grid input::placeholder {
-  color: #7787b0;
-}
-.db-shell {
-  margin-top: 14px;
-  padding: 14px;
-  border-radius: 16px;
-  border: 1px solid rgba(57,255,212,.18);
-  background: linear-gradient(180deg, rgba(4,10,24,.96), rgba(7,13,29,.96));
-}
-.db-shell-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-.db-shell-title {
+.section-desc {
   font-size: 13px;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  color: var(--teal);
-}
-.db-shell-meta {
-  font-size: 12px;
   color: var(--muted);
+  margin-top: 3px;
 }
-.pager {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 14px;
-  flex-wrap: wrap;
+
+/* ── D3 maps ── */
+.map-container {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
 }
-.link {
-  color: var(--cyan);
-  text-decoration: none;
-}
-.link:hover { text-decoration: underline; }
-@media (max-width: 1100px) {
-  .span-8, .span-7, .span-6, .span-5, .span-4 { grid-column: span 12; }
-  .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (max-width: 720px) {
-  .filter-grid { grid-template-columns: 1fr; }
-  .bar-row { grid-template-columns: 1fr; }
-}
+.map-container svg { width: 100%; display: block; }
+.map-container svg text { font-family: var(--font-mono); fill: var(--muted); }
+.map-container svg .node circle { stroke-width: 1.5; }
+.map-container svg .link { stroke: var(--border); stroke-opacity: 0.6; }
 </style>
 </head>
 <body>
-<header>
-  <div class="header-inner">
-    <h1>Agentic BugBounty Intel UI</h1>
-    <p class="lede">Dark console over the local target memory and the global disclosed-report archive. Read the target, scan the historical blast radius, and interrogate the disclosed corpus like a proper night-runner instead of spelunking raw JSON in the dark.</p>
+
+<!-- ── SIDEBAR ── -->
+<nav id="sidebar">
+  <div id="sidebar-header">
+    <div id="sidebar-logo">NETRUNNER</div>
+    <div id="sidebar-sub">v2 control center</div>
   </div>
-</header>
-<main>
-  <section class="card span-12">
-    <h2>Neon Overview</h2>
-    <div class="metric-row" id="overview-metrics"></div>
-    <div class="toolbar">
-      <a class="pill-link" href="/browse/target/">Browse Target Files</a>
-      <a class="pill-link" href="/browse/global/">Browse Global Files</a>
-      <a class="pill-link" href="/api/global" target="_blank" rel="noreferrer">Raw Global JSON</a>
+
+  <div id="sidebar-nav">
+    <div class="nav-item active" data-section="dashboard" onclick="showSection('dashboard')">
+      <span class="nav-icon">⬡</span>
+      <div><span class="nav-label">Dashboard</span><span class="nav-sub">overview · live feed</span></div>
+    </div>
+    <div class="nav-item" data-section="targets" onclick="showSection('targets')">
+      <span class="nav-icon">◈</span>
+      <div><span class="nav-label">Targets</span><span class="nav-sub">create · configure · run</span></div>
+    </div>
+    <div class="nav-item" data-section="runs" onclick="showSection('runs')">
+      <span class="nav-icon">▶</span>
+      <div><span class="nav-label">Runs</span><span class="nav-sub">launch · monitor · history</span></div>
+    </div>
+    <div class="nav-item" data-section="findings" onclick="showSection('findings')">
+      <span class="nav-icon">◎</span>
+      <div><span class="nav-label">Findings</span><span class="nav-sub">browse · triage · chains</span></div>
+    </div>
+    <div class="nav-item" data-section="intelligence" onclick="showSection('intelligence')">
+      <span class="nav-icon">⬢</span>
+      <div><span class="nav-label">Intelligence</span><span class="nav-sub">scope · H1 · CVE</span></div>
+    </div>
+    <div class="nav-item" data-section="history" onclick="showSection('history')">
+      <span class="nav-icon">⌛</span>
+      <div><span class="nav-label">History</span><span class="nav-sub">all runs · re-run</span></div>
+    </div>
+    <div class="nav-item" data-section="terminal" onclick="showSection('terminal')">
+      <span class="nav-icon">&gt;_</span>
+      <div><span class="nav-label">Terminal</span><span class="nav-sub">unified log stream</span></div>
+    </div>
+    <div class="nav-item" data-section="assistant" onclick="showSection('assistant')">
+      <span class="nav-icon">✦</span>
+      <div><span class="nav-label">AI Assistant</span><span class="nav-sub">chat with Claude</span></div>
+    </div>
+    <div class="nav-item" data-section="tools" onclick="showSection('tools')">
+      <span class="nav-icon">⚙</span>
+      <div><span class="nav-label">Tools</span><span class="nav-sub">all npm scripts</span></div>
+    </div>
+  </div>
+
+  <div id="sidebar-status">
+    <div><span id="status-dot"></span><span id="status-text" style="color:var(--muted)">No active run</span></div>
+    <div id="status-detail" style="color:var(--muted);margin-top:2px;"></div>
+    <div style="margin-top:8px;display:flex;gap:6px;align-items:center;">
+      <button class="btn btn-muted" onclick="toggleTheme()" id="theme-btn" style="padding:3px 7px;font-size:11px;">☾ Dark</button>
+    </div>
+  </div>
+</nav>
+
+<!-- ── MAIN CONTENT ── -->
+<main id="main">
+
+  <!-- SECTION: DASHBOARD -->
+  <section id="section-dashboard" class="section active">
+    <div class="section-header">
+      <div class="section-title">System Overview</div>
+      <div id="dash-subtitle" class="section-desc"></div>
+    </div>
+
+    <!-- Metric cards -->
+    <div class="metrics-grid" id="dash-metrics">
+      <div class="metric-card">
+        <div class="metric-value" id="m-targets" style="color:var(--pink)">0</div>
+        <div class="metric-label">TARGETS</div>
+        <div class="metric-sub" id="m-targets-sub">—</div>
+      </div>
+      <div class="metric-card" id="mc-runs" style="border-color:var(--border)">
+        <div class="metric-value" id="m-runs" style="color:var(--teal)">0</div>
+        <div class="metric-label">ACTIVE RUNS</div>
+        <div class="metric-sub" id="m-runs-sub">—</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value" id="m-findings" style="color:var(--cyan)">0</div>
+        <div class="metric-label">TOTAL FINDINGS</div>
+        <div class="metric-sub" id="m-findings-sub">—</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value" id="m-chains" style="color:var(--amber)">0</div>
+        <div class="metric-label">CHAINS</div>
+        <div class="metric-sub">across all targets</div>
+      </div>
+    </div>
+
+    <!-- Two col: live feed + chart -->
+    <div class="two-col" style="margin-bottom:16px;">
+
+      <!-- Live feed -->
+      <div class="panel">
+        <div class="panel-title">◉ LIVE FEED</div>
+        <div id="dash-target-badge" style="font-size:11px;color:var(--muted);margin-bottom:6px;">No active run</div>
+        <div class="domain-strip" id="dash-domain-strip">
+          <div class="domain-seg" title="AUTH"></div>
+          <div class="domain-seg" title="INJECT"></div>
+          <div class="domain-seg" title="CLIENT"></div>
+          <div class="domain-seg" title="ACCESS"></div>
+          <div class="domain-seg" title="MEDIA"></div>
+          <div class="domain-seg" title="INFRA"></div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);display:flex;gap:8px;margin-bottom:8px;">
+          <span>AUTH</span><span>INJECT</span><span>CLIENT</span><span>ACCESS</span><span>MEDIA</span><span>INFRA</span>
+        </div>
+        <div class="log-feed" id="dash-log-feed"></div>
+        <div style="margin-top:8px;" id="dash-launch-area">
+          <button class="btn btn-primary" onclick="showSection('targets')" style="font-size:11px;">▶ Go to Targets to launch a run</button>
+        </div>
+      </div>
+
+      <!-- Severity chart -->
+      <div class="panel">
+        <div class="panel-title">FINDINGS BY SEVERITY</div>
+        <canvas id="chart-severity" height="140"></canvas>
+        <div class="panel-title" style="margin-top:12px;">RECENT FINDINGS</div>
+        <div id="dash-recent-findings" style="font-size:11px;"></div>
+      </div>
+
+    </div>
+
+    <!-- Domain mindmap -->
+    <div class="panel" id="dash-mindmap-panel">
+      <div class="panel-title">◈ DOMAIN MINDMAP</div>
+      <div class="map-container">
+        <svg id="map-mindmap" height="220"></svg>
+      </div>
     </div>
   </section>
 
-  <section class="card span-7">
-    <h2>Target Configuration</h2>
-    <pre id="target-config">Loading...</pre>
-  </section>
+  <!-- SECTION: TARGETS -->
+  <section id="section-targets" class="section">
+    <div class="section-header">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <div class="section-title">Targets</div>
+          <div class="section-desc">Manage analysis targets</div>
+        </div>
+        <button class="btn btn-primary" onclick="openCreateTarget()">+ New Target</button>
+      </div>
+    </div>
+    <div id="targets-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;"></div>
 
-  <section class="card span-5">
-    <h2>Suggested Focus</h2>
-    <div id="skill-suggestions"></div>
-  </section>
-
-  <section class="card span-6">
-    <h2>Structured Scope</h2>
-    <div id="structured-scope"></div>
-  </section>
-
-  <section class="card span-6">
-    <h2>Local Target History</h2>
-    <div id="local-history"></div>
-  </section>
-
-  <section class="card span-4">
-    <h2>Top Programs</h2>
-    <div class="subtle">Global disclosed signal by program handle.</div>
-    <div id="top-programs-chart"></div>
-  </section>
-
-  <section class="card span-4">
-    <h2>Top Weaknesses</h2>
-    <div class="subtle">Most common weakness labels in the disclosed archive.</div>
-    <div id="top-weaknesses-chart"></div>
-  </section>
-
-  <section class="card span-4">
-    <h2>Global Pulse</h2>
-    <div id="global-summary"></div>
-  </section>
-
-  <section class="card span-12">
-    <h2>Global DB Navigator</h2>
-    <div class="subtle">Search, filter, and page through the global disclosed corpus without touching the raw database file.</div>
-
-    <div class="filter-grid">
-      <input id="search-input" type="text" placeholder="Search title, weakness, program, URL">
-      <select id="program-filter"><option value="">All programs</option></select>
-      <select id="weakness-filter"><option value="">All weaknesses</option></select>
-      <select id="severity-filter"><option value="">All severities</option></select>
+    <!-- Create target drawer -->
+    <div id="create-target-drawer" style="display:none;margin-top:20px;">
+      <div class="panel" style="max-width:480px;">
+        <div class="panel-title">NEW TARGET</div>
+        <label class="field-label">Target name (slug)</label>
+        <input class="field-input" id="ct-name" placeholder="e.g. acme-corp">
+        <label class="field-label">Program URL (optional)</label>
+        <input class="field-input" id="ct-url" placeholder="https://hackerone.com/acme">
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary" onclick="submitCreateTarget()">Create</button>
+          <button class="btn btn-muted" onclick="closeCreateTarget()">Cancel</button>
+        </div>
+        <div id="ct-result" style="margin-top:8px;font-size:11px;color:var(--teal);"></div>
+      </div>
     </div>
 
-    <div class="toolbar">
-      <button id="apply-filters" type="button">Apply Filters</button>
-      <button id="reset-filters" type="button">Reset</button>
+    <!-- Launch drawer -->
+    <div id="launch-drawer" style="display:none;margin-top:12px;">
+      <div class="panel" style="max-width:480px;">
+        <div class="panel-title">▶ LAUNCH RUN — <span id="ld-target-name"></span></div>
+        <label class="field-label">Mode</label>
+        <select class="field-input" id="ld-mode" style="width:auto;">
+          <option value="whitebox">whitebox</option>
+          <option value="blackbox">blackbox</option>
+        </select>
+        <div style="display:flex;gap:16px;margin-bottom:10px;font-size:9px;color:var(--ink);">
+          <label><input type="checkbox" id="ld-interactive"> --interactive</label>
+          <label><input type="checkbox" id="ld-hitl"> --hitl</label>
+          <label><input type="checkbox" id="ld-resume"> --resume</label>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:9px;color:var(--ink);">
+          <input type="checkbox" id="ld-intel" checked>
+          <label for="ld-intel">Auto-sync intelligence before run (H1 + CVE)</label>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary" onclick="submitLaunch()" style="font-size:10px;padding:7px 18px;">▶ Launch</button>
+          <button class="btn btn-muted" onclick="closeLaunchDrawer()">Cancel</button>
+        </div>
+        <div id="ld-result" style="margin-top:8px;font-size:11px;color:var(--teal);"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION: RUNS -->
+  <section id="section-runs" class="section">
+    <div class="section-header">
+      <div class="section-title">Runs</div>
+      <div class="section-desc">Launch, monitor, and review pipeline runs</div>
     </div>
 
-    <div class="db-shell">
-      <div class="db-shell-head">
-        <div class="db-shell-title">Disclosed Reports Query Window</div>
-        <div class="db-shell-meta" id="query-meta">Loading...</div>
+    <!-- Quick launch -->
+    <div class="panel" style="margin-bottom:16px;">
+      <div class="panel-title">QUICK LAUNCH</div>
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+        <div>
+          <label class="field-label">Target</label>
+          <select class="field-input" id="rl-target" style="width:160px;"></select>
+        </div>
+        <div>
+          <label class="field-label">Mode</label>
+          <select class="field-input" id="rl-mode" style="width:100px;">
+            <option>whitebox</option><option>blackbox</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="quickLaunch()" style="margin-bottom:10px;">▶ Start Run</button>
+        <div id="rl-result" style="font-size:11px;color:var(--teal);margin-bottom:10px;"></div>
+      </div>
+    </div>
+
+    <!-- Active runs -->
+    <div id="runs-active" style="margin-bottom:16px;"></div>
+
+    <!-- Recent runs -->
+    <div class="panel">
+      <div class="panel-title">RUN HISTORY</div>
+      <table class="data-table">
+        <thead><tr>
+          <th>Target</th><th>Started</th><th>Duration</th><th>Status</th><th>Findings</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="runs-history-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- SECTION: FINDINGS -->
+  <section id="section-findings" class="section">
+    <div class="section-header">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <div class="section-title">Findings</div>
+          <div class="section-desc">Browse confirmed findings, triage results, and chains</div>
+        </div>
+        <select class="field-input" id="fn-target-sel" style="width:160px;margin:0;" onchange="loadFindings()">
+          <option value="">— select target —</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Summary row -->
+    <div class="metrics-grid" id="fn-metrics" style="grid-template-columns:repeat(5,1fr);margin-bottom:14px;"></div>
+
+    <!-- Sub-tabs -->
+    <div style="display:flex;gap:4px;margin-bottom:14px;">
+      <button class="btn btn-primary" id="fn-tab-list"   onclick="fnTab('list')">List</button>
+      <button class="btn btn-muted"   id="fn-tab-chain"  onclick="fnTab('chain')">Chain Map</button>
+      <button class="btn btn-muted"   id="fn-tab-maps"   onclick="fnTab('maps')">Maps</button>
+      <button class="btn btn-muted"   id="fn-tab-triage" onclick="fnTab('triage')">Triage</button>
+    </div>
+
+    <div id="fn-view-list">
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+        <select class="field-input" id="fn-filter-sev" style="width:120px;margin:0;" onchange="applyFnFilters()">
+          <option value="">All severities</option>
+          <option>Critical</option><option>High</option><option>Medium</option><option>Low</option>
+        </select>
+        <input class="field-input" id="fn-filter-q" placeholder="Search..." style="width:200px;margin:0;" oninput="applyFnFilters()">
+      </div>
+      <table class="data-table">
+        <thead><tr><th>ID</th><th>Title</th><th>Severity</th><th>Component</th><th>Status</th></tr></thead>
+        <tbody id="fn-table-body"></tbody>
+      </table>
+    </div>
+
+    <div id="fn-view-chain" style="display:none;">
+      <div class="map-container" style="height:400px;">
+        <svg id="map-chains" style="width:100%;height:400px;"></svg>
+      </div>
+    </div>
+
+    <div id="fn-view-maps" style="display:none;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <div style="color:var(--teal);font-size:11px;letter-spacing:1px;margin-bottom:4px;">◈ INPUT MAP</div>
+          <div class="map-container" style="height:280px;">
+            <svg id="map-inputs" style="width:100%;height:280px;"></svg>
+          </div>
+        </div>
+        <div>
+          <div style="color:var(--pink);font-size:11px;letter-spacing:1px;margin-bottom:4px;">◉ SINK MAP</div>
+          <div class="map-container" style="height:280px;">
+            <svg id="map-sinks" style="width:100%;height:280px;"></svg>
+          </div>
+        </div>
+        <div style="grid-column:1/-1;">
+          <div style="color:var(--amber);font-size:11px;letter-spacing:1px;margin-bottom:4px;">⟶ TAINT FLOW — inputs → sinks → findings</div>
+          <div class="map-container" style="height:300px;">
+            <svg id="map-taint" style="width:100%;height:300px;"></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="fn-view-triage" style="display:none;">
+      <table class="data-table">
+        <thead><tr><th>ID</th><th>Verdict</th><th>Analyst Severity</th><th>CVSS</th><th>Summary</th></tr></thead>
+        <tbody id="fn-triage-body"></tbody>
+      </table>
+    </div>
+
+    <!-- Finding detail drawer -->
+    <div id="fn-drawer" style="display:none;position:fixed;top:0;right:0;width:460px;height:100vh;background:var(--surface2);border-left:1px solid var(--border);padding:20px;overflow-y:auto;z-index:1000;">
+      <button class="btn btn-muted" onclick="document.getElementById('fn-drawer').style.display='none'" style="float:right;">✕</button>
+      <div id="fn-drawer-content"></div>
+    </div>
+  </section>
+
+  <!-- SECTION: INTELLIGENCE -->
+  <section id="section-intelligence" class="section">
+    <div class="section-header">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <div class="section-title">Intelligence</div>
+          <div class="section-desc">Scope, history, skills, CVE intel, global DB</div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-muted" onclick="intelSync('h1')" style="font-size:11px;">Sync H1</button>
+          <button class="btn btn-muted" onclick="intelSync('bbscope')" style="font-size:11px;">Sync bbscope</button>
+          <button class="btn btn-muted" onclick="intelSync('cve')" style="font-size:11px;">Sync CVE</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:4px;margin-bottom:14px;">
+      <button class="btn btn-primary" id="it-tab-overview" onclick="intelTab('overview')">Overview</button>
+      <button class="btn btn-muted"   id="it-tab-scope"    onclick="intelTab('scope')">Scope</button>
+      <button class="btn btn-muted"   id="it-tab-history"  onclick="intelTab('history')">History</button>
+      <button class="btn btn-muted"   id="it-tab-topology" onclick="intelTab('topology')">Topology</button>
+      <button class="btn btn-muted"   id="it-tab-global"   onclick="intelTab('global')">Global DB</button>
+    </div>
+
+    <div id="it-view-overview">
+      <div class="metrics-grid" id="intel-metrics"></div>
+      <div class="two-col" style="margin-top:12px;">
+        <div class="panel">
+          <div class="panel-title">SUGGESTED FOCUS</div>
+          <div id="intel-skills" style="font-size:11px;line-height:2;"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">LOCAL TARGET HISTORY</div>
+          <table class="data-table" id="intel-hist-table">
+            <thead><tr><th>Title</th><th>Weakness</th><th>Severity</th></tr></thead>
+            <tbody id="intel-hist-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="it-view-scope" style="display:none;">
+      <table class="data-table">
+        <thead><tr><th>Asset</th><th>Type</th><th>Eligible</th><th>Max Severity</th></tr></thead>
+        <tbody id="intel-scope-body"></tbody>
+      </table>
+    </div>
+
+    <div id="it-view-history" style="display:none;">
+      <div id="intel-vuln-history"></div>
+    </div>
+
+    <div id="it-view-topology" style="display:none;">
+      <div class="map-container" style="height:420px;">
+        <svg id="map-topology" style="width:100%;height:420px;"></svg>
+      </div>
+    </div>
+
+    <div id="it-view-global" style="display:none;">
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+        <input  class="field-input" id="gq-search"   placeholder="Search reports..." style="width:200px;margin:0;">
+        <select class="field-input" id="gq-program"  style="width:140px;margin:0;"><option value="">All programs</option></select>
+        <select class="field-input" id="gq-weakness" style="width:140px;margin:0;"><option value="">All weaknesses</option></select>
+        <select class="field-input" id="gq-sev"      style="width:120px;margin:0;"><option value="">All severities</option></select>
+        <button class="btn btn-primary" onclick="loadGlobalPage(1)">Search</button>
       </div>
       <div id="global-results"></div>
-      <div class="pager">
-        <div class="db-shell-meta" id="pager-meta"></div>
-        <div style="display:flex; gap:10px;">
-          <button class="pager-btn" id="prev-page" type="button">Prev</button>
-          <button class="pager-btn" id="next-page" type="button">Next</button>
+      <div id="global-pagination" style="margin-top:10px;display:flex;gap:6px;font-size:11px;"></div>
+    </div>
+  </section>
+
+  <!-- SECTION: HISTORY -->
+  <section id="section-history" class="section">
+    <div class="section-header">
+      <div class="section-title">History</div>
+      <div class="section-desc">All past runs from the job log. Re-run any previous scan with one click.</div>
+    </div>
+
+    <div class="panel" style="margin-bottom:16px;">
+      <div class="panel-title">FINDINGS OVER TIME</div>
+      <canvas id="chart-timeline" height="100"></canvas>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">ALL RUNS</div>
+      <table class="data-table">
+        <thead><tr><th>Target</th><th>Script</th><th>Started</th><th>Duration</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="hist-table-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- SECTION: TERMINAL -->
+  <section id="section-terminal" class="section">
+    <div class="section-header">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div class="section-title">&gt;_ Terminal</div>
+          <div class="section-desc">Unified log stream from all jobs</div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <select class="field-input" id="term-job-sel" style="width:220px;margin:0;" onchange="switchTermJob()">
+            <option value="all">All jobs (live)</option>
+          </select>
+          <button class="btn btn-muted" onclick="clearTerminal()" style="font-size:11px;">Clear</button>
+          <button class="btn btn-muted" id="term-pause-btn" onclick="toggleTermPause()" style="font-size:11px;">⏸ Pause</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="background:var(--surface2);border-color:var(--border);">
+      <div id="term-feed" style="font-family:var(--font-mono);font-size:13px;line-height:1.7;height:480px;overflow-y:auto;color:var(--muted);"></div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <span style="color:var(--teal);font-size:10px;line-height:28px;">&gt;</span>
+      <input class="field-input" id="term-cmd" placeholder="run &lt;target&gt; | sync &lt;target&gt; h1 | tools:check"
+             style="margin:0;font-size:9px;" onkeydown="if(event.key==='Enter')execTermCmd()">
+      <button class="btn btn-primary" onclick="execTermCmd()" style="font-size:9px;">↵</button>
+    </div>
+  </section>
+
+  <!-- SECTION: AI ASSISTANT -->
+  <section id="section-assistant" class="section">
+    <div class="section-header">
+      <div class="section-title">✦ AI Assistant</div>
+      <div class="section-desc">Chat with Claude about findings, strategy, and next steps</div>
+    </div>
+
+    <div class="two-col" style="align-items:flex-start;">
+      <div class="panel" style="display:flex;flex-direction:column;height:500px;padding:0;">
+        <div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:11px;color:var(--teal);letter-spacing:1px;">CLAUDE // SECURITY ANALYST</span>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <select class="field-input" id="ai-target" style="width:130px;margin:0;font-size:11px;" onchange="state.currentTarget=this.value"></select>
+            <button class="btn btn-muted" onclick="clearChat()" style="font-size:11px;padding:2px 6px;">Clear</button>
+          </div>
+        </div>
+        <div class="chat-messages" id="chat-messages">
+          <div class="chat-bubble ai" style="align-self:flex-start;">
+            <div style="color:var(--teal);font-size:11px;margin-bottom:4px;">CLAUDE</div>
+            Select a target and ask me anything. I can summarize findings, suggest next investigation steps, explain vulnerabilities, or help you think through exploit chains.
+          </div>
+        </div>
+        <div class="chat-input-row">
+          <input class="chat-input" id="chat-input" placeholder="Ask Claude about your findings..." onkeydown="if(event.key==='Enter'&amp;&amp;!event.shiftKey){event.preventDefault();sendChat();}">
+          <button class="btn btn-primary" onclick="sendChat()" style="font-size:9px;">Send</button>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="panel">
+          <div class="panel-title">QUICK PROMPTS</div>
+          <div style="display:flex;flex-direction:column;gap:5px;">
+            <button class="btn btn-muted" onclick="quickChat('Summarize the current findings and their impact')" style="text-align:left;font-size:11px;">Summarize findings</button>
+            <button class="btn btn-muted" onclick="quickChat('What should I investigate next based on the current findings?')" style="text-align:left;font-size:11px;">What to investigate next?</button>
+            <button class="btn btn-muted" onclick="quickChat('Are there any obvious exploit chains between these findings?')" style="text-align:left;font-size:11px;">Identify exploit chains</button>
+            <button class="btn btn-muted" onclick="quickChat('Explain the most critical finding in detail')" style="text-align:left;font-size:11px;">Explain critical finding</button>
+            <button class="btn btn-muted" onclick="quickChat('What scope areas have not been covered yet?')" style="text-align:left;font-size:11px;">Coverage gaps?</button>
+            <button class="btn btn-muted" onclick="quickChat('Suggest CVSS scores for each finding based on context')" style="text-align:left;font-size:11px;">Review CVSS scores</button>
+          </div>
+        </div>
+        <div class="panel" style="font-size:11px;color:var(--muted);">
+          <div class="panel-title">MODEL</div>
+          <div id="ai-model-info">claude-haiku-4-5 (fast)</div>
+          <div style="margin-top:6px;font-size:11px;">Context injected automatically:<br>· Target + asset type<br>· Active run status<br>· Last 5 findings<br>· Recent log lines</div>
         </div>
       </div>
     </div>
   </section>
+
+  <!-- SECTION: TOOLS -->
+  <section id="section-tools" class="section">
+    <div class="section-header">
+      <div class="section-title">⚙ Tools</div>
+      <div class="section-desc">All npm scripts — for power users and manual overrides</div>
+    </div>
+
+    <div id="tools-groups"></div>
+  </section>
+
 </main>
+
 <script>
+// ── Global state ──────────────────────────────────────────────────────────
 const state = {
-  page: 1,
-  pageSize: 25,
-  optionsLoaded: false
+  currentSection: "dashboard",
+  currentTarget:  localStorage.getItem("nr-target") || null,
+  targets:        [],
+  activeJobs:     {},
+  sseStreams:      {},
+  charts:          {}
 };
 
-async function fetchJson(path) {
-  const response = await fetch(path);
-  if (!response.ok) {
-    throw new Error(`Failed to load ${path}`);
-  }
-  return response.json();
+// ── Section router ────────────────────────────────────────────────────────
+function showSection(name) {
+  const sec = document.getElementById(`section-${name}`);
+  const nav = document.querySelector(`[data-section="${name}"]`);
+  if (!sec || !nav) { console.warn(`showSection: unknown section "${name}"`); return; }
+  document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+  document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+  sec.classList.add("active");
+  nav.classList.add("active");
+  state.currentSection = name;
+  const loader = window[`load${name.charAt(0).toUpperCase()+name.slice(1)}`];
+  if (loader) loader();
 }
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
+// ── Theme toggle ──────────────────────────────────────────────────────────
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.dataset.theme === "dark";
+  html.dataset.theme = isDark ? "light" : "dark";
+  document.getElementById("theme-btn").textContent = isDark ? "☀ Light" : "☾ Dark";
+  localStorage.setItem("nr-theme", html.dataset.theme);
+}
+(function initTheme() {
+  const saved = localStorage.getItem("nr-theme");
+  if (saved) { document.documentElement.dataset.theme = saved; document.getElementById("theme-btn").textContent = saved === "light" ? "☀ Light" : "☾ Dark"; }
+})();
+
+// ── Fetch helpers ─────────────────────────────────────────────────────────
+async function api(url, opts) {
+  const res = await fetch(url, opts);
+  if (!res.ok) throw new Error(`${res.status} ${url}`);
+  return res.json();
 }
 
-function buildBars(items, valueKey, labelKey) {
-  if (!items.length) {
-    return '<div class="empty">No data available yet.</div>';
-  }
-  const max = Math.max(...items.map((item) => Number(item[valueKey] || 0)), 1);
-  return `<div class="bar-list">
-    ${items.map((item) => {
-      const value = Number(item[valueKey] || 0);
-      const pct = Math.max(4, Math.round((value / max) * 100));
-      return `
-        <div class="bar-row">
-          <div class="bar-label">${escapeHtml(item[labelKey] || "(unknown)")}</div>
-          <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
-          <div class="bar-value">${value}</div>
-        </div>
-      `;
-    }).join("")}
-  </div>`;
+async function apiPost(url, body) {
+  return api(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 }
 
-function renderOverview(target) {
-  const local = target.local;
-  const global = target.global;
-  const metrics = [
-    ["Structured scopes", local?.scopeSnapshot?.scopes?.length || 0],
-    ["Local history", local?.historySnapshot?.history?.length || 0],
-    ["Skill suggestions", local?.skillSnapshot?.skill_suggestions?.length || 0],
-    ["Global disclosed", global?.counts?.disclosed_reports || 0]
-  ];
-  const node = document.getElementById("overview-metrics");
-  node.innerHTML = metrics.map(([label, value]) => `
-    <div class="metric">
-      <span class="label">${label}</span>
-      <strong>${value}</strong>
-    </div>
-  `).join("");
+// ── Glitch helper ─────────────────────────────────────────────────────────
+function glitch(el) {
+  el.classList.add("glitch");
+  setTimeout(() => el.classList.remove("glitch"), 450);
 }
 
-function renderSkills(target) {
-  const items = target.local?.skillSnapshot?.skill_suggestions || [];
-  const node = document.getElementById("skill-suggestions");
-  if (!items.length) {
-    node.innerHTML = '<div class="empty">No target-specific skill suggestions yet.</div>';
-    return;
-  }
-  node.innerHTML = items.map((item) => `
-    <div style="margin-bottom:14px;">
-      <div class="tags"><span class="tag">${escapeHtml(item.skill)}</span></div>
-      <div class="subtle" style="margin-top:8px;">${escapeHtml(item.reason)}</div>
-    </div>
-  `).join("");
+// ── Count-up animation ───────────────────────────────────────────────────
+function animateCount(el, to) {
+  const from = parseInt(el.textContent) || 0;
+  if (from === to) return;
+  const obj = { v: from };
+  anime({ targets: obj, v: to, round: 1, duration: 700, easing: "easeOutExpo",
+          update() { el.textContent = obj.v; } });
 }
 
-function renderScope(target) {
-  const scopes = target.local?.scopeSnapshot?.scopes || [];
-  const node = document.getElementById("structured-scope");
-  if (!scopes.length) {
-    node.innerHTML = '<div class="empty">No structured scope snapshot available.</div>';
-    return;
-  }
-  node.innerHTML = `
-    <table>
-      <thead><tr><th>Identifier</th><th>Type</th><th>Eligible</th><th>Max Severity</th></tr></thead>
-      <tbody>
-        ${scopes.map((item) => `
-          <tr>
-            <td class="code">${escapeHtml(item.asset_identifier || item.id || "")}</td>
-            <td>${escapeHtml(item.asset_type || "")}</td>
-            <td>${item.eligible_for_submission === null ? "unknown" : item.eligible_for_submission}</td>
-            <td>${escapeHtml(item.max_severity || "")}</td>
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>
-  `;
+// ── HTML escape helper ────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
-function renderLocalHistory(target) {
-  const history = target.local?.historySnapshot?.history || [];
-  const node = document.getElementById("local-history");
-  if (!history.length) {
-    node.innerHTML = '<div class="empty">No local target history stored for this program.</div>';
-    return;
-  }
-  node.innerHTML = `
-    <table>
-      <thead><tr><th>Title</th><th>Weakness</th><th>Severity</th><th>Created</th></tr></thead>
-      <tbody>
-        ${history.slice(0, 15).map((item) => `
-          <tr>
-            <td>${escapeHtml(item.title || "")}</td>
-            <td>${escapeHtml(item.weakness || item.cwe || "")}</td>
-            <td>${escapeHtml(item.severity_rating || "")}</td>
-            <td>${escapeHtml(item.created_at || "")}</td>
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>
-  `;
+// ── Badge helper ──────────────────────────────────────────────────────────
+function severityBadge(s) {
+  const map = { Critical: "crit", High: "high", Medium: "med", Low: "low" };
+  const cls = map[s] || "info";
+  return `<span class="badge badge-${cls}">${escHtml(s?.toUpperCase() || "?")}</span>`;
 }
 
-function renderGlobalSummary(target) {
-  const global = target.global || {};
-  document.getElementById("top-programs-chart").innerHTML = buildBars(
-    (global.summaries?.top_programs || []).slice(0, 10),
-    "disclosed_count",
-    "program_name"
-  );
-  document.getElementById("top-weaknesses-chart").innerHTML = buildBars(
-    (global.summaries?.top_weaknesses || []).slice(0, 10),
-    "count",
-    "weakness"
-  );
-  document.getElementById("global-summary").innerHTML = `
-    <div class="metric-row">
-      <div class="metric"><span class="label">Disclosed Reports</span><strong>${global.counts?.disclosed_reports || 0}</strong></div>
-      <div class="metric"><span class="label">Programs Indexed</span><strong>${global.counts?.programs || 0}</strong></div>
-      <div class="metric"><span class="label">Weakness Labels</span><strong>${global.counts?.weaknesses || 0}</strong></div>
-    </div>
-    <div class="subtle" style="margin-top:12px;">Last sync: ${escapeHtml(global.meta?.synced_at || "unknown")}</div>
-  `;
-}
-
-function populateOptions(queryPayload) {
-  if (state.optionsLoaded) {
-    return;
-  }
-  const programFilter = document.getElementById("program-filter");
-  const weaknessFilter = document.getElementById("weakness-filter");
-  const severityFilter = document.getElementById("severity-filter");
-
-  for (const program of queryPayload.options?.programs || []) {
-    programFilter.insertAdjacentHTML("beforeend", `<option value="${escapeHtml(program)}">${escapeHtml(program)}</option>`);
-  }
-  for (const weakness of queryPayload.options?.weaknesses || []) {
-    weaknessFilter.insertAdjacentHTML("beforeend", `<option value="${escapeHtml(weakness)}">${escapeHtml(weakness)}</option>`);
-  }
-  for (const severity of queryPayload.options?.severities || []) {
-    severityFilter.insertAdjacentHTML("beforeend", `<option value="${escapeHtml(severity)}">${escapeHtml(severity)}</option>`);
-  }
-  state.optionsLoaded = true;
-}
-
-async function loadGlobalPage() {
-  const q = document.getElementById("search-input").value.trim();
-  const program = document.getElementById("program-filter").value;
-  const weakness = document.getElementById("weakness-filter").value;
-  const severity = document.getElementById("severity-filter").value;
-  const query = new URLSearchParams({
-    page: String(state.page),
-    page_size: String(state.pageSize)
-  });
-  if (q) query.set("q", q);
-  if (program) query.set("program", program);
-  if (weakness) query.set("weakness", weakness);
-  if (severity) query.set("severity", severity);
-
-  const payload = await fetchJson(`/api/global/query?${query.toString()}`);
-  populateOptions(payload);
-
-  const node = document.getElementById("global-results");
-  if (!payload.items.length) {
-    node.innerHTML = '<div class="empty">No disclosed reports match the current filters.</div>';
+// ── Sidebar status update ─────────────────────────────────────────────────
+function updateSidebarStatus(jobs) {
+  const running = jobs.filter(j => j.status === "running");
+  const dot     = document.getElementById("status-dot");
+  const txt     = document.getElementById("status-text");
+  const detail  = document.getElementById("status-detail");
+  if (running.length > 0) {
+    dot.className = "running";
+    txt.style.color = "var(--teal)";
+    txt.textContent = `${running.length} run${running.length > 1 ? "s" : ""} active`;
+    detail.textContent = running[0].target + " · " + (running[0].script || "");
   } else {
-    node.innerHTML = `
-      <table>
-        <thead>
-          <tr>
-            <th>Program</th>
-            <th>Title</th>
-            <th>Weakness</th>
-            <th>Severity</th>
-            <th>Disclosed</th>
-            <th>Link</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${payload.items.map((item) => `
-            <tr>
-              <td class="code">${escapeHtml(item.program_handle || item.program_name || "")}</td>
-              <td>${escapeHtml(item.title || "")}</td>
-              <td>${escapeHtml(item.weakness || item.cwe || "")}</td>
-              <td>${escapeHtml(item.severity_rating || "")}</td>
-              <td>${escapeHtml(item.disclosed_at || item.created_at || "")}</td>
-              <td>${item.url ? `<a class="link" href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">Open</a>` : ""}</td>
-            </tr>
-          `).join("")}
-        </tbody>
-      </table>
-    `;
+    dot.className = "";
+    txt.style.color = "var(--muted)";
+    txt.textContent = "No active run";
+    detail.textContent = "";
+  }
+}
+
+// ── Boot sequence ────────────────────────────────────────────────────────
+(async function boot() {
+  // Stagger nav items
+  anime({ targets: ".nav-item", opacity: [0, 1], translateX: [-16, 0],
+          delay: anime.stagger(60), easing: "easeOutExpo", duration: 500 });
+
+  // Load targets for state
+  try { state.targets = await api("/api/targets"); } catch { state.targets = []; }
+
+  // Poll job status every 5s to update sidebar
+  async function pollJobs() {
+    try {
+      const jobs = await api("/api/jobs");
+      updateSidebarStatus(jobs);
+    } catch {}
+    setTimeout(pollJobs, 5000);
+  }
+  pollJobs();
+
+  // Load initial section
+  showSection("dashboard");
+})();
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────
+let dashSseCancel = null;
+
+async function loadDashboard() {
+  // Typed.js subtitle
+  if (window.Typed && !window._typedDash) {
+    window._typedDash = new Typed("#dash-subtitle", {
+      strings: ["SYSTEM ONLINE · ALL AGENTS READY", "BUG BOUNTY CONTROL CENTER v2"],
+      typeSpeed: 40, backSpeed: 20, loop: true, backDelay: 3000
+    });
   }
 
-  document.getElementById("query-meta").textContent = `${payload.total} matching reports`;
-  document.getElementById("pager-meta").textContent = `Page ${payload.page} / ${payload.total_pages}`;
-  document.getElementById("prev-page").disabled = payload.page <= 1;
-  document.getElementById("next-page").disabled = payload.page >= payload.total_pages;
+  // Fetch targets + jobs
+  const [targets, jobs] = await Promise.all([
+    api("/api/targets").catch(() => []),
+    api("/api/jobs").catch(() => [])
+  ]);
+
+  // Metrics
+  animateCount(document.getElementById("m-targets"), targets.length);
+  const running = jobs.filter(j => j.status === "running");
+  animateCount(document.getElementById("m-runs"), running.length);
+
+  const mcRuns = document.getElementById("mc-runs");
+  if (running.length > 0) {
+    mcRuns.style.borderColor = "var(--teal)";
+    glitch(document.getElementById("m-runs"));
+  } else {
+    mcRuns.style.borderColor = "var(--border)";
+  }
+
+  document.getElementById("m-targets-sub").textContent =
+    targets.filter(t => t.default_mode === "whitebox").length + " whitebox";
+  document.getElementById("m-runs-sub").textContent =
+    running.length > 0 ? running[0].target : "idle";
+
+  // Sum findings across all targets
+  const totalFindings = targets.reduce((s, t) => s + (t.finding_count || 0), 0);
+  animateCount(document.getElementById("m-findings"), totalFindings);
+  document.getElementById("m-findings-sub").textContent = totalFindings > 0 ? "see Findings section" : "none yet";
+
+  // Live feed — attach to first running job
+  if (dashSseCancel) dashSseCancel();
+  const activeJob = running[0];
+  if (activeJob) {
+    document.getElementById("dash-target-badge").textContent =
+      `▶ ${activeJob.target} · ${activeJob.id}`;
+    dashSseCancel = startSseFeed(activeJob.id, "dash-log-feed", (evt) => {
+      updateDomainStrip(evt, "dash-domain-strip");
+    });
+  } else {
+    document.getElementById("dash-target-badge").textContent = "No active run";
+  }
+
+  // Severity chart
+  const allFindings = [];
+  for (const t of targets) {
+    if (t.finding_count > 0) {
+      try {
+        const data = await api(`/api/findings/${t.name}`);
+        if (data.bundle?.findings) allFindings.push(...data.bundle.findings);
+      } catch {}
+    }
+  }
+  renderSeverityChart(allFindings);
+  renderRecentFindings(allFindings.slice(-5).reverse());
+
+  // Domain mindmap
+  renderMindmap(allFindings, targets);
 }
 
-async function bootstrap() {
-  const target = await fetchJson("/api/target");
-  document.getElementById("target-config").textContent = JSON.stringify(target.config, null, 2);
-  renderOverview(target);
-  renderSkills(target);
-  renderScope(target);
-  renderLocalHistory(target);
-  renderGlobalSummary(target);
+// Render log lines into a feed div
+// eslint-disable-next-line no-control-regex
+const ANSI_RE = /\x1b\[[0-9;]*[mGKHFABCDJsu]|\x1b\][^\x07]*\x07/g;
+function stripAnsi(s) { return s.replace(ANSI_RE, ""); }
 
-  document.getElementById("apply-filters").addEventListener("click", async () => {
-    state.page = 1;
-    await loadGlobalPage();
-  });
-  document.getElementById("reset-filters").addEventListener("click", async () => {
-    document.getElementById("search-input").value = "";
-    document.getElementById("program-filter").value = "";
-    document.getElementById("weakness-filter").value = "";
-    document.getElementById("severity-filter").value = "";
-    state.page = 1;
-    await loadGlobalPage();
-  });
-  document.getElementById("prev-page").addEventListener("click", async () => {
-    if (state.page > 1) {
-      state.page -= 1;
-      await loadGlobalPage();
-    }
-  });
-  document.getElementById("next-page").addEventListener("click", async () => {
-    state.page += 1;
-    await loadGlobalPage();
-  });
-  document.getElementById("search-input").addEventListener("keydown", async (event) => {
-    if (event.key === "Enter") {
-      state.page = 1;
-      await loadGlobalPage();
-    }
-  });
-
-  await loadGlobalPage();
+function appendLogLine(feedId, line) {
+  const feed = document.getElementById(feedId);
+  if (!feed) return;
+  const clean = stripAnsi(line);
+  const div = document.createElement("div");
+  const ts  = new Date().toTimeString().slice(0, 8);
+  let cls   = "log-info";
+  if (clean.includes("✓") || clean.toLowerCase().includes("confirmed")) cls = "log-find";
+  else if (clean.toLowerCase().includes("candidate")) cls = "log-cand";
+  else if (clean.toLowerCase().includes("error")) cls = "log-err";
+  div.innerHTML = `<span class="log-ts">[${ts}]</span> <span class="${cls}">${escHtml(clean)}</span>`;
+  feed.appendChild(div);
+  if (feed.children.length > 60) feed.removeChild(feed.firstChild);
+  feed.scrollTop = feed.scrollHeight;
 }
 
-bootstrap().catch((error) => {
-  document.body.insertAdjacentHTML("beforeend", `<div class="card span-12" style="margin:20px;">${escapeHtml(error.message)}</div>`);
-});
+// Start SSE stream for a job, returns cancel fn
+function startSseFeed(jobId, feedId, onEvt) {
+  const es = new EventSource(`/api/stream/${jobId}`);
+  es.onmessage = (e) => {
+    const evt = JSON.parse(e.data);
+    if (evt.type === "log" && evt.line) appendLogLine(feedId, evt.line);
+    if (onEvt) onEvt(evt);
+  };
+  es.onerror = () => es.close();
+  state.sseStreams[jobId] = es;
+  return () => { es.close(); delete state.sseStreams[jobId]; };
+}
+
+// Update domain progress strip based on log content
+function updateDomainStrip(evt, stripId) {
+  const strip  = document.getElementById(stripId);
+  if (!strip) return;
+  const segs   = strip.querySelectorAll(".domain-seg");
+  const domains = ["AUTH","INJECT","CLIENT","ACCESS","MEDIA","INFRA"];
+  if (evt.type === "status" && evt.domain) {
+    const idx = domains.indexOf(evt.domain);
+    if (idx >= 0) {
+      segs.forEach(s => s.classList.remove("running"));
+      for (let i = 0; i < idx; i++) segs[i].classList.add("done");
+      segs[idx].classList.add("running");
+    }
+  }
+  if (evt.type === "done") segs.forEach(s => { s.classList.remove("running"); s.classList.add("done"); });
+}
+
+function renderSeverityChart(findings) {
+  const counts = { Critical: 0, High: 0, Medium: 0, Low: 0, Informative: 0 };
+  for (const f of findings) {
+    const s = f.severity_claimed;
+    if (counts[s] !== undefined) counts[s]++;
+  }
+  const ctx = document.getElementById("chart-severity");
+  if (!ctx || !window.Chart) return;
+  if (state.charts.severity) state.charts.severity.destroy();
+  state.charts.severity = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: Object.keys(counts),
+      datasets: [{
+        data: Object.values(counts),
+        backgroundColor: ["rgba(255,79,216,0.6)","rgba(255,107,53,0.6)","rgba(255,215,0,0.6)","rgba(57,255,212,0.6)","rgba(85,199,255,0.6)"],
+        borderColor:     ["#ff4fd8","#ff6b35","#ffd700","#39ffd4","#55c7ff"],
+        borderWidth: 1
+      }]
+    },
+    options: { indexAxis: "y", plugins: { legend: { display: false } }, scales: {
+      x: { ticks: { color: "#8ea0cb" }, grid: { color: "#1e3a5f" } },
+      y: { ticks: { color: "#8ea0cb" }, grid: { display: false } }
+    }}
+  });
+}
+
+function renderRecentFindings(findings) {
+  const el = document.getElementById("dash-recent-findings");
+  if (!el) return;
+  el.innerHTML = findings.length === 0
+    ? `<div style="color:var(--muted)">No findings yet</div>`
+    : findings.map(f => `
+      <div style="display:flex;justify-content:space-between;padding:4px 6px;background:var(--surface);border-radius:3px;margin-bottom:3px;">
+        <span style="color:var(--ink)">${escHtml(f.finding_title || "")}</span>
+        ${severityBadge(f.severity_claimed)}
+      </div>`).join("");
+}
+
+// ── D3 Domain Mindmap ─────────────────────────────────────────────────────
+function renderMindmap(findings, targets) {
+  const svg   = d3.select("#map-mindmap");
+  svg.selectAll("*").remove();
+  const W = svg.node().parentElement.clientWidth || 700;
+  const H = 220;
+  svg.attr("viewBox", `0 0 ${W} ${H}`);
+
+  const domains = ["AUTH","INJECT","CLIENT","ACCESS","MEDIA","INFRA"];
+  const colors  = ["#55c7ff","#ff4fd8","#ffd700","#39ffd4","#ff6b35","#8ea0cb"];
+  const cx = W / 2, cy = H / 2, R = 80;
+
+  // Center node
+  svg.append("circle").attr("cx",cx).attr("cy",cy).attr("r",18)
+    .attr("fill","var(--surface)").attr("stroke","var(--teal)").attr("stroke-width",1.5);
+  svg.append("text").attr("x",cx).attr("y",cy+3).attr("text-anchor","middle")
+    .attr("font-size",7).attr("fill","var(--teal)").text("TARGET");
+
+  domains.forEach((d, i) => {
+    const angle  = (i / domains.length) * Math.PI * 2 - Math.PI / 2;
+    const dx     = cx + R * Math.cos(angle);
+    const dy     = cy + R * Math.sin(angle);
+    const count  = findings.filter(f => f.domain === d || (f.vulnerability_class || "").includes(d.toLowerCase())).length;
+    const color  = colors[i];
+
+    // Link
+    svg.append("line").attr("x1",cx).attr("y1",cy).attr("x2",dx).attr("y2",dy)
+      .attr("stroke",color).attr("stroke-opacity",0.4).attr("stroke-width",1);
+
+    // Domain node
+    const g = svg.append("g").attr("transform",`translate(${dx},${dy})`)
+      .style("opacity",0).style("transform",`translate(${dx}px,${dy}px) scale(0)`);
+    g.append("circle").attr("r",12).attr("fill","var(--surface)").attr("stroke",color).attr("stroke-width",1.5);
+    g.append("text").attr("y",3).attr("text-anchor","middle").attr("font-size",5.5).attr("fill",color).text(d);
+    if (count > 0) {
+      g.append("circle").attr("cx",10).attr("cy",-10).attr("r",6).attr("fill",color).attr("fill-opacity",0.9);
+      g.append("text").attr("x",10).attr("y",-8).attr("text-anchor","middle").attr("font-size",6).attr("fill","#060816").text(count);
+    }
+
+    // Animate in with delay
+    anime({ targets: g.node(), opacity: [0,1], scale: [0,1], delay: i * 120,
+            duration: 600, easing: "easeOutBack" });
+  });
+}
+
+// ── TARGETS ───────────────────────────────────────────────────────────────
+let launchTarget = null;
+
+async function loadTargets() {
+  const targets = await api("/api/targets").catch(() => []);
+  state.targets = targets;
+  const list = document.getElementById("targets-list");
+  list.innerHTML = targets.length === 0
+    ? `<div style="color:var(--muted);font-size:9px;">No targets found. Create one with "+ New Target".</div>`
+    : targets.map(t => `
+      <div class="panel" style="border-color:${t.status==="running"?"var(--teal)":"var(--border)"}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+          <div>
+            <div style="font-size:11px;font-weight:bold;color:var(--ink)">${escHtml(t.name)}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">${escHtml(t.asset_type)} · ${escHtml(t.default_mode)}</div>
+          </div>
+          <span class="badge ${t.status==="running"?"badge-low":"badge-info"}">${escHtml(t.status.toUpperCase())}</span>
+        </div>
+        <div style="display:flex;gap:6px;font-size:11px;color:var(--muted);margin-bottom:10px;">
+          <span>${t.finding_count} finding${t.finding_count!==1?"s":""}</span>
+          ${t.last_run ? `<span>· last: ${new Date(t.last_run).toLocaleDateString()}</span>` : ""}
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-primary" onclick="openLaunchDrawer('${escHtml(t.name)}','${escHtml(t.default_mode)}')">▶ Launch</button>
+          <button class="btn btn-muted" onclick="showSection('findings');state.currentTarget='${escHtml(t.name)}';loadFindings()">◎ Findings</button>
+          <button class="btn btn-danger" onclick="resetTarget('${escHtml(t.name)}')">↺ Reset</button>
+        </div>
+      </div>`).join("");
+}
+
+function openCreateTarget() {
+  document.getElementById("create-target-drawer").style.display = "block";
+}
+function closeCreateTarget() {
+  document.getElementById("create-target-drawer").style.display = "none";
+}
+
+async function submitCreateTarget() {
+  const name = document.getElementById("ct-name").value.trim();
+  const url  = document.getElementById("ct-url").value.trim();
+  if (!name) return;
+  try {
+    const r = await apiPost("/api/targets/create", { name, program_url: url });
+    document.getElementById("ct-result").textContent = `Job started: ${r.job_id}. Check Terminal for progress.`;
+    setTimeout(loadTargets, 2000);
+  } catch (e) {
+    document.getElementById("ct-result").textContent = `Error: ${e.message}`;
+    document.getElementById("ct-result").style.color = "var(--pink)";
+  }
+}
+
+function openLaunchDrawer(target, mode) {
+  launchTarget = target;
+  document.getElementById("ld-target-name").textContent = target;
+  document.getElementById("ld-mode").value = mode || "whitebox";
+  document.getElementById("ld-interactive").checked = false;
+  document.getElementById("ld-hitl").checked = false;
+  document.getElementById("ld-resume").checked = false;
+  document.getElementById("ld-intel").checked = true;
+  document.getElementById("ld-result").textContent = "";
+  document.getElementById("launch-drawer").style.display = "block";
+  document.getElementById("launch-drawer").scrollIntoView({ behavior: "smooth" });
+}
+function closeLaunchDrawer() {
+  document.getElementById("launch-drawer").style.display = "none";
+  launchTarget = null;
+}
+
+async function submitLaunch() {
+  if (!launchTarget) return;
+  const body = {
+    target:      launchTarget,
+    mode:        document.getElementById("ld-mode").value,
+    interactive: document.getElementById("ld-interactive").checked,
+    hitl:        document.getElementById("ld-hitl").checked,
+    resume:      document.getElementById("ld-resume").checked,
+    skipIntel:   !document.getElementById("ld-intel").checked
+  };
+  try {
+    const r = await apiPost("/api/run/start", body);
+    document.getElementById("ld-result").textContent = `✓ Run started. Job ID: ${r.job_id}`;
+    closeLaunchDrawer();
+    showSection("runs");
+  } catch (e) {
+    document.getElementById("ld-result").textContent = `Error: ${e.message}`;
+    document.getElementById("ld-result").style.color = "var(--pink)";
+  }
+}
+
+async function resetTarget(name) {
+  if (!confirm(`Reset target "${name}"? This will wipe findings and logs.`)) return;
+  await apiPost(`/api/targets/${name}/reset`, {});
+  setTimeout(loadTargets, 1500);
+}
+
+// ── RUNS ──────────────────────────────────────────────────────────────────
+async function loadRuns() {
+  const sel = document.getElementById("rl-target");
+  const targets = await api("/api/targets").catch(() => []);
+  sel.innerHTML = targets.map(t => `<option value="${escHtml(t.name)}">${escHtml(t.name)}</option>`).join("");
+
+  const jobs = await api("/api/jobs").catch(() => []);
+  updateSidebarStatus(jobs);
+
+  const active   = jobs.filter(j => j.status === "running");
+  const activeEl = document.getElementById("runs-active");
+  if (active.length === 0) {
+    activeEl.innerHTML = `<div style="color:var(--muted);font-size:11px;margin-bottom:8px;">No active runs.</div>`;
+  } else {
+    activeEl.innerHTML = active.map(job => `
+      <div class="panel" style="border-color:var(--teal);margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div>
+            <span class="panel-title" style="color:var(--teal)">▶ ${escHtml(job.target)}</span>
+            <span style="font-size:11px;color:var(--muted);margin-left:8px;">${escHtml(job.id)}</span>
+          </div>
+          <button class="btn btn-danger" onclick="stopRun('${escHtml(job.id)}')">■ Stop</button>
+        </div>
+        <div class="domain-strip" id="strip-${escHtml(job.id)}">
+          <div class="domain-seg"></div><div class="domain-seg"></div><div class="domain-seg"></div>
+          <div class="domain-seg"></div><div class="domain-seg"></div><div class="domain-seg"></div>
+        </div>
+        <div class="log-feed" id="feed-${escHtml(job.id)}" style="height:150px;margin-top:8px;"></div>
+      </div>`).join("");
+
+    for (const job of active) {
+      startSseFeed(job.id, `feed-${job.id}`, (evt) => updateDomainStrip(evt, `strip-${job.id}`));
+    }
+  }
+
+  const tbody = document.getElementById("runs-history-body");
+  const hist  = jobs.filter(j => j.status !== "running");
+  tbody.innerHTML = hist.length === 0
+    ? `<tr><td colspan="6" style="color:var(--muted);text-align:center;">No completed runs yet</td></tr>`
+    : hist.map(j => {
+        const started  = j.started ? new Date(j.started).toLocaleString() : "—";
+        const dur      = j.started && j.finished
+          ? Math.round((new Date(j.finished) - new Date(j.started)) / 1000) + "s" : "—";
+        const statusBadge = j.status === "done"
+          ? `<span class="badge badge-low">DONE</span>`
+          : j.status === "error"
+          ? `<span class="badge badge-crit">ERROR</span>`
+          : `<span class="badge badge-info">${escHtml(j.status.toUpperCase())}</span>`;
+        return `<tr>
+          <td>${escHtml(j.target)}</td>
+          <td>${escHtml(started)}</td>
+          <td>${escHtml(dur)}</td>
+          <td>${statusBadge}</td>
+          <td>—</td>
+          <td><button class="btn btn-muted" onclick="openLaunchDrawer('${escHtml(j.target)}','whitebox')" style="font-size:11px;padding:2px 6px;">Re-run</button></td>
+        </tr>`;
+      }).join("");
+}
+
+async function quickLaunch() {
+  const target = document.getElementById("rl-target").value;
+  const mode   = document.getElementById("rl-mode").value;
+  if (!target) return;
+  try {
+    const r = await apiPost("/api/run/start", { target, mode, skipIntel: false });
+    document.getElementById("rl-result").textContent = `✓ Started: ${r.job_id}`;
+    setTimeout(loadRuns, 1500);
+  } catch (e) {
+    document.getElementById("rl-result").textContent = `Error: ${e.message}`;
+    document.getElementById("rl-result").style.color = "var(--pink)";
+  }
+}
+
+async function stopRun(jobId) {
+  if (!confirm("Stop this run?")) return;
+  await apiPost(`/api/run/stop/${jobId}`, {});
+  setTimeout(loadRuns, 800);
+}
+
+// ── FINDINGS ──────────────────────────────────────────────────────────────
+let fnAllFindings = [];
+let fnTriageResults = [];
+
+function fnTab(tab) {
+  ["list","chain","maps","triage"].forEach(t => {
+    document.getElementById(`fn-view-${t}`).style.display = t === tab ? "block" : "none";
+    document.getElementById(`fn-tab-${t}`).className = `btn ${t===tab?"btn-primary":"btn-muted"}`;
+  });
+  if (tab === "chain" && fnAllFindings.length > 0) renderChainMap(fnAllFindings);
+  if (tab === "maps") { renderInputMap(); renderSinkMap(); renderTaintMap(); }
+}
+
+async function loadFindings() {
+  const sel = document.getElementById("fn-target-sel");
+  if (sel.options.length <= 1) {
+    const targets = await api("/api/targets").catch(() => []);
+    targets.forEach(t => {
+      const o = document.createElement("option");
+      o.value = t.name; o.textContent = t.name;
+      sel.appendChild(o);
+    });
+  }
+  const target = sel.value || state.currentTarget;
+  if (!target) return;
+  const data = await api(`/api/findings/${target}`).catch(() => ({}));
+  fnAllFindings   = data.bundle?.findings || [];
+  fnTriageResults = data.triage?.results  || [];
+  const sev = { Critical:0, High:0, Medium:0, Low:0, Informative:0 };
+  fnAllFindings.forEach(f => { if (sev[f.severity_claimed] !== undefined) sev[f.severity_claimed]++; });
+  const metrics = document.getElementById("fn-metrics");
+  metrics.innerHTML = Object.entries(sev).map(([s, n]) => `
+    <div class="metric-card" style="padding:8px 10px;">
+      <div class="metric-value" style="font-size:18px;color:var(--${s==="Critical"?"crit":s==="High"?"high":s==="Medium"?"med":s==="Low"?"low":"cyan"})">${n}</div>
+      <div class="metric-label" style="font-size:11px;">${s.toUpperCase()}</div>
+    </div>`).join("") + `
+    <div class="metric-card" style="padding:8px 10px;">
+      <div class="metric-value" style="font-size:18px;color:var(--amber)">${fnAllFindings.filter(f=>f.chain_meta).length}</div>
+      <div class="metric-label" style="font-size:11px;">CHAINS</div>
+    </div>`;
+  applyFnFilters();
+  renderTriageTable();
+}
+
+function applyFnFilters() {
+  const sev = document.getElementById("fn-filter-sev").value;
+  const q   = document.getElementById("fn-filter-q").value.toLowerCase();
+  const filtered = fnAllFindings.filter(f => {
+    if (sev && f.severity_claimed !== sev) return false;
+    if (q && !JSON.stringify(f).toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const tbody = document.getElementById("fn-table-body");
+  tbody.innerHTML = filtered.length === 0
+    ? `<tr><td colspan="5" style="color:var(--muted);text-align:center;">No findings match filters</td></tr>`
+    : filtered.map(f => `<tr onclick="showFindingDetail('${escHtml(f.report_id)}');" style="cursor:pointer;">
+        <td style="color:var(--cyan)">${escHtml(f.report_id)}</td>
+        <td>${escHtml(f.finding_title || "")}</td>
+        <td>${severityBadge(f.severity_claimed)}</td>
+        <td style="font-size:11px;color:var(--muted)">${escHtml((f.affected_component||"").slice(0,40))}</td>
+        <td><span class="badge badge-low">${escHtml(f.confirmation_status||"confirmed")}</span></td>
+      </tr>`).join("");
+}
+
+function renderTriageTable() {
+  const tbody = document.getElementById("fn-triage-body");
+  tbody.innerHTML = fnTriageResults.length === 0
+    ? `<tr><td colspan="5" style="color:var(--muted);text-align:center;">No triage results</td></tr>`
+    : fnTriageResults.map(r => `<tr>
+        <td style="color:var(--cyan)">${escHtml(r.report_id)}</td>
+        <td><span class="badge badge-low">${escHtml(r.triage_verdict)}</span></td>
+        <td>${escHtml(r.analyst_severity || "—")}</td>
+        <td>${r.analyst_cvss_score ?? "—"}</td>
+        <td style="font-size:11px;color:var(--muted)">${escHtml((r.triage_summary||"").slice(0,80))}</td>
+      </tr>`).join("");
+}
+
+function showFindingDetail(id) {
+  const f = fnAllFindings.find(f => f.report_id === id);
+  if (!f) return;
+  const drawer = document.getElementById("fn-drawer");
+  document.getElementById("fn-drawer-content").innerHTML = `
+    <div style="margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:bold;margin-bottom:4px;">${escHtml(f.finding_title||"")}</div>
+      ${severityBadge(f.severity_claimed)}
+      <span style="font-size:11px;color:var(--muted);margin-left:8px;">${escHtml(f.report_id)}</span>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">COMPONENT</div>
+    <div style="font-size:9px;color:var(--cyan);margin-bottom:12px;">${escHtml(f.affected_component||"")}</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">SUMMARY</div>
+    <div style="font-size:9px;line-height:1.6;margin-bottom:12px;">${escHtml(f.summary||"")}</div>
+    ${f.poc_code ? `
+    <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">POC</div>
+    <pre style="background:var(--surface);border:1px solid var(--border);padding:8px;border-radius:4px;font-size:11px;overflow-x:auto;white-space:pre-wrap;">${escHtml(f.poc_code)}</pre>` : ""}
+    ${f.chain_meta ? `
+    <div style="font-size:11px;color:var(--amber);margin-top:12px;">⛓ CHAIN: ${escHtml(f.chain_meta.chain_label||"")}</div>` : ""}
+    <div style="display:flex;gap:6px;margin-top:14px;">
+      <button class="btn btn-muted" onclick="runScript('reports:render')" style="font-size:11px;">Render H1 Report</button>
+    </div>`;
+  drawer.style.display = "block";
+}
+
+// ── D3 Chain Map ───────────────────────────────────────────────────────────
+function renderChainMap(findings) {
+  const svg  = d3.select("#map-chains");
+  svg.selectAll("*").remove();
+  const W    = svg.node().parentElement.clientWidth || 700;
+  const H    = 400;
+  svg.attr("viewBox", `0 0 ${W} ${H}`);
+  const nodes = findings.map(f => ({
+    id:       f.report_id,
+    label:    (f.finding_title || f.report_id).slice(0, 22),
+    severity: f.severity_claimed,
+    r:        Math.max(8, (f.cvss_score_claimed || 5) * 1.5),
+    chain:    f.chain_meta?.chain_id || null
+  }));
+  const links = [];
+  findings.forEach(f => {
+    if (f.chain_meta?.participating_ids) {
+      f.chain_meta.participating_ids.forEach(tid => {
+        if (tid !== f.report_id) links.push({ source: f.report_id, target: tid });
+      });
+    }
+  });
+  const colorMap = { Critical:"#ff4fd8", High:"#ff6b35", Medium:"#ffd700", Low:"#39ffd4" };
+  const sim = d3.forceSimulation(nodes)
+    .force("link",   d3.forceLink(links).id(d => d.id).distance(90))
+    .force("charge", d3.forceManyBody().strength(-120))
+    .force("center", d3.forceCenter(W/2, H/2))
+    .force("collide", d3.forceCollide(d => d.r + 8));
+  const link = svg.append("g").selectAll("line")
+    .data(links).enter().append("line")
+    .attr("stroke", "var(--teal)").attr("stroke-opacity", 0.5).attr("stroke-width", 1.5);
+  const node = svg.append("g").selectAll("g")
+    .data(nodes).enter().append("g")
+    .call(d3.drag()
+      .on("start", (e, d) => { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx=d.x; d.fy=d.y; })
+      .on("drag",  (e, d) => { d.fx=e.x; d.fy=e.y; })
+      .on("end",   (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
+  node.append("circle")
+    .attr("r", d => d.r)
+    .attr("fill", d => (colorMap[d.severity] || "#8ea0cb") + "33")
+    .attr("stroke", d => colorMap[d.severity] || "#8ea0cb")
+    .attr("stroke-width", 1.5);
+  node.append("text")
+    .attr("text-anchor", "middle").attr("dy", "0.35em")
+    .attr("font-size", 6).attr("fill", "var(--ink)")
+    .text(d => d.label);
+  sim.on("tick", () => {
+    link.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+        .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+    node.attr("transform", d => `translate(${d.x},${d.y})`);
+  });
+  function pulseLinks() {
+    link.transition().duration(1500).attr("stroke-opacity", 0.15)
+      .transition().duration(1500).attr("stroke-opacity", 0.55)
+      .on("end", pulseLinks);
+  }
+  pulseLinks();
+}
+
+async function runScript(script) {
+  await apiPost("/api/script/run", { script });
+  showSection("terminal");
+}
+
+// ── D3 Input Map ──────────────────────────────────────────────────────────
+async function renderInputMap() {
+  const svg = d3.select("#map-inputs");
+  svg.selectAll("*").remove();
+  const W = svg.node().parentElement.clientWidth || 560;
+  const H = 280;
+  svg.attr("viewBox", `0 0 ${W} ${H}`);
+  const target = document.getElementById("fn-target-sel").value || state.currentTarget;
+  if (!target) return;
+  let surface = {};
+  try { surface = await (await fetch(`/browse/targets/${encodeURIComponent(target)}/surface_map.json`)).json(); } catch {}
+  const CAT = { query:"#39ffd4", body:"#ff4fd8", path:"#55c7ff", header:"#a78bfa", cookie:"#ffd700", ipc:"#ff6b35", external:"#8ea0cb" };
+  const cats = { query:new Set(), body:new Set(), path:new Set(), header:new Set(), cookie:new Set(), ipc:new Set(), external:new Set() };
+  (surface.entry_points || []).forEach(ep => {
+    const method = (ep.method || "GET").toUpperCase();
+    const qp = ep.query_params || ep.params || (method === "GET" ? ep.parameters : []) || [];
+    (Array.isArray(qp) ? qp : Object.keys(qp)).forEach(p => cats.query.add(String(p).slice(0,22)));
+    if (["POST","PUT","PATCH"].includes(method)) {
+      const bp = ep.body_params || ep.body_schema || ep.params || ep.parameters || [];
+      (Array.isArray(bp) ? bp : Object.keys(bp)).forEach(p => cats.body.add(String(p).slice(0,22)));
+    }
+    const pathStr = ep.path || ep.url || "";
+    const pathMatches = pathStr.match(/[:{\<]([a-zA-Z_][a-zA-Z0-9_]*)[}\>]?/g) || [];
+    pathMatches.forEach(m => cats.path.add(m.replace(/[:{}/<>]/g,"").slice(0,22)));
+    const hdrs = ep.headers || ep.request_headers || [];
+    (Array.isArray(hdrs) ? hdrs : Object.keys(hdrs)).forEach(h => cats.header.add(String(h).slice(0,22)));
+    const cks = ep.cookies || [];
+    (Array.isArray(cks) ? cks : Object.keys(cks)).forEach(c => cats.cookie.add(String(c).slice(0,22)));
+  });
+  (surface.headers || []).forEach(h => cats.header.add(String(h.name||h).slice(0,22)));
+  (surface.cookies || []).forEach(c => cats.cookie.add(String(c.name||c).slice(0,22)));
+  (surface.ipc_channels || []).forEach(e => cats.ipc.add((e.channel||e.name||"?").slice(0,22)));
+  (surface.external_comms || []).forEach(e => cats.external.add((e.url||e.host||"?").slice(0,30)));
+  const nodes = [{ id:"_root", label: target.slice(0,14), root:true }];
+  const links = [];
+  let li = 0;
+  Object.entries(cats).forEach(([cat, items]) => {
+    if (items.size === 0) return;
+    const gid = `_g_${cat}`;
+    nodes.push({ id:gid, label:cat.toUpperCase(), grp:true, color:CAT[cat] });
+    links.push({ source:"_root", target:gid });
+    [...items].slice(0,16).forEach(label => {
+      const nid = `lf_${li++}`;
+      nodes.push({ id:nid, label, color:CAT[cat] });
+      links.push({ source:gid, target:nid });
+    });
+  });
+  if (nodes.length <= 1) {
+    svg.append("text").attr("x",W/2).attr("y",H/2).attr("text-anchor","middle")
+      .attr("fill","#8ea0cb").attr("font-size","9px").text("No surface map — run Stage 1 first");
+    return;
+  }
+  const g = svg.append("g");
+  svg.call(d3.zoom().scaleExtent([0.3,3]).on("zoom", e => g.attr("transform", e.transform)));
+  const link = g.selectAll("line").data(links).join("line")
+    .attr("stroke","#1e3a5f").attr("stroke-width",1).attr("stroke-opacity",0.7);
+  const node = g.selectAll("g.n").data(nodes).join("g").attr("class","n")
+    .call(d3.drag()
+      .on("start",(e,d)=>{ if(!e.active) sim.alphaTarget(0.3).restart(); d.fx=d.x; d.fy=d.y; })
+      .on("drag", (e,d)=>{ d.fx=e.x; d.fy=e.y; })
+      .on("end",  (e,d)=>{ if(!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
+  node.append("circle")
+    .attr("r", d => d.root?12 : d.grp?8 : 4)
+    .attr("fill", d => d.root?"var(--teal)" : (d.color||"#8ea0cb")+"44")
+    .attr("stroke", d => d.root?"var(--teal)" : d.color||"#8ea0cb")
+    .attr("stroke-width",1.5);
+  node.append("text")
+    .attr("dy", d => d.root?-16 : d.grp?-12 : -8)
+    .attr("text-anchor","middle")
+    .attr("font-size", d => d.root?"9px" : d.grp?"8px" : "6px")
+    .attr("fill", d => d.root?"var(--teal)" : d.color||"#8ea0cb")
+    .text(d => d.label);
+  const sim = d3.forceSimulation(nodes)
+    .force("link",   d3.forceLink(links).id(d=>d.id).distance(d => d.source.root?80:50))
+    .force("charge", d3.forceManyBody().strength(-90))
+    .force("center", d3.forceCenter(W/2, H/2))
+    .on("tick", () => {
+      link.attr("x1",d=>d.source.x).attr("y1",d=>d.source.y)
+          .attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
+      node.attr("transform",d=>`translate(${d.x},${d.y})`);
+    });
+}
+
+// ── D3 Sink Map ───────────────────────────────────────────────────────────
+async function renderSinkMap() {
+  const svg = d3.select("#map-sinks");
+  svg.selectAll("*").remove();
+  const W = svg.node().parentElement.clientWidth || 560;
+  const H = 280;
+  svg.attr("viewBox", `0 0 ${W} ${H}`);
+  const target = document.getElementById("fn-target-sel").value || state.currentTarget;
+  if (!target) return;
+  let candidates = [];
+  try {
+    const raw = await (await fetch(`/browse/targets/${encodeURIComponent(target)}/findings/unconfirmed/candidates.json`)).json();
+    candidates = Array.isArray(raw) ? raw : (raw.candidates || []);
+  } catch {}
+  const sinkColors = { sqli:"#ff4fd8", xss:"#ff6b35", ssti:"#ffd700", ssrf:"#55c7ff", rce:"#ff4fd8", idor:"#a78bfa", lfi:"#ff6b35", other:"#8ea0cb" };
+  const normType = t => { const l=(t||"").toLowerCase(); return Object.keys(sinkColors).find(k=>l.includes(k))||"other"; };
+  const groups = {};
+  candidates.slice(0,80).forEach((c,i) => {
+    const t = normType(c.vuln_type || c.type || "");
+    if (!groups[t]) groups[t] = [];
+    groups[t].push({ id:`snk_${i}`, label:(c.title||c.location||t).slice(0,20), type:t, confirmed:!!c.confirmed });
+  });
+  const nodes = [{ id:"_root", label:"SINKS", root:true }];
+  const links = [];
+  Object.entries(groups).forEach(([type, items]) => {
+    const gid = `_sg_${type}`;
+    nodes.push({ id:gid, label:type.toUpperCase(), grp:true, color:sinkColors[type] });
+    links.push({ source:"_root", target:gid });
+    items.slice(0,12).forEach(m => {
+      nodes.push({ ...m, color:sinkColors[m.type] });
+      links.push({ source:gid, target:m.id });
+    });
+  });
+  if (nodes.length <= 1) {
+    svg.append("text").attr("x",W/2).attr("y",H/2).attr("text-anchor","middle")
+      .attr("fill","#8ea0cb").attr("font-size","9px").text("No candidates — run Stage 2 first");
+    return;
+  }
+  const g = svg.append("g");
+  svg.call(d3.zoom().scaleExtent([0.3,3]).on("zoom", e => g.attr("transform", e.transform)));
+  const link = g.selectAll("line").data(links).join("line")
+    .attr("stroke","#1e3a5f").attr("stroke-width",1).attr("stroke-opacity",0.7);
+  const node = g.selectAll("g.n").data(nodes).join("g").attr("class","n")
+    .call(d3.drag()
+      .on("start",(e,d)=>{ if(!e.active) sim.alphaTarget(0.3).restart(); d.fx=d.x; d.fy=d.y; })
+      .on("drag", (e,d)=>{ d.fx=e.x; d.fy=e.y; })
+      .on("end",  (e,d)=>{ if(!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
+  node.append("circle")
+    .attr("r", d => d.root?12 : d.grp?8 : d.confirmed?6:4)
+    .attr("fill", d => d.root?"#ff4fd8" : (d.color||"#8ea0cb")+"44")
+    .attr("stroke", d => d.confirmed?"var(--teal)" : d.root?"#ff4fd8" : d.color||"#8ea0cb")
+    .attr("stroke-width", d => d.confirmed?2:1.5);
+  node.append("text")
+    .attr("dy", d => d.root?-16 : d.grp?-12 : -8)
+    .attr("text-anchor","middle")
+    .attr("font-size", d => d.root?"9px" : d.grp?"8px" : "6px")
+    .attr("fill", d => d.root?"#ff4fd8" : d.color||"#8ea0cb")
+    .text(d => d.label);
+  const sim = d3.forceSimulation(nodes)
+    .force("link",   d3.forceLink(links).id(d=>d.id).distance(d => d.source.root?80:50))
+    .force("charge", d3.forceManyBody().strength(-90))
+    .force("center", d3.forceCenter(W/2, H/2))
+    .on("tick", () => {
+      link.attr("x1",d=>d.source.x).attr("y1",d=>d.source.y)
+          .attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
+      node.attr("transform",d=>`translate(${d.x},${d.y})`);
+    });
+}
+
+// ── D3 Taint Flow Map ─────────────────────────────────────────────────────
+async function renderTaintMap() {
+  const svg = d3.select("#map-taint");
+  svg.selectAll("*").remove();
+  const W = svg.node().parentElement.clientWidth || 900;
+  const H = 300;
+  svg.attr("viewBox", `0 0 ${W} ${H}`);
+  const target = document.getElementById("fn-target-sel").value || state.currentTarget;
+  if (!target) return;
+  let surface = {}, candidates = [];
+  try { surface = await (await fetch(`/browse/targets/${encodeURIComponent(target)}/surface_map.json`)).json(); } catch {}
+  try {
+    const raw = await (await fetch(`/browse/targets/${encodeURIComponent(target)}/findings/unconfirmed/candidates.json`)).json();
+    candidates = Array.isArray(raw) ? raw : (raw.candidates||[]);
+  } catch {}
+  const sinkColors = { sqli:"#ff4fd8",xss:"#ff6b35",ssti:"#ffd700",ssrf:"#55c7ff",rce:"#ff4fd8",idor:"#a78bfa",other:"#8ea0cb" };
+  const normType = t => { const l=(t||"").toLowerCase(); return Object.keys(sinkColors).find(k=>l.includes(k))||"other"; };
+  const eps       = (surface.entry_points||[]).slice(0,8).map((e,i)=>({ id:`inp_${i}`, col:0, label:(e.path||e.url||"?").slice(-20), color:"#39ffd4", ep:e }));
+  const sinkNodes = candidates.slice(0,8).map((c,i)=>({ id:`snk_${i}`, col:1, label:(c.title||c.location||"?").slice(0,20), color:sinkColors[normType(c.vuln_type||"")], cand:c }));
+  const finNodes  = (fnAllFindings||[]).slice(0,6).map((f,i)=>({ id:`fin_${i}`, col:2, label:(f.finding_title||f.report_id||"?").slice(0,20), color:"#ff4fd8" }));
+  const xPos  = [W*0.12, W*0.50, W*0.88];
+  const nodes = [...eps, ...sinkNodes, ...finNodes];
+  [eps, sinkNodes, finNodes].forEach((col, ci) => {
+    col.forEach((n,i)=>{ n.fx=xPos[ci]; n.fy=H*(0.15+0.7*(i+0.5)/Math.max(col.length,1)); });
+  });
+  const links = [];
+  eps.forEach(ep => {
+    let matched = false;
+    sinkNodes.forEach(s => {
+      const loc = (s.cand.endpoint_path||s.cand.location||"").toLowerCase();
+      const epPath = (ep.ep.path||ep.ep.url||"").toLowerCase().split("/")[1]||"";
+      if (epPath && loc.includes(epPath)) { links.push({ source:ep.id, target:s.id, color:ep.color }); matched=true; }
+    });
+    if (!matched) sinkNodes.slice(0,2).forEach(s=>links.push({ source:ep.id, target:s.id, color:ep.color }));
+  });
+  sinkNodes.forEach(s => finNodes.slice(0,2).forEach(f=>links.push({ source:s.id, target:f.id, color:s.color })));
+  if (nodes.length === 0) {
+    svg.append("text").attr("x",W/2).attr("y",H/2).attr("text-anchor","middle")
+      .attr("fill","#8ea0cb").attr("font-size","9px").text("No data for taint flow — run pipeline first");
+    return;
+  }
+  [["INPUTS","#39ffd4"],["SINKS","#ff6b35"],["FINDINGS","#ff4fd8"]].forEach(([lbl,col],i)=>{
+    svg.append("text").attr("x",xPos[i]).attr("y",12).attr("text-anchor","middle")
+      .attr("font-size","7px").attr("fill",col).attr("letter-spacing","2px").text(lbl);
+  });
+  const nodeById = Object.fromEntries(nodes.map(n=>[n.id,n]));
+  svg.selectAll("path.fl").data(links).join("path").attr("class","fl")
+    .attr("fill","none")
+    .attr("stroke", d=>d.color||"#1e3a5f")
+    .attr("stroke-width",1)
+    .attr("stroke-opacity",0.45)
+    .attr("d", d => {
+      const s=nodeById[d.source], t=nodeById[d.target];
+      if(!s||!t) return "";
+      const mx=(s.fx+t.fx)/2;
+      return `M${s.fx},${s.fy} C${mx},${s.fy} ${mx},${t.fy} ${t.fx},${t.fy}`;
+    });
+  const g = svg.append("g");
+  const node = g.selectAll("g.tn").data(nodes).join("g").attr("class","tn");
+  node.append("circle")
+    .attr("cx",d=>d.fx).attr("cy",d=>d.fy).attr("r",5)
+    .attr("fill",d=>(d.color||"#8ea0cb")+"44")
+    .attr("stroke",d=>d.color||"#8ea0cb").attr("stroke-width",1.5);
+  node.append("text")
+    .attr("x",d=>d.col===0?d.fx-9 : d.col===2?d.fx+9 : d.fx)
+    .attr("y",d=>d.fy).attr("dy","0.35em")
+    .attr("text-anchor",d=>d.col===0?"end":d.col===2?"start":"middle")
+    .attr("font-size","6px").attr("fill",d=>d.color||"#8ea0cb")
+    .text(d=>d.label);
+}
+
+// ── INTELLIGENCE ─────────────────────────────────────────────────────────
+function intelTab(tab) {
+  ["overview","scope","history","topology","global"].forEach(t => {
+    document.getElementById(`it-view-${t}`).style.display = t===tab?"block":"none";
+    document.getElementById(`it-tab-${t}`).className = `btn ${t===tab?"btn-primary":"btn-muted"}`;
+  });
+  if (tab==="topology") renderTopologyMap();
+  if (tab==="global") loadGlobalPage(1);
+}
+
+async function loadIntelligence() {
+  const data = await api("/api/target").catch(() => ({}));
+  const local  = data.local  || {};
+  const globalData = data.global || {};
+
+  const m = document.getElementById("intel-metrics");
+  const scopes   = local.scopeSnapshot?.scopes?.length    || 0;
+  const histCount= local.historySnapshot?.history?.length || 0;
+  const skills   = local.skillSnapshot?.skill_suggestions?.length || 0;
+  const disclosed= globalData.counts?.disclosed_reports || 0;
+  m.innerHTML = [
+    ["SCOPES",     scopes,    "var(--teal)"],
+    ["LOCAL HIST", histCount, "var(--cyan)"],
+    ["SKILLS",     skills,    "var(--pink)"],
+    ["DISCLOSED",  disclosed, "var(--amber)"]
+  ].map(([label, val, color]) => `
+    <div class="metric-card">
+      <div class="metric-value" style="color:${color}">${val.toLocaleString()}</div>
+      <div class="metric-label">${label}</div>
+    </div>`).join("");
+
+  const skillEl = document.getElementById("intel-skills");
+  const sk = local.skillSnapshot?.skill_suggestions || [];
+  skillEl.innerHTML = sk.length === 0
+    ? `<span style="color:var(--muted)">No suggestions — run calibration:extract-skills</span>`
+    : sk.slice(0,10).map(s => `<div style="color:var(--ink)">◈ ${escHtml(s.title||s)}</div>`).join("");
+
+  const hist = local.historySnapshot?.history?.slice(0,15) || [];
+  document.getElementById("intel-hist-body").innerHTML = hist.length === 0
+    ? `<tr><td colspan="3" style="color:var(--muted)">No history</td></tr>`
+    : hist.map(h => `<tr>
+        <td style="font-size:11px;">${escHtml((h.title||"").slice(0,50))}</td>
+        <td style="font-size:11px;color:var(--muted)">${escHtml(h.weakness||"—")}</td>
+        <td>${severityBadge(h.severity_rating)}</td>
+      </tr>`).join("");
+
+  const scps = local.scopeSnapshot?.scopes || [];
+  document.getElementById("intel-scope-body").innerHTML = scps.length === 0
+    ? `<tr><td colspan="4" style="color:var(--muted)">No scope data</td></tr>`
+    : scps.slice(0, 50).map(s => `<tr>
+        <td style="color:var(--cyan);font-size:11px;">${escHtml(s.asset_identifier||"")}</td>
+        <td style="font-size:11px;">${escHtml(s.asset_type||"")}</td>
+        <td><span class="badge ${s.eligible_for_submission?"badge-low":"badge-high"}">${s.eligible_for_submission?"YES":"NO"}</span></td>
+        <td style="font-size:11px;">${escHtml(s.max_severity||"—")}</td>
+      </tr>`).join("");
+}
+
+async function intelSync(type) {
+  const scriptMap = { h1: "h1:sync", bbscope: "bbscope:sync", cve: "cve:sync" };
+  await apiPost("/api/script/run", { script: scriptMap[type], target: state.currentTarget });
+  showSection("terminal");
+}
+
+let globalPage = 1;
+let globalOptionsLoaded = false;
+
+async function loadGlobalPage(page) {
+  globalPage = page;
+  const q   = document.getElementById("gq-search")?.value   || "";
+  const prg = document.getElementById("gq-program")?.value  || "";
+  const wk  = document.getElementById("gq-weakness")?.value || "";
+  const sev = document.getElementById("gq-sev")?.value      || "";
+  const url = `/api/global/query?q=${encodeURIComponent(q)}&program=${encodeURIComponent(prg)}&weakness=${encodeURIComponent(wk)}&severity=${encodeURIComponent(sev)}&page=${page}&page_size=25`;
+  const data = await api(url).catch(() => ({}));
+
+  if (!globalOptionsLoaded && data.options) {
+    const pSel = document.getElementById("gq-program");
+    const wSel = document.getElementById("gq-weakness");
+    (data.options.programs||[]).forEach(p => { const o=document.createElement("option"); o.value=p; o.text=p; pSel.appendChild(o); });
+    (data.options.weaknesses||[]).forEach(w => { const o=document.createElement("option"); o.value=w; o.text=w; wSel.appendChild(o); });
+    globalOptionsLoaded = true;
+  }
+
+  const items = data.items || [];
+  document.getElementById("global-results").innerHTML = items.length === 0
+    ? `<div style="color:var(--muted);font-size:11px;">No results</div>`
+    : `<table class="data-table"><thead><tr><th>Program</th><th>Title</th><th>Weakness</th><th>Severity</th><th>Date</th></tr></thead><tbody>`
+    + items.map(r => `<tr>
+        <td style="font-size:11px;color:var(--muted)">${escHtml(r.program_handle||"")}</td>
+        <td style="font-size:11px;"><a href="${escHtml(r.url||"")}" target="_blank" style="color:var(--cyan);text-decoration:none;">${escHtml((r.title||"").slice(0,60))}</a></td>
+        <td style="font-size:11px;color:var(--muted)">${escHtml(r.weakness||"—")}</td>
+        <td>${severityBadge(r.severity_rating)}</td>
+        <td style="font-size:11px;color:var(--muted)">${escHtml((r.disclosed_at||"").slice(0,10))}</td>
+      </tr>`).join("")
+    + `</tbody></table>`;
+
+  const total = data.total_pages || 1;
+  const pag   = document.getElementById("global-pagination");
+  pag.innerHTML = "";
+  if (page > 1) { const b=document.createElement("button"); b.className="btn btn-muted"; b.textContent="← Prev"; b.onclick=()=>loadGlobalPage(page-1); pag.appendChild(b); }
+  const info = document.createElement("span"); info.style.color="var(--muted)"; info.style.lineHeight="26px";
+  info.textContent = `Page ${page} / ${total} (${data.total||0} total)`; pag.appendChild(info);
+  if (page < total) { const b=document.createElement("button"); b.className="btn btn-muted"; b.textContent="Next →"; b.onclick=()=>loadGlobalPage(page+1); pag.appendChild(b); }
+}
+
+// ── D3 Attack Surface Topology ────────────────────────────────────────────
+async function renderTopologyMap() {
+  const svg = d3.select("#map-topology");
+  svg.selectAll("*").remove();
+  const W = svg.node().parentElement.clientWidth || 700;
+  const H = 420;
+  svg.attr("viewBox", `0 0 ${W} ${H}`);
+
+  let surfaceData = null;
+  try {
+    const target = state.currentTarget;
+    if (target) {
+      const r = await fetch(`/browse/targets/${encodeURIComponent(target)}/surface_map.json`);
+      if (r.ok) surfaceData = await r.json();
+    }
+  } catch {}
+
+  const entryPoints = surfaceData?.entry_points || [];
+  const ipc         = surfaceData?.ipc_channels  || [];
+  const ext         = surfaceData?.external_comms || [];
+
+  const root = { name: state.currentTarget||"target", children: [
+    { name: "Entry Points", color: "#39ffd4", children: entryPoints.slice(0,12).map(e => ({ name: (e.path||e).slice(0,30), leaf: true })) },
+    { name: "IPC",          color: "#55c7ff", children: ipc.slice(0,8).map(e  => ({ name: (e.channel||e).slice(0,30), leaf: true })) },
+    { name: "External",     color: "#ff6b35", children: ext.slice(0,8).map(e  => ({ name: (e.url||e).slice(0,30), leaf: true })) }
+  ]};
+
+  const layout = d3.tree().size([2 * Math.PI, Math.min(W,H)/2 - 60]);
+  const hroot  = d3.hierarchy(root);
+  layout(hroot);
+
+  const cx = W/2, cy = H/2;
+  const radialPoint = (x, y) => [(y)*Math.cos(x - Math.PI/2), (y)*Math.sin(x - Math.PI/2)];
+
+  const g = svg.append("g").attr("transform", `translate(${cx},${cy})`);
+
+  g.append("g").selectAll("path")
+    .data(hroot.links()).enter().append("path")
+    .attr("fill","none").attr("stroke","var(--border)").attr("stroke-opacity",0.5).attr("stroke-width",1)
+    .attr("d", d3.linkRadial().angle(d => d.x).radius(d => d.y));
+
+  const node = g.append("g").selectAll("g")
+    .data(hroot.descendants()).enter().append("g")
+    .attr("transform", d => { const [nx,ny] = radialPoint(d.x, d.y); return `translate(${nx},${ny})`; })
+    .style("opacity", 0);
+
+  node.append("circle").attr("r", d => d.depth===0?10:d.depth===1?6:4)
+    .attr("fill", d => d.depth===0?"var(--surface)":d.data.color||"var(--border)")
+    .attr("stroke", d => d.depth===0?"var(--teal)":"transparent")
+    .attr("fill-opacity", d => d.data.leaf ? 0.5 : 0.8);
+
+  node.filter(d => d.depth <= 1).append("text")
+    .attr("dy","0.31em")
+    .attr("x", d => d.x < Math.PI === !d.children ? 8 : -8)
+    .attr("text-anchor", d => d.x < Math.PI === !d.children ? "start" : "end")
+    .attr("font-size", d => d.depth===0?8:7)
+    .attr("fill", d => d.depth===0?"var(--teal)":"var(--muted)")
+    .text(d => d.data.name);
+
+  node.each(function(d) {
+    anime({ targets: this, opacity: [0,1], translateX: [10,0], delay: d.depth*120,
+            duration: 500, easing: "easeOutExpo" });
+  });
+}
+
+// ── HISTORY ───────────────────────────────────────────────────────────────
+async function loadHistory() {
+  const jobs = await api("/api/history").catch(() => []);
+
+  const byDay = {};
+  jobs.filter(j => j.status==="done" && j.started).forEach(j => {
+    const day = j.started.slice(0,10);
+    byDay[day] = (byDay[day]||0) + 1;
+  });
+  const days = Object.keys(byDay).sort().slice(-30);
+  const ctx  = document.getElementById("chart-timeline");
+  if (ctx && window.Chart) {
+    if (state.charts.timeline) state.charts.timeline.destroy();
+    state.charts.timeline = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: days,
+        datasets: [{ label: "Runs", data: days.map(d => byDay[d]||0),
+          borderColor: "#39ffd4", backgroundColor: "rgba(57,255,212,0.1)",
+          tension: 0.4, fill: true, pointRadius: 3 }]
+      },
+      options: { plugins:{legend:{display:false}}, scales:{
+        x:{ticks:{color:"#8ea0cb",font:{size:8}},grid:{color:"#1e3a5f"}},
+        y:{ticks:{color:"#8ea0cb",font:{size:8},precision:0},grid:{color:"#1e3a5f"}}
+      }}
+    });
+  }
+
+  const tbody = document.getElementById("hist-table-body");
+  tbody.innerHTML = jobs.length === 0
+    ? `<tr><td colspan="6" style="color:var(--muted);text-align:center;">No run history yet</td></tr>`
+    : jobs.map(j => {
+        const started = j.started ? new Date(j.started).toLocaleString() : "—";
+        const dur = j.started && j.finished
+          ? Math.round((new Date(j.finished)-new Date(j.started))/1000)+"s" : "—";
+        const badge = j.status==="done"?`<span class="badge badge-low">DONE</span>`
+          :j.status==="error"?`<span class="badge badge-crit">ERROR</span>`
+          :j.status==="running"?`<span class="badge badge-info">RUNNING</span>`
+          :`<span class="badge badge-high">${escHtml(j.status.toUpperCase())}</span>`;
+        return `<tr>
+          <td style="color:var(--cyan)">${escHtml(j.target)}</td>
+          <td style="font-size:11px;color:var(--muted)">${escHtml(j.script||"")} ${escHtml((j.args||[]).join(" "))}</td>
+          <td style="font-size:11px;">${escHtml(started)}</td>
+          <td style="font-size:11px;">${escHtml(dur)}</td>
+          <td>${badge}</td>
+          <td>
+            <button class="btn btn-muted" onclick="openLaunchDrawer('${escHtml(j.target)}','whitebox');showSection('targets')" style="font-size:11px;padding:2px 6px;">Re-run</button>
+            <button class="btn btn-muted" onclick="viewJobLog('${escHtml(j.id)}')" style="font-size:11px;padding:2px 6px;">Log</button>
+          </td>
+        </tr>`;
+      }).join("");
+}
+
+function viewJobLog(jobId) {
+  state.currentJobId = jobId;
+  showSection("terminal");
+}
+
+// ── TERMINAL ──────────────────────────────────────────────────────────────
+let termPaused = false;
+let termSseCancels = [];
+
+function appendTermLine(line, cls) {
+  if (termPaused) return;
+  const feed = document.getElementById("term-feed");
+  if (!feed) return;
+  const clean = stripAnsi(line);
+  const div = document.createElement("div");
+  const ts  = new Date().toTimeString().slice(0,8);
+  const c   = cls||classifyLog(clean);
+  div.innerHTML = `<span style="color:var(--muted)">[${ts}]</span> <span class="${c}">${escHtml(clean)}</span>`;
+  feed.appendChild(div);
+  if (feed.children.length > 300) feed.removeChild(feed.firstChild);
+  feed.scrollTop = feed.scrollHeight;
+}
+
+function classifyLog(line) {
+  const l = line.toLowerCase();
+  if (l.includes("✓")||l.includes("confirmed")) return "log-find";
+  if (l.includes("candidate"))                   return "log-cand";
+  if (l.includes("error")||l.includes("failed")) return "log-err";
+  return "log-info";
+}
+
+function clearTerminal() {
+  const f = document.getElementById("term-feed");
+  if (f) f.innerHTML = "";
+}
+
+function toggleTermPause() {
+  termPaused = !termPaused;
+  document.getElementById("term-pause-btn").textContent = termPaused ? "▶ Resume" : "⏸ Pause";
+}
+
+async function loadTerminal() {
+  const jobs = await api("/api/jobs").catch(() => []);
+  const sel = document.getElementById("term-job-sel");
+  sel.innerHTML = `<option value="all">All jobs (live)</option>`;
+  jobs.slice(0,20).forEach(j => {
+    const o = document.createElement("option");
+    o.value = j.id;
+    o.textContent = `${j.target} · ${j.status} · ${j.id.slice(-8)}`;
+    sel.appendChild(o);
+  });
+  termSseCancels.forEach(c => c());
+  termSseCancels = [];
+  jobs.filter(j => j.status==="running").forEach(j => {
+    const es = new EventSource(`/api/stream/${j.id}`);
+    es.onmessage = e => {
+      try {
+        const evt = JSON.parse(e.data);
+        if (evt.line) appendTermLine(`[${j.target}] ${evt.line}`);
+      } catch {}
+    };
+    termSseCancels.push(() => es.close());
+  });
+  if (state.currentJobId) {
+    document.getElementById("term-job-sel").value = state.currentJobId;
+    switchTermJob();
+    state.currentJobId = null;
+  }
+}
+
+function switchTermJob() {
+  const jobId = document.getElementById("term-job-sel").value;
+  if (jobId === "all") { loadTerminal(); return; }
+  clearTerminal();
+  termSseCancels.forEach(c => c());
+  termSseCancels = [];
+  const es = new EventSource(`/api/stream/${jobId}`);
+  es.onmessage = e => {
+    try {
+      const evt = JSON.parse(e.data);
+      if (evt.line) appendTermLine(evt.line);
+      if (evt.type === "done") es.close();
+    } catch {}
+  };
+  termSseCancels.push(() => es.close());
+}
+
+const CMD_MAP = {
+  run:       (args) => apiPost("/api/run/start",   { target: args[0], mode: "whitebox" }),
+  stop:      (args) => apiPost(`/api/run/stop/${encodeURIComponent(args[0])}`, {}),
+  sync:      (args) => apiPost("/api/script/run",  { script: `${args[1]||"h1"}:sync`, target: args[0] }),
+  "tools:check": () => apiPost("/api/script/run",  { script: "tools:check" }),
+  "h1:bootstrap":()=> apiPost("/api/script/run",  { script: "h1:bootstrap" }),
+};
+
+async function execTermCmd() {
+  const raw   = document.getElementById("term-cmd").value.trim();
+  if (!raw) return;
+  appendTermLine(`> ${raw}`, "log-find");
+  document.getElementById("term-cmd").value = "";
+  const parts = raw.split(/\s+/);
+  const cmd   = CMD_MAP[parts[0]] || CMD_MAP[raw];
+  if (cmd) {
+    try { const r = await cmd(parts.slice(1)); appendTermLine(JSON.stringify(r), "log-info"); }
+    catch(e) { appendTermLine(`error: ${e.message}`, "log-err"); }
+  } else {
+    try { await apiPost("/api/script/run", { script: raw }); appendTermLine(`queued: npm run ${raw}`, "log-info"); }
+    catch(e) { appendTermLine(`unknown command: ${raw}`, "log-err"); }
+  }
+}
+
+// ── AI ASSISTANT ──────────────────────────────────────────────────────────
+async function loadAssistant() {
+  const sel = document.getElementById("ai-target");
+  if (sel.options.length === 0) {
+    const targets = await api("/api/targets").catch(() => []);
+    targets.forEach(t => {
+      const o = document.createElement("option");
+      o.value = t.name; o.textContent = t.name;
+      sel.appendChild(o);
+    });
+    if (state.currentTarget) sel.value = state.currentTarget;
+  }
+}
+
+function clearChat() {
+  const el = document.getElementById("chat-messages");
+  el.innerHTML = `<div class="chat-bubble ai"><div style="color:var(--teal);font-size:11px;margin-bottom:4px;">CLAUDE</div>Chat cleared. Ask me anything about your findings.</div>`;
+}
+
+function quickChat(msg) {
+  document.getElementById("chat-input").value = msg;
+  sendChat();
+}
+
+async function sendChat() {
+  const input   = document.getElementById("chat-input");
+  const message = input.value.trim();
+  if (!message) return;
+  input.value = "";
+  const target   = document.getElementById("ai-target")?.value || state.currentTarget;
+  const messages = document.getElementById("chat-messages");
+  const userBubble = document.createElement("div");
+  userBubble.className = "chat-bubble user";
+  userBubble.textContent = message;
+  messages.appendChild(userBubble);
+  messages.scrollTop = messages.scrollHeight;
+  const aiBubble = document.createElement("div");
+  aiBubble.className = "chat-bubble ai";
+  aiBubble.innerHTML = `<div style="color:var(--teal);font-size:11px;margin-bottom:4px;">CLAUDE</div><span id="ai-cursor">▋</span>`;
+  messages.appendChild(aiBubble);
+  messages.scrollTop = messages.scrollHeight;
+  let text = "";
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, target })
+    });
+    if (!res.ok) throw new Error(`${res.status}`);
+    const reader = res.body.getReader();
+    const dec    = new TextDecoder();
+    let buf      = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        try {
+          const evt = JSON.parse(line.slice(6));
+          if (evt.type === "chunk" && evt.text) {
+            text += evt.text;
+            aiBubble.innerHTML = `<div style="color:var(--teal);font-size:11px;margin-bottom:4px;">CLAUDE</div>${markdownToHtml(text)}<span>▋</span>`;
+            messages.scrollTop = messages.scrollHeight;
+          }
+          if (evt.type === "error") {
+            aiBubble.innerHTML = `<div style="color:var(--pink)">Error: ${escHtml(evt.error||"unknown")}</div>`;
+          }
+        } catch {}
+      }
+    }
+    aiBubble.innerHTML = `<div style="color:var(--teal);font-size:11px;margin-bottom:4px;">CLAUDE</div>${markdownToHtml(text)}`;
+  } catch (e) {
+    aiBubble.innerHTML = `<div style="color:var(--pink)">Failed to reach AI: ${escHtml(e.message)}</div>`;
+  }
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function markdownToHtml(md) {
+  return md
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/`([^`]+)`/g, `<code style="background:var(--surface);padding:1px 4px;border-radius:2px;font-size:11px;">$1</code>`)
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/^- (.+)$/gm, `<div style="padding-left:10px;">· $1</div>`)
+    .replace(/\n/g, "<br>");
+}
+
+// ── TOOLS ─────────────────────────────────────────────────────────────────
+const TOOL_GROUPS = [
+  { label: "Pipeline", scripts: [
+    { name: "pipeline",         desc: "Run full pipeline for default target" },
+    { name: "target:new",       desc: "Create new target workspace" },
+    { name: "target:reset",     desc: "Wipe findings/logs (preserves src)" },
+    { name: "target:setup",     desc: "Detect + configure assets" },
+    { name: "target:profile",   desc: "Build target profile JSON" }
+  ]},
+  { label: "Intelligence — HackerOne", scripts: [
+    { name: "h1:doctor",        desc: "Check H1 API credentials" },
+    { name: "h1:sync",          desc: "Sync target scope + history from H1" },
+    { name: "h1:disclosed",     desc: "Incremental sync of global disclosed reports" },
+    { name: "h1:bootstrap",     desc: "Full history backfill (run once)" }
+  ]},
+  { label: "Intelligence — Scope & CVE", scripts: [
+    { name: "bbscope:doctor",   desc: "Check bbscope connectivity" },
+    { name: "bbscope:sync",     desc: "Sync scope from bbscope.com" },
+    { name: "cve:sync",         desc: "Sync CVE intel for default target" },
+    { name: "cve:query",        desc: "Query CVE intel" }
+  ]},
+  { label: "Calibration & Skills", scripts: [
+    { name: "calibration:sync", desc: "Classify disclosed reports into patterns" },
+    { name: "calibration:query",desc: "Query calibration dataset" },
+    { name: "calibration:extract-skills", desc: "Extract hacker skill patterns (LLM)" },
+    { name: "skills:query",     desc: "Query the skill library" }
+  ]},
+  { label: "Output & Validation", scripts: [
+    { name: "reports:render",   desc: "Render H1-ready markdown reports" },
+    { name: "poc:render",       desc: "Extract PoC files + summary.md" },
+    { name: "triage:local",     desc: "Run deterministic local triage" },
+    { name: "validate:bundle",  desc: "Validate report_bundle.json" },
+    { name: "validate:triage",  desc: "Validate triage_result.json" },
+    { name: "validate:target",  desc: "Validate target.json" }
+  ]},
+  { label: "Dataset & Notifications", scripts: [
+    { name: "dataset:export",      desc: "Append all sessions to dataset/" },
+    { name: "dataset:stats",       desc: "Show training example counts" },
+    { name: "notify:test",         desc: "Send test notification" },
+    { name: "interactsh:start",    desc: "Start local interactsh server" },
+    { name: "interactsh:stop",     desc: "Stop local interactsh server" },
+    { name: "tools:check",         desc: "Check all required tools installed" },
+    { name: "tools:install",       desc: "Install missing tools" },
+    { name: "apis:check",          desc: "Check all external API endpoints" }
+  ]}
+];
+
+function loadTools() {
+  const container = document.getElementById("tools-groups");
+  container.innerHTML = TOOL_GROUPS.map(g => `
+    <div class="panel" style="margin-bottom:12px;">
+      <div class="panel-title">${escHtml(g.label)}</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        ${g.scripts.map(s => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 6px;background:var(--bg);border-radius:3px;">
+            <div>
+              <span style="color:var(--cyan);font-size:11px;font-family:var(--font-mono);">${escHtml(s.name)}</span>
+              <span style="color:var(--muted);font-size:10px;margin-left:8px;">${escHtml(s.desc)}</span>
+            </div>
+            <button class="btn btn-muted" onclick="runToolScript('${escHtml(s.name)}')">▶ Run</button>
+          </div>
+          <div id="tool-result-${escHtml(s.name.replace(/[:]/g,'-'))}" style="display:none;padding:3px 6px;font-size:10px;color:var(--teal);background:var(--surface);border-radius:3px;"></div>
+        `).join("")}
+      </div>
+    </div>`).join("");
+}
+
+async function runToolScript(script) {
+  const safeId = script.replace(/[:]/g,"-");
+  const el = document.getElementById(`tool-result-${safeId}`);
+  if (el) { el.style.display="block"; el.textContent="Starting..."; el.style.color="var(--teal)"; }
+  try {
+    const r = await apiPost("/api/script/run", { script, target: state.currentTarget });
+    if (el) el.textContent = `✓ Job started: ${r.job_id} — see Terminal for output`;
+    setTimeout(() => { state.currentJobId = r.job_id; showSection("terminal"); }, 1200);
+  } catch(e) {
+    if (el) { el.textContent = `Error: ${e.message}`; el.style.color = "var(--pink)"; }
+  }
+}
 </script>
+
 </body>
 </html>

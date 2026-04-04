@@ -4,7 +4,7 @@
   "private": true,
   "description": "Validation, runtime, and regression tooling for the Bug Bounty Agent Framework.",
   "scripts": {
-    "test": "node --test --test-isolation=none tests/contracts.test.js",
+    "test": "node --test --test-isolation=none tests/contracts.test.js tests/html-extract.test.js tests/setup-tools.test.js tests/model-adapter.test.js tests/candidates-shard.test.js tests/file-triage.test.js tests/surface-map.test.js tests/git-intel.test.js tests/secret-scan.test.js tests/http.test.js tests/fuzzing.test.js tests/redact.test.js tests/fp-registry.test.js tests/ui-jobs.test.js tests/ui-chat.test.js tests/contracts/*.test.js",
     "pipeline": "node scripts/run-pipeline.js --target duckduckgo",
     "target:new": "node scripts/new-target.js",
     "target:reset": "node scripts/reset-target.js",
@@ -33,6 +33,23 @@
     "calibration:extract-skills": "node scripts/extract-skills.js",
     "skills:query": "node scripts/query-skills.js",
     "cve:sync": "node scripts/sync-cve-intel.js",
-    "cve:query": "node scripts/query-cve-intel.js"
+    "cve:query": "node scripts/query-cve-intel.js",
+    "apis:check": "node scripts/check-apis.js",
+    "apis:check:tier1": "node scripts/check-apis.js --tier 1",
+    "notify:test": "node -e \"require('./scripts/lib/notify').notify('run_completed',{target:'test',run_type:'domains',subdomains_found:42,hosts_live:18,hosts_interesting:5,findings_count:2,duration_s:312}).then(()=>console.log('sent')).catch(e=>console.error(e.message))\"",
+    "scope:sync": "node scripts/sync-program-scope.js",
+    "interactsh:start": "bash scripts/start-interactsh.sh",
+    "interactsh:stop": "bash scripts/stop-interactsh.sh",
+    "interactsh:status": "node -e \"const ix=require('./scripts/lib/interactsh');console.log(ix.status())\"",
+    "tools:check": "node scripts/setup-tools.js --check",
+    "tools:install": "node scripts/setup-tools.js",
+    "tools:update": "node scripts/setup-tools.js --update",
+    "dataset:export": "node scripts/export-training-data.js --all",
+    "dataset:export:new": "node scripts/export-training-data.js --all --no-append",
+    "dataset:stats": "node scripts/export-training-data.js --stats"
+  },
+  "dependencies": {
+    "ajv": "^8.18.0",
+    "cheerio": "^1.2.0"
   }
 }

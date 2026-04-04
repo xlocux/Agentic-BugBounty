@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FileManifest",
+  "type": "object",
+  "required": ["schema_version", "generated_at", "target", "files"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 2 },
+    "generated_at":   { "type": "string" },
+    "target":         { "type": "string", "minLength": 1 },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "language", "relevance_tag"],
+        "properties": {
+          "path":          { "type": "string" },
+          "size_bytes":    { "type": "integer" },
+          "language":      { "type": "string" },
+          "relevance_tag": { "type": "string", "enum": ["auth", "routing", "input", "db", "template", "config", "upload", "async", "dependency", "other"] }
+        }
+      }
+    }
+  }
+}

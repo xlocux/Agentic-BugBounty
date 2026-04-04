@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CandidatesPool",
+  "type": "object",
+  "required": ["schema_version", "generated_at", "target", "candidates"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 2 },
+    "generated_at":   { "type": "string" },
+    "target":         { "type": "string" },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "state", "agent", "vuln_class", "severity", "title"],
+        "properties": {
+          "id":        { "type": "string" },
+          "state":     { "type": "string", "enum": ["candidate", "needs_evidence", "chain_candidate", "confirmed", "rejected", "out_of_scope"] },
+          "agent":     { "type": "string", "enum": ["auth", "inject", "client", "access", "media", "infra", "git_intel"] },
+          "vuln_class":{ "type": "string" },
+          "severity":  { "type": "string", "enum": ["critical", "high", "medium", "low", "info"] },
+          "title":     { "type": "string" },
+          "chain_id":  { "type": ["string", "null"] },
+          "confidence":{ "type": ["number", "null"], "minimum": 0, "maximum": 1 }
+        }
+      }
+    }
+  }
+}

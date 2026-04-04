@@ -1,3 +1,6 @@
+# ── Git worktrees ────────────────────────────────────────────────────────────
+.worktrees/
+
 # ── Cloned / downloaded target source code ──────────────────────────────────
 # Never commit scanned project sources — clone them locally via target setup
 targets/*/src/

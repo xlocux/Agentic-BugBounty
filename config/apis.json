@@ -1,0 +1,361 @@
+{
+  "_comment": "Agentic BugBounty — unified API configuration. All keys are read from environment variables defined in .env. Never commit real keys.",
+
+  "model_assignments": {
+    "researcher":  "claude-opus-4-6",
+    "coordinator": "claude-opus-4-6",
+    "triage":      "openrouter/auto"
+  },
+
+  "platforms": {
+    "_comment": "Bug bounty platform APIs for scope and program data",
+    "hackerone": {
+      "enabled": true,
+      "base_url": "https://api.hackerone.com/v1",
+      "env": {
+        "username": "H1_API_USERNAME",
+        "token": "H1_API_TOKEN"
+      },
+      "rate_limit": { "requests": 60, "window_seconds": 60 },
+      "docs": "https://api.hackerone.com/docs/v1"
+    },
+    "bugcrowd": {
+      "enabled": false,
+      "base_url": "https://bugcrowd.com/api/v1",
+      "env": {
+        "token": "BUGCROWD_API_TOKEN"
+      },
+      "rate_limit": { "requests": 30, "window_seconds": 60 },
+      "docs": "https://bugcrowd.com/resources/api"
+    },
+    "intigriti": {
+      "enabled": false,
+      "base_url": "https://api.intigriti.com/external/researcher/v1",
+      "env": {
+        "token": "INTIGRITI_API_TOKEN"
+      },
+      "rate_limit": { "requests": 30, "window_seconds": 60 },
+      "docs": "https://api.intigriti.com/docs"
+    },
+    "yeswehack": {
+      "enabled": false,
+      "base_url": "https://api.yeswehack.com",
+      "env": {
+        "token": "YESWEHACK_API_TOKEN"
+      },
+      "rate_limit": { "requests": 30, "window_seconds": 60 },
+      "docs": "https://api.yeswehack.com/docs"
+    },
+    "bbscope": {
+      "enabled": true,
+      "base_url": "https://bbscope.com/api",
+      "env": {},
+      "_comment": "No auth required",
+      "rate_limit": { "requests": 10, "window_seconds": 60 },
+      "docs": "https://bbscope.com"
+    }
+  },
+
+  "vulnerability_intelligence": {
+    "_comment": "CVE and vulnerability data sources — used by cve-hunt.js and priority scoring",
+    "nvd": {
+      "enabled": true,
+      "tier": 1,
+      "base_url": "https://services.nvd.nist.gov/rest/json/cves/2.0",
+      "env": {
+        "api_key": "NVD_API_KEY"
+      },
+      "_comment": "Optional key: 50 req/30s without key, 2000 req/30s with key",
+      "rate_limit": {
+        "without_key": { "requests": 5,    "window_seconds": 30, "delay_ms": 7000 },
+        "with_key":    { "requests": 2000, "window_seconds": 30, "delay_ms": 50   }
+      },
+      "docs": "https://nvd.nist.gov/developers/vulnerabilities",
+      "get_key": "https://nvd.nist.gov/developers/request-an-api-key"
+    },
+    "osv": {
+      "enabled": true,
+      "tier": 1,
+      "base_url": "https://api.osv.dev/v1",
+      "env": {},
+      "_comment": "No auth required. Best for npm/pip/composer/maven package CVEs",
+      "rate_limit": { "requests": 1000, "window_seconds": 60, "delay_ms": 0 },
+      "docs": "https://google.github.io/osv.dev/api/"
+    },
+    "wpscan": {
+      "enabled": true,
+      "tier": 1,
+      "base_url": "https://wpscan.com/api/v3",
+      "env": {
+        "api_token": "WPSCAN_API_TOKEN"
+      },
+      "_comment": "75 req/day on free tier. Required for WordPress core/plugin/theme CVEs",
+      "rate_limit": { "requests": 75, "window_seconds": 86400, "delay_ms": 1200 },
+      "docs": "https://wpscan.com/api",
+      "get_key": "https://wpscan.com/register"
+    },
+    "exploitdb": {
+      "enabled": true,
+      "tier": 2,
+      "base_url": "https://www.exploit-db.com/search",
+      "env": {},
+      "_comment": "No auth required. Scraping-based — use sparingly",
+      "rate_limit": { "requests": 10, "window_seconds": 60, "delay_ms": 3000 },
+      "docs": "https://www.exploit-db.com"
+    }
+  },
+
+  "recon_intelligence": {
+    "_comment": "Passive recon APIs — zero active probing on target",
+    "shodan": {
+      "enabled": false,
+      "tier": 2,
+      "base_url": "https://api.shodan.io",
+      "env": {
+        "api_key": "SHODAN_API_KEY"
+      },
+      "_comment": "100 query credits/month on free tier. Best for banner grabbing + port data without touching target",
+      "rate_limit": { "requests": 1, "window_seconds": 1, "delay_ms": 1000 },
+      "docs": "https://developer.shodan.io/api",
+      "get_key": "https://account.shodan.io"
+    },
+    "securitytrails": {
+      "enabled": false,
+      "tier": 2,
+      "base_url": "https://api.securitytrails.com/v1",
+      "env": {
+        "api_key": "SECURITYTRAILS_API_KEY"
+      },
+      "_comment": "50 req/month on free tier. Best for subdomain history and DNS history",
+      "rate_limit": { "requests": 2, "window_seconds": 60, "delay_ms": 2000 },
+      "docs": "https://docs.securitytrails.com/reference",
+      "get_key": "https://securitytrails.com/corp/api"
+    },
+    "virustotal": {
+      "enabled": false,
+      "tier": 2,
+      "base_url": "https://www.virustotal.com/api/v3",
+      "env": {
+        "api_key": "VIRUSTOTAL_API_KEY"
+      },
+      "_comment": "500 req/day on free tier. Used for passive subdomain enum and IP reputation",
+      "rate_limit": { "requests": 4, "window_seconds": 60, "delay_ms": 15000 },
+      "docs": "https://developers.virustotal.com/reference",
+      "get_key": "https://www.virustotal.com/gui/my-apikey"
+    },
+    "censys": {
+      "enabled": false,
+      "tier": 3,
+      "base_url": "https://search.censys.io/api/v2",
+      "env": {
+        "api_id":     "CENSYS_API_ID",
+        "api_secret": "CENSYS_API_SECRET"
+      },
+      "_comment": "250 req/month on free tier. Shodan alternative for host/cert search",
+      "rate_limit": { "requests": 1, "window_seconds": 1, "delay_ms": 1000 },
+      "docs": "https://search.censys.io/api",
+      "get_key": "https://search.censys.io/account/api"
+    },
+    "urlscan": {
+      "enabled": false,
+      "tier": 3,
+      "base_url": "https://urlscan.io/api/v1",
+      "env": {
+        "api_key": "URLSCAN_API_KEY"
+      },
+      "_comment": "5000 req/day on free tier. Passive screenshots + tech detection + DOM analysis",
+      "rate_limit": { "requests": 10, "window_seconds": 60, "delay_ms": 1000 },
+      "docs": "https://urlscan.io/docs/api",
+      "get_key": "https://urlscan.io/user/signup"
+    },
+    "alienvault_otx": {
+      "enabled": false,
+      "tier": 3,
+      "base_url": "https://otx.alienvault.com/api/v1",
+      "env": {
+        "api_key": "OTX_API_KEY"
+      },
+      "_comment": "Unlimited free. Passive DNS and threat intel on IPs/domains",
+      "rate_limit": { "requests": 10, "window_seconds": 1, "delay_ms": 0 },
+      "docs": "https://otx.alienvault.com/api",
+      "get_key": "https://otx.alienvault.com/accounts/register"
+    }
+  },
+
+  "tech_detection": {
+    "_comment": "Tech stack fingerprinting APIs",
+    "wappalyzer": {
+      "enabled": false,
+      "tier": 3,
+      "base_url": "https://api.wappalyzer.com/v2",
+      "env": {
+        "api_key": "WAPPALYZER_API_KEY"
+      },
+      "_comment": "500 req/month on free tier. Most accurate tech+version detection",
+      "rate_limit": { "requests": 1, "window_seconds": 1, "delay_ms": 1000 },
+      "docs": "https://www.wappalyzer.com/api",
+      "get_key": "https://www.wappalyzer.com/api"
+    }
+  },
+
+  "notifications": {
+    "_comment": "Notification channels — set enabled: true and fill env vars to activate",
+    "telegram": {
+      "enabled": false,
+      "tier": 1,
+      "env": {
+        "bot_token": "TELEGRAM_BOT_TOKEN",
+        "chat_id":   "TELEGRAM_CHAT_ID"
+      },
+      "_comment": "Primary notification channel. Setup: @BotFather → /newbot. Get chat_id: @userinfobot",
+      "bidirectional": true,
+      "_bidirectional_comment": "Bot can receive commands: /status /hunt /scan /findings /queue",
+      "get_key": "https://t.me/BotFather"
+    },
+    "discord": {
+      "enabled": false,
+      "tier": 2,
+      "env": {
+        "webhook_url": "DISCORD_WEBHOOK_URL"
+      },
+      "_comment": "Secondary channel. Create webhook: Server Settings → Integrations → Webhooks"
+    },
+    "slack": {
+      "enabled": false,
+      "tier": 3,
+      "env": {
+        "webhook_url": "SLACK_WEBHOOK_URL"
+      },
+      "_comment": "Tertiary channel. Create webhook: api.slack.com → Your Apps → Incoming Webhooks"
+    },
+    "email": {
+      "enabled": false,
+      "tier": 3,
+      "env": {
+        "smtp_host": "SMTP_HOST",
+        "smtp_port": "SMTP_PORT",
+        "smtp_user": "SMTP_USER",
+        "smtp_pass": "SMTP_PASS",
+        "to":        "NOTIFY_EMAIL_TO"
+      }
+    },
+
+    "rules": {
+      "_comment": "What triggers a notification and at what severity threshold",
+      "min_severity":           "high",
+      "_min_severity_values":   "low | medium | high | critical",
+      "batch_interval_seconds": 3600,
+      "_batch_comment":         "Non-critical events (new subdomains, dead hosts) are batched and sent every N seconds",
+      "events": {
+        "finding_confirmed":      { "immediate": true,  "min_severity": "high"     },
+        "cve_match":              { "immediate": true,  "min_severity": "medium"   },
+        "new_subdomain_interesting": { "immediate": true,  "min_severity": null    },
+        "subdomain_takeover_candidate": { "immediate": true, "min_severity": null  },
+        "new_subdomain_bulk":     { "immediate": false, "batch": true              },
+        "subdomain_dead":         { "immediate": false, "batch": true              },
+        "tech_stack_changed":     { "immediate": false, "batch": true              },
+        "run_completed":          { "immediate": true,  "min_severity": null       },
+        "session_limit_hit":      { "immediate": true,  "min_severity": null       },
+        "scheduled_scan_started": { "immediate": false, "batch": true              }
+      }
+    }
+  },
+
+  "llm": {
+    "_comment": "LLM routing — Claude for analysis, free models for mechanical phases",
+    "claude": {
+      "use_for": ["vuln_analysis", "poc_development", "triage", "severity_assessment"],
+      "_comment": "Claude is invoked via claude CLI / Claude Code SDK — no API key needed here"
+    },
+    "openrouter": {
+      "use_for": ["scope_parsing", "subdomain_enum", "tech_fingerprinting", "host_filtering", "report_generation"],
+      "config_file": "config/openrouter.json",
+      "_comment": "Free model chain via OpenRouter for mechanical phases 0-3"
+    }
+  },
+
+  "interactsh": {
+    "_comment": "Out-of-band callback infrastructure — always running as daemon during active sessions",
+    "enabled": true,
+    "tier": 1,
+    "cli": {
+      "env": "INTERACTSH_BIN",
+      "default": "interactsh-client",
+      "install": "go install -v github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest"
+    },
+    "server": {
+      "env": "INTERACTSH_SERVER",
+      "_comment": "Optional: self-hosted interactsh server. Leave empty to use public oast.fun/me/live"
+    },
+    "pid_file":  "/tmp/agentic-bb-interactsh.pid",
+    "host_file": "/tmp/agentic-bb-interactsh-host.txt",
+    "log_file":  "/tmp/agentic-bb-interactsh.jsonl",
+    "url_scheme": "{report_id}.{target_handle}.{host}",
+    "_url_example": "web-001.acme.abc123.oast.fun",
+    "auto_start": true,
+    "_auto_start_comment": "interactsh is started automatically by run-pipeline.js before any scan"
+  },
+
+  "identity": {
+    "_comment": "Operative identity management — fake accounts for target registration during testing",
+    "email_scheme": "{base}+{target}.{role}@{domain}",
+    "_email_example": "xlocux+acme.victim@gmail.com",
+    "env": {
+      "base_email":  "OPERATIVE_BASE_EMAIL",
+      "password":    "OPERATIVE_PASSWORD",
+      "enc_key":     "OPERATIVE_ENC_KEY"
+    },
+    "roles": ["victim", "attacker", "admin", "reviewer"],
+    "_roles_comment": "victim = target user, attacker = our testing account, admin = elevated role, reviewer = read-only",
+    "encryption": "aes-256-cbc",
+    "_encryption_comment": "Passwords encrypted in DB. Key derived from OPERATIVE_ENC_KEY via SHA-256. Plaintext if key not set.",
+    "auto_create": ["victim", "attacker"],
+    "_auto_create_comment": "Roles created automatically when a new target is registered"
+  },
+
+  "tools": {
+    "_comment": "Local Kali tools — paths auto-detected from PATH if not set explicitly",
+    "subfinder":    { "env": "SUBFINDER_BIN",    "default": "subfinder"    },
+    "amass":        { "env": "AMASS_BIN",        "default": "amass"        },
+    "ffuf":         { "env": "FFUF_BIN",         "default": "ffuf"         },
+    "gobuster":     { "env": "GOBUSTER_BIN",     "default": "gobuster"     },
+    "nuclei":       { "env": "NUCLEI_BIN",       "default": "nuclei"       },
+    "nmap":         { "env": "NMAP_BIN",         "default": "nmap"         },
+    "whatweb":      { "env": "WHATWEB_BIN",      "default": "whatweb"      },
+    "nikto":        { "env": "NIKTO_BIN",        "default": "nikto"        },
+    "sqlmap":       { "env": "SQLMAP_BIN",       "default": "sqlmap"       },
+    "feroxbuster":  { "env": "FEROXBUSTER_BIN",  "default": "feroxbuster"  },
+    "wpscan":       { "env": "WPSCAN_BIN",       "default": "wpscan"       },
+    "dalfox":       { "env": "DALFOX_BIN",       "default": "dalfox"       },
+    "httpx":        { "env": "HTTPX_BIN",        "default": "httpx"        },
+    "ghauri":       { "env": "GHAURI_BIN",       "default": "ghauri"       }
+  },
+
+  "database": {
+    "global_db_path": "data/global-intelligence/agentic-bugbounty-global.db",
+    "_comment": "Single global SQLite DB for all targets, domains, findings, tech stack, changes"
+  },
+
+  "scheduling": {
+    "enabled": false,
+    "_comment": "Optional cron-based rescans. Set enabled: true to activate",
+    "default_interval_days": 7,
+    "run_types": ["domains", "whitebox", "blackbox", "cve_hunt"]
+  },
+
+  "ui": {
+    "port": 31337,
+    "_comment": "Cyberpunk dashboard — npm run ui:intel",
+    "features": {
+      "targets":   true,
+      "domains":   true,
+      "tech":      true,
+      "changes":   true,
+      "scope":     true,
+      "intel":     true,
+      "runs":      true,
+      "cve_alerts": true,
+      "live_stream": true
+    }
+  }
+}

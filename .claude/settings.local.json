@@ -11,7 +11,22 @@
       "Bash(ccw cli:*)",
       "Bash(source .env)",
       "Bash(openssl req:*)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "Bash(git checkout:*)",
+      "Bash(git stash:*)",
+      "Bash(npm test:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(npm run:*)",
+      "Bash(npm install:*)",
+      "Bash(git -C /d/Agentic-BugBounty log --oneline -10)",
+      "Bash(git -C D:/Agentic-BugBounty branch)",
+      "Bash(ls D:/Agentic-BugBounty/targets/*/)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d.get\\(''''version'''',''''unknown''''\\)\\)\")",
+      "Bash(git -C D:/Agentic-BugBounty/targets/duckduckgo/src/duckduckgo-privacy-extension log --oneline -1)",
+      "Bash(python3 -m json.tool)",
+      "Bash(node -e \"require\\(''''./scripts/run-pipeline.js''''\\)\")",
+      "WebFetch(domain:adragos.ro)"
     ]
   }
 }

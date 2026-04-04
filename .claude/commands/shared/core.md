@@ -59,7 +59,8 @@ Do not add fields. Do not omit required fields.
       "researcher_notes": "context the triager needs",
       "confirmation_status": "confirmed | unconfirmed",
       "reason_not_confirmed": null,
-      "attachments": []
+      "attachments": [],
+      "chain_meta": null
     }
   ],
   "unconfirmed_candidates": [],
@@ -72,6 +73,58 @@ Do not add fields. Do not omit required fields.
   }
 }
 ```
+
+### chain_meta — solo per finding a catena
+
+Quando un finding è il risultato della combinazione di due o più vulnerabilità,
+popola `chain_meta` con questa struttura invece di lasciarlo null:
+
+```json
+"chain_meta": {
+  "is_chain": true,
+  "chain_steps": [
+    {
+      "step": 1,
+      "report_id_source": "WEB-003",
+      "vuln_class": "open_redirect",
+      "primitive_provided": "redirect_control",
+      "component": "/auth/logout?next=",
+      "precondition": "la vittima clicca il link dell'attaccante"
+    },
+    {
+      "step": 2,
+      "report_id_source": "WEB-007",
+      "vuln_class": "CSRF",
+      "primitive_provided": "request_forgery",
+      "component": "POST /api/account/email",
+      "precondition": "l'attaccante controlla la destinazione del redirect"
+    }
+  ],
+  "primitives_used": ["redirect_control", "request_forgery"],
+  "absorbed_finding_ids": ["WEB-003", "WEB-007"],
+  "chain_severity_rationale": "open_redirect da solo = Low; CSRF da solo = Medium; la chain raggiunge account email takeover senza privilegi aggiuntivi = High"
+}
+```
+
+Per chain a 3 step, estendi `chain_steps` con un terzo oggetto:
+
+```json
+{
+  "step": 3,
+  "report_id_source": "WEB-012",
+  "vuln_class": "RCE_via_template_injection",
+  "primitive_provided": "code_exec",
+  "component": "/admin/template/edit",
+  "precondition": "l'attaccante ha ottenuto accesso admin via chain step 1-2"
+}
+```
+
+Regole:
+- `chain_steps` deve essere in ordine di esecuzione (step 1 = prima azione dell'attaccante)
+- `report_id_source` referenzia il finding candidato individuale originale
+- `absorbed_finding_ids` elenca tutti i finding collassati in questo chain report
+- `chain_severity_rationale` deve giustificare la severity della chain vs. i pezzi
+- Se `is_chain = true`, il campo `attack_flow_diagram` è **obbligatorio** (non opzionale)
 
 ---
 

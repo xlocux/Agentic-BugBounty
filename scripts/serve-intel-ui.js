@@ -12,6 +12,9 @@ const {
   readJson,
   resolveTargetConfigPath
 } = require("./lib/contracts");
+const { createJob, startJob, stopJob, getJob, listJobs, tailJob } = require("./lib/ui-jobs");
+const { streamChatResponse } = require("./lib/ui-chat");
+const { serveBrowse } = require("./lib/ui-static");
 
 function parseArgs(argv) {
   const parsed = {
@@ -49,6 +52,55 @@ function getTargetContext(targetArg) {
   };
 }
 
+function listTargetDirs() {
+  const targetsBase = path.resolve("targets");
+  if (!fs.existsSync(targetsBase)) return [];
+  return fs.readdirSync(targetsBase)
+    .filter(name => fs.existsSync(path.join(targetsBase, name, "target.json")))
+    .map(name => {
+      const cfgPath  = path.join(targetsBase, name, "target.json");
+      const cfg      = (() => { try { return JSON.parse(fs.readFileSync(cfgPath, "utf8")); } catch { return {}; } })();
+      const bundlePath = path.join(targetsBase, name, "findings", "confirmed", "report_bundle.json");
+      const bundle   = (() => { try { return JSON.parse(fs.readFileSync(bundlePath, "utf8")); } catch { return null; } })();
+      const running  = listJobs().find(j => j.target === name && j.status === "running");
+      return {
+        name,
+        asset_type:     cfg.asset_type || "unknown",
+        default_mode:   cfg.default_mode || "whitebox",
+        finding_count:  bundle?.findings?.length ?? 0,
+        status:         running ? "running" : "idle",
+        active_job_id:  running?.id || null,
+        last_run:       listJobs().find(j => j.target === name)?.started || null
+      };
+    });
+}
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    req.on("data", chunk => { data += chunk; });
+    req.on("end", () => {
+      try { resolve(JSON.parse(data || "{}")); }
+      catch { resolve({}); }
+    });
+    req.on("error", reject);
+  });
+}
+
+function sseStart(res) {
+  res.writeHead(200, {
+    "Content-Type":  "text/event-stream",
+    "Cache-Control": "no-cache",
+    "Connection":    "keep-alive",
+    "Access-Control-Allow-Origin": "*"
+  });
+  res.write(":\n\n");
+}
+
+function sseSend(res, obj) {
+  res.write(`data: ${JSON.stringify(obj)}\n\n`);
+}
+
 function sendJson(response, payload) {
   response.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
   response.end(JSON.stringify(payload, null, 2));
@@ -64,126 +116,7 @@ function sendNotFound(response) {
   response.end("Not Found");
 }
 
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
 
-function contentTypeFor(filePath) {
-  const ext = path.extname(filePath).toLowerCase();
-  if (ext === ".json") return "application/json; charset=utf-8";
-  if (ext === ".md") return "text/markdown; charset=utf-8";
-  if (ext === ".html") return "text/html; charset=utf-8";
-  if (ext === ".txt" || ext === ".log") return "text/plain; charset=utf-8";
-  return "application/octet-stream";
-}
-
-function safeResolveWithinRoot(rootDir, requestedPath) {
-  const normalized = String(requestedPath || "")
-    .replaceAll("\\", "/")
-    .replace(/^\/+/, "");
-  const absolute = path.resolve(rootDir, normalized);
-  const rootResolved = path.resolve(rootDir);
-  const relative = path.relative(rootResolved, absolute);
-  if (relative.startsWith("..") || path.isAbsolute(relative)) {
-    return null;
-  }
-  return absolute;
-}
-
-function renderDirectoryPage(title, rootName, relativePath, entries) {
-  const crumbs = relativePath
-    .split("/")
-    .filter(Boolean)
-    .map((segment, index, array) => {
-      const href = `/browse/${rootName}/${array.slice(0, index + 1).join("/")}`;
-      return `<a href="${href}">${escapeHtml(segment)}</a>`;
-    })
-    .join(" / ");
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>${escapeHtml(title)}</title>
-  <style>
-    :root {
-      --bg: #060816;
-      --surface: rgba(12, 18, 38, 0.92);
-      --ink: #e8ecff;
-      --muted: #8ea0cb;
-      --line: rgba(100, 128, 214, 0.26);
-      --teal: #39ffd4;
-      --cyan: #55c7ff;
-      --pink: #ff4fd8;
-      --font-body: "IBM Plex Sans", "Segoe UI", sans-serif;
-      --font-mono: "JetBrains Mono", Consolas, monospace;
-    }
-    * { box-sizing: border-box; }
-    body {
-      font-family: var(--font-body);
-      background:
-        radial-gradient(circle at top left, rgba(57,255,212,.08), transparent 22%),
-        radial-gradient(circle at top right, rgba(255,79,216,.09), transparent 24%),
-        linear-gradient(180deg, #050712, #09101f 55%, #050712);
-      color: var(--ink);
-      margin: 0;
-      padding: 24px;
-      min-height: 100vh;
-    }
-    a { color: var(--cyan); text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    .card {
-      background: linear-gradient(180deg, rgba(16,25,51,.94), rgba(10,15,33,.94));
-      border: 1px solid var(--line);
-      border-radius: 20px;
-      padding: 18px;
-      max-width: 1180px;
-      margin: 0 auto;
-      box-shadow: 0 0 0 1px rgba(85,199,255,.12), 0 0 24px rgba(85,199,255,.08);
-    }
-    table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
-    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
-    th { color: var(--muted); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
-    .muted { color: var(--muted); }
-    h1 { margin: 0 0 10px; font-size: 22px; letter-spacing: .08em; text-transform: uppercase; }
-    .back {
-      display: inline-flex;
-      padding: 8px 14px;
-      border: 1px solid rgba(85,199,255,.25);
-      border-radius: 999px;
-      background: rgba(85,199,255,.08);
-      margin-bottom: 16px;
-    }
-    .path { font-family: var(--font-mono); font-size: 12px; word-break: break-all; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <a class="back" href="/">Back to Intel UI</a>
-    <h1>${escapeHtml(title)}</h1>
-    <p class="muted path">/${escapeHtml(rootName)}${relativePath ? ` / ${crumbs}` : ""}</p>
-    <table>
-      <thead><tr><th>Name</th><th>Type</th><th>Open</th></tr></thead>
-      <tbody>
-        ${relativePath ? `<tr><td>..</td><td>directory</td><td><a href="/browse/${rootName}/${relativePath.split("/").slice(0, -1).join("/")}">Up</a></td></tr>` : ""}
-        ${entries.map((entry) => `
-          <tr>
-            <td>${escapeHtml(entry.name)}</td>
-            <td>${entry.isDirectory ? "directory" : "file"}</td>
-            <td><a href="${entry.href}">${entry.isDirectory ? "Browse" : "Open"}</a></td>
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>
-  </div>
-</body>
-</html>`;
-}
 
 function buildGlobalSummary(globalDataset) {
   if (!globalDataset) {
@@ -326,18 +259,184 @@ function main() {
   const targetContext = getTargetContext(args.target);
   const roots = {
     global: args.globalDir,
-    target: targetContext.intelligenceDir
+    target: targetContext.intelligenceDir,
+    targets: path.resolve("targets")
   };
 
-  const server = http.createServer((request, response) => {
+  async function handleRequest(request, response) {
     const parsedUrl = new URL(request.url, `http://${request.headers.host || "127.0.0.1"}`);
-    const decodedPathname = (() => {
-      try {
-        return decodeURIComponent(parsedUrl.pathname);
-      } catch {
-        return parsedUrl.pathname;
+    const method = request.method;
+    const url    = parsedUrl.pathname;
+
+    // ── Targets ────────────────────────────────────────────────────────────
+    if (method === "GET" && url === "/api/targets") {
+      return sendJson(response, listTargetDirs());
+    }
+
+    if (method === "POST" && url === "/api/targets/create") {
+      const body = await readBody(request);
+      const { name, program_url } = body;
+      if (!name) return sendJson(response, { error: "name required" });
+      const job = createJob({
+        target: name,
+        script: "node",
+        args: ["scripts/new-target.js", name, "--program-url", program_url || ""]
+      });
+      startJob(job);
+      return sendJson(response, { job_id: job.id });
+    }
+
+    if (method === "POST" && /^\/api\/targets\/([^/]+)\/reset$/.test(url)) {
+      const name = url.split("/")[3];
+      const job  = createJob({ target: name, script: "node", args: ["scripts/reset-target.js", "--target", name] });
+      startJob(job);
+      return sendJson(response, { job_id: job.id });
+    }
+
+    // ── Run control ────────────────────────────────────────────────────────
+    if (method === "POST" && url === "/api/run/start") {
+      const body   = await readBody(request);
+      const { target, mode, interactive, hitl, resume, skipIntel } = body;
+      if (!target) return sendJson(response, { error: "target required" });
+
+      if (!skipIntel) {
+        const intelJob = createJob({
+          target,
+          script: "node",
+          args: ["scripts/sync-hackerone-intel.js", "--target", target]
+        });
+        startJob(intelJob);
       }
-    })();
+
+      const args = ["scripts/run-pipeline.js", "--target", target, "--cli", "claude"];
+      if (mode)        args.push("--mode", mode);
+      if (interactive) args.push("--interactive");
+      if (hitl)        args.push("--hitl");
+      if (resume)      args.push("--resume");
+
+      const runJob = createJob({ target, script: "node", args });
+      startJob(runJob);
+      return sendJson(response, { job_id: runJob.id });
+    }
+
+    if (method === "POST" && /^\/api\/run\/stop\/(.+)$/.test(url)) {
+      const jobId = url.replace("/api/run/stop/", "");
+      stopJob(jobId);
+      return sendJson(response, { ok: true });
+    }
+
+    if (method === "GET" && /^\/api\/run\/status\/(.+)$/.test(url)) {
+      const target = url.replace("/api/run/status/", "");
+      if (target.includes("/") || target.includes("..") || target.includes("\\")) {
+        response.writeHead(400); response.end("invalid target name"); return;
+      }
+      const job    = listJobs().find(j => j.target === target && j.status === "running");
+      const bundlePath = path.resolve("targets", target, "findings", "confirmed", "report_bundle.json");
+      const bundle = (() => { try { return JSON.parse(fs.readFileSync(bundlePath, "utf8")); } catch { return null; } })();
+      return sendJson(response, {
+        running:          !!job,
+        job_id:           job?.id || null,
+        started:          job?.started || null,
+        finding_count:    bundle?.findings?.length ?? 0,
+        domains_completed: bundle?.meta?.domains_completed ?? []
+      });
+    }
+
+    // ── SSE stream ─────────────────────────────────────────────────────────
+    if (method === "GET" && /^\/api\/stream\/(.+)$/.test(url)) {
+      const jobId  = url.replace("/api/stream/", "");
+      const from   = Number(parsedUrl.searchParams.get("from") || 0);
+      const job    = getJob(jobId);
+      if (!job) { response.writeHead(404); response.end("job not found"); return; }
+
+      sseStart(response);
+      sseSend(response, { type: "connected", job_id: jobId });
+
+      const cancel = tailJob(jobId, from, (line, offset) => {
+        const type = line.includes("✓") || line.includes("confirmed") ? "finding"
+                   : line.includes("candidate") ? "candidate"
+                   : line.includes("chain") ? "chain"
+                   : "log";
+        sseSend(response, { type, line, offset, ts: Date.now() });
+      }, ({ exit_code }) => {
+        sseSend(response, { type: "done", exit_code });
+        response.end();
+      });
+
+      request.on("close", cancel);
+      return;
+    }
+
+    // ── Jobs list ──────────────────────────────────────────────────────────
+    if (method === "GET" && url === "/api/jobs") {
+      return sendJson(response, listJobs().slice(0, 50));
+    }
+
+    // ── Findings ───────────────────────────────────────────────────────────
+    if (method === "GET" && /^\/api\/findings\/(.+)$/.test(url)) {
+      const target = url.replace("/api/findings/", "");
+      if (target.includes("/") || target.includes("..") || target.includes("\\")) {
+        response.writeHead(400); response.end("invalid target name"); return;
+      }
+      const base   = path.resolve("targets", target, "findings");
+      const bundle = (() => { try { return JSON.parse(fs.readFileSync(path.join(base, "confirmed", "report_bundle.json"), "utf8")); } catch { return null; } })();
+      const triage = (() => { try { return JSON.parse(fs.readFileSync(path.join(base, "triage_result.json"), "utf8")); } catch { return null; } })();
+      return sendJson(response, { bundle, triage });
+    }
+
+    // ── History ─────────────────────────────────────────────────────────────
+    if (method === "GET" && url === "/api/history") {
+      return sendJson(response, listJobs());
+    }
+
+    if (method === "GET" && /^\/api\/history\/(.+)$/.test(url)) {
+      const target = url.replace("/api/history/", "");
+      if (target.includes("/") || target.includes("..") || target.includes("\\")) {
+        response.writeHead(400); response.end("invalid target name"); return;
+      }
+      return sendJson(response, listJobs().filter(j => j.target === target));
+    }
+
+    // ── Script runner (Tools section) ─────────────────────────────────────
+    if (method === "POST" && url === "/api/script/run") {
+      const body   = await readBody(request);
+      const { script, target } = body;
+      if (!script) return sendJson(response, { error: "script required" });
+      const npmArgs = ["run", script];
+      const job = createJob({ target: target || "global", script: "npm", args: npmArgs });
+      startJob(job);
+      return sendJson(response, { job_id: job.id });
+    }
+
+    // ── AI chat ─────────────────────────────────────────────────────────────
+    if (method === "POST" && url === "/api/chat") {
+      const body = await readBody(request);
+      const { message, target } = body;
+      if (!message) { response.writeHead(400); response.end("message required"); return; }
+      if (target && (target.includes("/") || target.includes("..") || target.includes("\\"))) {
+        response.writeHead(400); response.end("invalid target name"); return;
+      }
+
+      const bundlePath = target ? path.resolve("targets", target, "findings", "confirmed", "report_bundle.json") : null;
+      const bundle = bundlePath && fs.existsSync(bundlePath)
+        ? JSON.parse(fs.readFileSync(bundlePath, "utf8")) : null;
+      const runningJob = target ? listJobs().find(j => j.target === target && j.status === "running") : null;
+
+      const ctx = {
+        target:          target || "unknown",
+        asset_type:      bundle?.meta?.asset_type || "unknown",
+        active_run:      runningJob ? { stage: "running", elapsed: "?" } : null,
+        recent_findings: (bundle?.findings || []).slice(-5).map(f => ({ id: f.report_id, title: f.finding_title, severity: f.severity_claimed })),
+        recent_logs:     []
+      };
+
+      sseStart(response);
+      streamChatResponse(message, ctx,
+        (text) => sseSend(response, { type: "chunk", text }),
+        (err)  => { sseSend(response, { type: err ? "error" : "done", error: err?.message }); response.end(); }
+      );
+      return;
+    }
 
     if (parsedUrl.pathname === "/" || parsedUrl.pathname === "/index.html") {
       response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
@@ -371,67 +470,19 @@ function main() {
       return;
     }
 
-    if (parsedUrl.pathname.startsWith("/browse/")) {
-      const suffix = parsedUrl.pathname.slice("/browse/".length);
-      const [rootName, ...rest] = suffix.split("/");
-      const rootDir = roots[rootName];
-      if (!rootDir) {
-        sendNotFound(response);
-        return;
-      }
-
-      const relativePath = rest.join("/");
-      const absolutePath = safeResolveWithinRoot(rootDir, relativePath);
-      if (!absolutePath || !fs.existsSync(absolutePath)) {
-        sendHtml(
-          response,
-          `<h1>File not found</h1><p>The requested path is not available inside the ${escapeHtml(rootName)} root.</p><p><a href="/browse/${escapeHtml(rootName)}/">Open root</a></p>`,
-          404
-        );
-        return;
-      }
-
-      const stat = fs.statSync(absolutePath);
-      if (stat.isDirectory()) {
-        const entries = fs.readdirSync(absolutePath, { withFileTypes: true })
-          .map((entry) => {
-            const nextRelative = [relativePath, entry.name].filter(Boolean).join("/");
-            return {
-              name: entry.name,
-              isDirectory: entry.isDirectory(),
-              href: entry.isDirectory()
-                ? `/browse/${rootName}/${nextRelative}`
-                : `/browse/${rootName}/${nextRelative}`
-            };
-          })
-          .sort((left, right) => {
-            if (left.isDirectory !== right.isDirectory) {
-              return left.isDirectory ? -1 : 1;
-            }
-            return left.name.localeCompare(right.name);
-          });
-
-        sendHtml(response, renderDirectoryPage(`${rootName} files`, rootName, relativePath, entries));
-        return;
-      }
-
-      response.writeHead(200, { "Content-Type": contentTypeFor(absolutePath) });
-      response.end(fs.readFileSync(absolutePath));
-      return;
-    }
-
-    if (
-      parsedUrl.pathname.includes("global-intelligence") ||
-      parsedUrl.pathname.includes("%5C") ||
-      decodedPathname.includes("\\data") ||
-      decodedPathname.includes("global-intelligence")
-    ) {
-      response.writeHead(302, { Location: "/browse/global/" });
-      response.end();
-      return;
-    }
+    if (serveBrowse(roots, parsedUrl, response)) return;
 
     sendNotFound(response);
+  }
+
+  const server = http.createServer((request, response) => {
+    handleRequest(request, response).catch((err) => {
+      console.error("[serve-intel-ui] unhandled error:", err);
+      if (!response.headersSent) {
+        response.writeHead(500);
+        response.end("Internal Server Error");
+      }
+    });
   });
 
   listenWithFallback(server, args.port)

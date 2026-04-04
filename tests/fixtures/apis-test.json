@@ -1,0 +1,7 @@
+{
+  "model_assignments": {
+    "researcher":  "claude-opus-4-6",
+    "coordinator": "claude-opus-4-6",
+    "triage":      "openrouter/auto"
+  }
+}
