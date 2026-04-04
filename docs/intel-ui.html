@@ -1275,11 +1275,11 @@ function applyFnFilters() {
   tbody.innerHTML = filtered.length === 0
     ? `<tr><td colspan="5" style="color:var(--muted);text-align:center;">No findings match filters</td></tr>`
     : filtered.map(f => `<tr onclick="showFindingDetail('${escHtml(f.report_id)}');" style="cursor:pointer;">
-        <td style="color:var(--cyan)">${f.report_id}</td>
+        <td style="color:var(--cyan)">${escHtml(f.report_id)}</td>
         <td>${escHtml(f.finding_title || "")}</td>
         <td>${severityBadge(f.severity_claimed)}</td>
         <td style="font-size:8px;color:var(--muted)">${escHtml((f.affected_component||"").slice(0,40))}</td>
-        <td><span class="badge badge-low">${f.confirmation_status||"confirmed"}</span></td>
+        <td><span class="badge badge-low">${escHtml(f.confirmation_status||"confirmed")}</span></td>
       </tr>`).join("");
 }
 
@@ -1288,9 +1288,9 @@ function renderTriageTable() {
   tbody.innerHTML = fnTriageResults.length === 0
     ? `<tr><td colspan="5" style="color:var(--muted);text-align:center;">No triage results</td></tr>`
     : fnTriageResults.map(r => `<tr>
-        <td style="color:var(--cyan)">${r.report_id}</td>
-        <td><span class="badge badge-low">${r.triage_verdict}</span></td>
-        <td>${r.analyst_severity || "—"}</td>
+        <td style="color:var(--cyan)">${escHtml(r.report_id)}</td>
+        <td><span class="badge badge-low">${escHtml(r.triage_verdict)}</span></td>
+        <td>${escHtml(r.analyst_severity || "—")}</td>
         <td>${r.analyst_cvss_score ?? "—"}</td>
         <td style="font-size:8px;color:var(--muted)">${escHtml((r.triage_summary||"").slice(0,80))}</td>
       </tr>`).join("");
@@ -1304,7 +1304,7 @@ function showFindingDetail(id) {
     <div style="margin-bottom:14px;">
       <div style="font-size:12px;font-weight:bold;margin-bottom:4px;">${escHtml(f.finding_title||"")}</div>
       ${severityBadge(f.severity_claimed)}
-      <span style="font-size:8px;color:var(--muted);margin-left:8px;">${f.report_id}</span>
+      <span style="font-size:8px;color:var(--muted);margin-left:8px;">${escHtml(f.report_id)}</span>
     </div>
     <div style="font-size:8px;color:var(--muted);margin-bottom:4px;">COMPONENT</div>
     <div style="font-size:9px;color:var(--cyan);margin-bottom:12px;">${escHtml(f.affected_component||"")}</div>
