@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NETRUNNER // Control Center</title>
 
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
 <!-- CDN libs -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/typed.js@2/dist/typed.umd.js"></script>
@@ -30,8 +34,9 @@
   --high:     #ff6b35;
   --med:      #ffd700;
   --low:      #39ffd4;
-  --sidebar-w: 200px;
-  --font-mono: 'Courier New', Courier, monospace;
+  --sidebar-w: 210px;
+  --font-ui:   'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
 }
 
 /* ── Light theme ── */
@@ -56,7 +61,8 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
+  font-size: 14px;
   background: var(--bg);
   color: var(--ink);
   height: 100vh;
@@ -127,13 +133,13 @@ body::after {
 .nav-item.active .nav-label { color: var(--teal); }
 .nav-icon  { font-size: 15px; color: var(--muted); width: 16px; text-align: center; }
 .nav-item.active .nav-icon { color: var(--teal); }
-.nav-label { font-size: 11px; color: var(--muted); letter-spacing: 0.5px; }
-.nav-sub   { font-size: 9px; color: var(--muted); display: block; }
+.nav-label { font-size: 13px; color: var(--muted); letter-spacing: 0.3px; }
+.nav-sub   { font-size: 11px; color: var(--muted); display: block; }
 
 #sidebar-status {
   padding: 10px 14px;
   border-top: 1px solid var(--border);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 #status-dot {
@@ -181,13 +187,13 @@ body::after {
   line-height: 1;
 }
 .metric-label {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted);
-  letter-spacing: 1.5px;
+  letter-spacing: 0.8px;
   margin-top: 4px;
 }
 .metric-sub {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted);
   margin-top: 2px;
 }
@@ -212,25 +218,26 @@ body::after {
   padding: 12px;
 }
 .panel-title {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--teal);
-  letter-spacing: 1.5px;
-  font-weight: bold;
+  letter-spacing: 1px;
+  font-weight: 600;
   margin-bottom: 10px;
 }
 
 /* ── Tables ── */
-.data-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .data-table th {
   text-align: left;
   color: var(--muted);
-  font-size: 9px;
-  letter-spacing: 1px;
-  padding: 5px 8px;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  padding: 6px 8px;
   border-bottom: 1px solid var(--border);
 }
 .data-table td {
-  padding: 6px 8px;
+  padding: 7px 8px;
   border-bottom: 1px solid var(--border);
   color: var(--ink);
 }
@@ -239,11 +246,11 @@ body::after {
 /* ── Severity badges ── */
 .badge {
   display: inline-block;
-  padding: 2px 6px;
+  padding: 2px 7px;
   border-radius: 3px;
-  font-size: 9px;
-  font-weight: bold;
-  letter-spacing: 0.5px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
 }
 .badge-crit   { background: rgba(255,79,216,0.15); color: var(--crit); }
 .badge-high   { background: rgba(255,107,53,0.15); color: var(--high); }
@@ -256,11 +263,12 @@ body::after {
   display: inline-block;
   padding: 5px 12px;
   border-radius: 4px;
-  font-family: var(--font-mono);
-  font-size: 11px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   border: 1px solid;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.2px;
   transition: box-shadow 0.2s;
 }
 .btn-primary {
@@ -282,7 +290,8 @@ body::after {
 
 /* ── Log feed ── */
 .log-feed {
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: 12px;
   line-height: 1.8;
   overflow-y: auto;
   height: 200px;
@@ -294,16 +303,16 @@ body::after {
 .log-info { color: var(--muted); }
 
 /* ── Input / form ── */
-.field-label { font-size: 10px; color: var(--muted); margin-bottom: 4px; display: block; }
+.field-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; display: block; font-weight: 500; }
 .field-input {
   width: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 6px 8px;
+  padding: 7px 10px;
   color: var(--ink);
-  font-family: var(--font-mono);
-  font-size: 11px;
+  font-family: var(--font-ui);
+  font-size: 13px;
   margin-bottom: 10px;
 }
 .field-input:focus { outline: none; border-color: var(--teal); }
@@ -351,7 +360,7 @@ body::after {
 
 /* ── Chat ── */
 .chat-messages { height: 340px; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-.chat-bubble { max-width: 80%; padding: 8px 10px; border-radius: 6px; font-size: 12px; line-height: 1.6; }
+.chat-bubble { max-width: 80%; padding: 10px 13px; border-radius: 6px; font-size: 14px; line-height: 1.6; }
 .chat-bubble.user { align-self: flex-end; background: rgba(57,255,212,0.1); border: 1px solid var(--teal); color: var(--ink); }
 .chat-bubble.ai   { align-self: flex-start; background: var(--surface); border: 1px solid var(--border); color: var(--ink); }
 .chat-input-row { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--border); }
@@ -372,12 +381,12 @@ body::after {
   margin-bottom: 18px;
 }
 .section-title {
-  font-size: 14px;
-  font-weight: bold;
+  font-size: 18px;
+  font-weight: 600;
   color: var(--ink);
 }
 .section-desc {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--muted);
   margin-top: 3px;
 }
@@ -819,7 +828,7 @@ body::after {
     </div>
 
     <div class="panel" style="background:var(--surface2);border-color:var(--border);">
-      <div id="term-feed" style="font-family:var(--font-mono);font-size:11px;line-height:1.8;height:480px;overflow-y:auto;color:var(--muted);"></div>
+      <div id="term-feed" style="font-family:var(--font-mono);font-size:13px;line-height:1.7;height:480px;overflow-y:auto;color:var(--muted);"></div>
     </div>
 
     <div style="display:flex;gap:8px;margin-top:8px;">
