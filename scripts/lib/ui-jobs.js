@@ -3,6 +3,8 @@ const fs     = require("node:fs");
 const path   = require("node:path");
 const { spawn } = require("node:child_process");
 
+let _seq = 0;
+
 function logsDir() {
   return process.env.UI_LOGS_DIR || path.resolve(__dirname, "../../logs/ui");
 }
@@ -22,7 +24,7 @@ function saveJobs(jobs) {
 }
 
 function createJob({ target, script, args = [] }) {
-  const id  = `job-${Date.now()}-${target}`;
+  const id  = `job-${Date.now()}-${++_seq}-${target}`;
   const job = {
     id, target, script, args,
     pid: null, started: null, finished: null,
@@ -74,6 +76,7 @@ function startJob(job) {
 function stopJob(id) {
   const job = getJob(id);
   if (!job || !job.pid) return;
+  if (["done", "error", "stopped"].includes(job.status)) return;
   try { process.kill(job.pid, "SIGTERM"); } catch {}
   _updateJob(id, { status: "stopped", finished: new Date().toISOString() });
 }
@@ -116,7 +119,7 @@ function tailJob(id, fromByte, onLine, onDone) {
     }
 
     if (["done", "error", "stopped"].includes(job.status)) {
-      onDone({ exit_code: job.exit_code ?? 0 });
+      if (!cancelled) onDone({ exit_code: job.exit_code ?? 0 });
       return;
     }
     setTimeout(poll, 250);
