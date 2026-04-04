@@ -522,12 +522,99 @@ body::after {
 
   <!-- SECTION: TARGETS -->
   <section id="section-targets" class="section">
-    <!-- populated by Task 6 -->
+    <div class="section-header">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <div class="section-title">Targets</div>
+          <div class="section-desc">Manage analysis targets</div>
+        </div>
+        <button class="btn btn-primary" onclick="openCreateTarget()">+ New Target</button>
+      </div>
+    </div>
+    <div id="targets-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;"></div>
+
+    <!-- Create target drawer -->
+    <div id="create-target-drawer" style="display:none;margin-top:20px;">
+      <div class="panel" style="max-width:480px;">
+        <div class="panel-title">NEW TARGET</div>
+        <label class="field-label">Target name (slug)</label>
+        <input class="field-input" id="ct-name" placeholder="e.g. acme-corp">
+        <label class="field-label">Program URL (optional)</label>
+        <input class="field-input" id="ct-url" placeholder="https://hackerone.com/acme">
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary" onclick="submitCreateTarget()">Create</button>
+          <button class="btn btn-muted" onclick="closeCreateTarget()">Cancel</button>
+        </div>
+        <div id="ct-result" style="margin-top:8px;font-size:8px;color:var(--teal);"></div>
+      </div>
+    </div>
+
+    <!-- Launch drawer -->
+    <div id="launch-drawer" style="display:none;margin-top:12px;">
+      <div class="panel" style="max-width:480px;">
+        <div class="panel-title">▶ LAUNCH RUN — <span id="ld-target-name"></span></div>
+        <label class="field-label">Mode</label>
+        <select class="field-input" id="ld-mode" style="width:auto;">
+          <option value="whitebox">whitebox</option>
+          <option value="blackbox">blackbox</option>
+        </select>
+        <div style="display:flex;gap:16px;margin-bottom:10px;font-size:9px;color:var(--ink);">
+          <label><input type="checkbox" id="ld-interactive"> --interactive</label>
+          <label><input type="checkbox" id="ld-hitl"> --hitl</label>
+          <label><input type="checkbox" id="ld-resume"> --resume</label>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:9px;color:var(--ink);">
+          <input type="checkbox" id="ld-intel" checked>
+          <label for="ld-intel">Auto-sync intelligence before run (H1 + CVE)</label>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary" onclick="submitLaunch()" style="font-size:10px;padding:7px 18px;">▶ Launch</button>
+          <button class="btn btn-muted" onclick="closeLaunchDrawer()">Cancel</button>
+        </div>
+        <div id="ld-result" style="margin-top:8px;font-size:8px;color:var(--teal);"></div>
+      </div>
+    </div>
   </section>
 
   <!-- SECTION: RUNS -->
   <section id="section-runs" class="section">
-    <!-- populated by Task 7 -->
+    <div class="section-header">
+      <div class="section-title">Runs</div>
+      <div class="section-desc">Launch, monitor, and review pipeline runs</div>
+    </div>
+
+    <!-- Quick launch -->
+    <div class="panel" style="margin-bottom:16px;">
+      <div class="panel-title">QUICK LAUNCH</div>
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+        <div>
+          <label class="field-label">Target</label>
+          <select class="field-input" id="rl-target" style="width:160px;"></select>
+        </div>
+        <div>
+          <label class="field-label">Mode</label>
+          <select class="field-input" id="rl-mode" style="width:100px;">
+            <option>whitebox</option><option>blackbox</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="quickLaunch()" style="margin-bottom:10px;">▶ Start Run</button>
+        <div id="rl-result" style="font-size:8px;color:var(--teal);margin-bottom:10px;"></div>
+      </div>
+    </div>
+
+    <!-- Active runs -->
+    <div id="runs-active" style="margin-bottom:16px;"></div>
+
+    <!-- Recent runs -->
+    <div class="panel">
+      <div class="panel-title">RUN HISTORY</div>
+      <table class="data-table">
+        <thead><tr>
+          <th>Target</th><th>Started</th><th>Duration</th><th>Status</th><th>Findings</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="runs-history-body"></tbody>
+      </table>
+    </div>
   </section>
 
   <!-- SECTION: FINDINGS -->
@@ -879,6 +966,180 @@ function renderMindmap(findings, targets) {
     anime({ targets: g.node(), opacity: [0,1], scale: [0,1], delay: i * 120,
             duration: 600, easing: "easeOutBack" });
   });
+}
+
+// ── TARGETS ───────────────────────────────────────────────────────────────
+let launchTarget = null;
+
+async function loadTargets() {
+  const targets = await api("/api/targets").catch(() => []);
+  state.targets = targets;
+  const list = document.getElementById("targets-list");
+  list.innerHTML = targets.length === 0
+    ? `<div style="color:var(--muted);font-size:9px;">No targets found. Create one with "+ New Target".</div>`
+    : targets.map(t => `
+      <div class="panel" style="border-color:${t.status==="running"?"var(--teal)":"var(--border)"}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+          <div>
+            <div style="font-size:11px;font-weight:bold;color:var(--ink)">${escHtml(t.name)}</div>
+            <div style="font-size:8px;color:var(--muted);margin-top:2px;">${escHtml(t.asset_type)} · ${escHtml(t.default_mode)}</div>
+          </div>
+          <span class="badge ${t.status==="running"?"badge-low":"badge-info"}">${escHtml(t.status.toUpperCase())}</span>
+        </div>
+        <div style="display:flex;gap:6px;font-size:8px;color:var(--muted);margin-bottom:10px;">
+          <span>${t.finding_count} finding${t.finding_count!==1?"s":""}</span>
+          ${t.last_run ? `<span>· last: ${new Date(t.last_run).toLocaleDateString()}</span>` : ""}
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-primary" onclick="openLaunchDrawer('${escHtml(t.name)}','${escHtml(t.default_mode)}')">▶ Launch</button>
+          <button class="btn btn-muted" onclick="showSection('findings');state.currentTarget='${escHtml(t.name)}';loadFindings()">◎ Findings</button>
+          <button class="btn btn-danger" onclick="resetTarget('${escHtml(t.name)}')">↺ Reset</button>
+        </div>
+      </div>`).join("");
+}
+
+function openCreateTarget() {
+  document.getElementById("create-target-drawer").style.display = "block";
+}
+function closeCreateTarget() {
+  document.getElementById("create-target-drawer").style.display = "none";
+}
+
+async function submitCreateTarget() {
+  const name = document.getElementById("ct-name").value.trim();
+  const url  = document.getElementById("ct-url").value.trim();
+  if (!name) return;
+  try {
+    const r = await apiPost("/api/targets/create", { name, program_url: url });
+    document.getElementById("ct-result").textContent = `Job started: ${r.job_id}. Check Terminal for progress.`;
+    setTimeout(loadTargets, 2000);
+  } catch (e) {
+    document.getElementById("ct-result").textContent = `Error: ${e.message}`;
+    document.getElementById("ct-result").style.color = "var(--pink)";
+  }
+}
+
+function openLaunchDrawer(target, mode) {
+  launchTarget = target;
+  document.getElementById("ld-target-name").textContent = target;
+  document.getElementById("ld-mode").value = mode || "whitebox";
+  document.getElementById("ld-interactive").checked = false;
+  document.getElementById("ld-hitl").checked = false;
+  document.getElementById("ld-resume").checked = false;
+  document.getElementById("ld-intel").checked = true;
+  document.getElementById("ld-result").textContent = "";
+  document.getElementById("launch-drawer").style.display = "block";
+  document.getElementById("launch-drawer").scrollIntoView({ behavior: "smooth" });
+}
+function closeLaunchDrawer() {
+  document.getElementById("launch-drawer").style.display = "none";
+  launchTarget = null;
+}
+
+async function submitLaunch() {
+  if (!launchTarget) return;
+  const body = {
+    target:      launchTarget,
+    mode:        document.getElementById("ld-mode").value,
+    interactive: document.getElementById("ld-interactive").checked,
+    hitl:        document.getElementById("ld-hitl").checked,
+    resume:      document.getElementById("ld-resume").checked,
+    skipIntel:   !document.getElementById("ld-intel").checked
+  };
+  try {
+    const r = await apiPost("/api/run/start", body);
+    document.getElementById("ld-result").textContent = `✓ Run started. Job ID: ${r.job_id}`;
+    closeLaunchDrawer();
+    showSection("runs");
+  } catch (e) {
+    document.getElementById("ld-result").textContent = `Error: ${e.message}`;
+    document.getElementById("ld-result").style.color = "var(--pink)";
+  }
+}
+
+async function resetTarget(name) {
+  if (!confirm(`Reset target "${name}"? This will wipe findings and logs.`)) return;
+  await apiPost(`/api/targets/${name}/reset`, {});
+  setTimeout(loadTargets, 1500);
+}
+
+// ── RUNS ──────────────────────────────────────────────────────────────────
+async function loadRuns() {
+  const sel = document.getElementById("rl-target");
+  const targets = await api("/api/targets").catch(() => []);
+  sel.innerHTML = targets.map(t => `<option value="${escHtml(t.name)}">${escHtml(t.name)}</option>`).join("");
+
+  const jobs = await api("/api/jobs").catch(() => []);
+  updateSidebarStatus(jobs);
+
+  const active   = jobs.filter(j => j.status === "running");
+  const activeEl = document.getElementById("runs-active");
+  if (active.length === 0) {
+    activeEl.innerHTML = `<div style="color:var(--muted);font-size:8px;margin-bottom:8px;">No active runs.</div>`;
+  } else {
+    activeEl.innerHTML = active.map(job => `
+      <div class="panel" style="border-color:var(--teal);margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div>
+            <span class="panel-title" style="color:var(--teal)">▶ ${escHtml(job.target)}</span>
+            <span style="font-size:7px;color:var(--muted);margin-left:8px;">${escHtml(job.id)}</span>
+          </div>
+          <button class="btn btn-danger" onclick="stopRun('${escHtml(job.id)}')">■ Stop</button>
+        </div>
+        <div class="domain-strip" id="strip-${escHtml(job.id)}">
+          <div class="domain-seg"></div><div class="domain-seg"></div><div class="domain-seg"></div>
+          <div class="domain-seg"></div><div class="domain-seg"></div><div class="domain-seg"></div>
+        </div>
+        <div class="log-feed" id="feed-${escHtml(job.id)}" style="height:150px;margin-top:8px;"></div>
+      </div>`).join("");
+
+    for (const job of active) {
+      startSseFeed(job.id, `feed-${job.id}`, (evt) => updateDomainStrip(evt, `strip-${job.id}`));
+    }
+  }
+
+  const tbody = document.getElementById("runs-history-body");
+  const hist  = jobs.filter(j => j.status !== "running");
+  tbody.innerHTML = hist.length === 0
+    ? `<tr><td colspan="6" style="color:var(--muted);text-align:center;">No completed runs yet</td></tr>`
+    : hist.map(j => {
+        const started  = j.started ? new Date(j.started).toLocaleString() : "—";
+        const dur      = j.started && j.finished
+          ? Math.round((new Date(j.finished) - new Date(j.started)) / 1000) + "s" : "—";
+        const statusBadge = j.status === "done"
+          ? `<span class="badge badge-low">DONE</span>`
+          : j.status === "error"
+          ? `<span class="badge badge-crit">ERROR</span>`
+          : `<span class="badge badge-info">${escHtml(j.status.toUpperCase())}</span>`;
+        return `<tr>
+          <td>${escHtml(j.target)}</td>
+          <td>${escHtml(started)}</td>
+          <td>${escHtml(dur)}</td>
+          <td>${statusBadge}</td>
+          <td>—</td>
+          <td><button class="btn btn-muted" onclick="openLaunchDrawer('${escHtml(j.target)}','whitebox')" style="font-size:7px;padding:2px 6px;">Re-run</button></td>
+        </tr>`;
+      }).join("");
+}
+
+async function quickLaunch() {
+  const target = document.getElementById("rl-target").value;
+  const mode   = document.getElementById("rl-mode").value;
+  if (!target) return;
+  try {
+    const r = await apiPost("/api/run/start", { target, mode, skipIntel: false });
+    document.getElementById("rl-result").textContent = `✓ Started: ${r.job_id}`;
+    setTimeout(loadRuns, 1500);
+  } catch (e) {
+    document.getElementById("rl-result").textContent = `Error: ${e.message}`;
+    document.getElementById("rl-result").style.color = "var(--pink)";
+  }
+}
+
+async function stopRun(jobId) {
+  if (!confirm("Stop this run?")) return;
+  await apiPost(`/api/run/stop/${jobId}`, {});
+  setTimeout(loadRuns, 800);
 }
 </script>
 
