@@ -701,27 +701,183 @@ body::after {
 
   <!-- SECTION: INTELLIGENCE -->
   <section id="section-intelligence" class="section">
-    <!-- populated by Task 9 -->
+    <div class="section-header">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <div class="section-title">Intelligence</div>
+          <div class="section-desc">Scope, history, skills, CVE intel, global DB</div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-muted" onclick="intelSync('h1')" style="font-size:8px;">Sync H1</button>
+          <button class="btn btn-muted" onclick="intelSync('bbscope')" style="font-size:8px;">Sync bbscope</button>
+          <button class="btn btn-muted" onclick="intelSync('cve')" style="font-size:8px;">Sync CVE</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:4px;margin-bottom:14px;">
+      <button class="btn btn-primary" id="it-tab-overview" onclick="intelTab('overview')">Overview</button>
+      <button class="btn btn-muted"   id="it-tab-scope"    onclick="intelTab('scope')">Scope</button>
+      <button class="btn btn-muted"   id="it-tab-history"  onclick="intelTab('history')">History</button>
+      <button class="btn btn-muted"   id="it-tab-topology" onclick="intelTab('topology')">Topology</button>
+      <button class="btn btn-muted"   id="it-tab-global"   onclick="intelTab('global')">Global DB</button>
+    </div>
+
+    <div id="it-view-overview">
+      <div class="metrics-grid" id="intel-metrics"></div>
+      <div class="two-col" style="margin-top:12px;">
+        <div class="panel">
+          <div class="panel-title">SUGGESTED FOCUS</div>
+          <div id="intel-skills" style="font-size:8px;line-height:2;"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">LOCAL TARGET HISTORY</div>
+          <table class="data-table" id="intel-hist-table">
+            <thead><tr><th>Title</th><th>Weakness</th><th>Severity</th></tr></thead>
+            <tbody id="intel-hist-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="it-view-scope" style="display:none;">
+      <table class="data-table">
+        <thead><tr><th>Asset</th><th>Type</th><th>Eligible</th><th>Max Severity</th></tr></thead>
+        <tbody id="intel-scope-body"></tbody>
+      </table>
+    </div>
+
+    <div id="it-view-history" style="display:none;">
+      <div id="intel-vuln-history"></div>
+    </div>
+
+    <div id="it-view-topology" style="display:none;">
+      <div class="map-container" style="height:420px;">
+        <svg id="map-topology" style="width:100%;height:420px;"></svg>
+      </div>
+    </div>
+
+    <div id="it-view-global" style="display:none;">
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+        <input  class="field-input" id="gq-search"   placeholder="Search reports..." style="width:200px;margin:0;">
+        <select class="field-input" id="gq-program"  style="width:140px;margin:0;"><option value="">All programs</option></select>
+        <select class="field-input" id="gq-weakness" style="width:140px;margin:0;"><option value="">All weaknesses</option></select>
+        <select class="field-input" id="gq-sev"      style="width:120px;margin:0;"><option value="">All severities</option></select>
+        <button class="btn btn-primary" onclick="loadGlobalPage(1)">Search</button>
+      </div>
+      <div id="global-results"></div>
+      <div id="global-pagination" style="margin-top:10px;display:flex;gap:6px;font-size:8px;"></div>
+    </div>
   </section>
 
   <!-- SECTION: HISTORY -->
   <section id="section-history" class="section">
-    <!-- populated by Task 10 -->
+    <div class="section-header">
+      <div class="section-title">History</div>
+      <div class="section-desc">All past runs from the job log. Re-run any previous scan with one click.</div>
+    </div>
+
+    <div class="panel" style="margin-bottom:16px;">
+      <div class="panel-title">FINDINGS OVER TIME</div>
+      <canvas id="chart-timeline" height="100"></canvas>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">ALL RUNS</div>
+      <table class="data-table">
+        <thead><tr><th>Target</th><th>Script</th><th>Started</th><th>Duration</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="hist-table-body"></tbody>
+      </table>
+    </div>
   </section>
 
   <!-- SECTION: TERMINAL -->
   <section id="section-terminal" class="section">
-    <!-- populated by Task 11 -->
+    <div class="section-header">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div class="section-title">&gt;_ Terminal</div>
+          <div class="section-desc">Unified log stream from all jobs</div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <select class="field-input" id="term-job-sel" style="width:220px;margin:0;" onchange="switchTermJob()">
+            <option value="all">All jobs (live)</option>
+          </select>
+          <button class="btn btn-muted" onclick="clearTerminal()" style="font-size:8px;">Clear</button>
+          <button class="btn btn-muted" id="term-pause-btn" onclick="toggleTermPause()" style="font-size:8px;">⏸ Pause</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="background:#020510;border-color:var(--border);">
+      <div id="term-feed" style="font-family:var(--font-mono);font-size:8px;line-height:1.8;height:480px;overflow-y:auto;color:#8ea0cb;"></div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <span style="color:var(--teal);font-size:10px;line-height:28px;">&gt;</span>
+      <input class="field-input" id="term-cmd" placeholder="run &lt;target&gt; | sync &lt;target&gt; h1 | tools:check"
+             style="margin:0;font-size:9px;" onkeydown="if(event.key==='Enter')execTermCmd()">
+      <button class="btn btn-primary" onclick="execTermCmd()" style="font-size:9px;">↵</button>
+    </div>
   </section>
 
   <!-- SECTION: AI ASSISTANT -->
   <section id="section-assistant" class="section">
-    <!-- populated by Task 12 -->
+    <div class="section-header">
+      <div class="section-title">✦ AI Assistant</div>
+      <div class="section-desc">Chat with Claude about findings, strategy, and next steps</div>
+    </div>
+
+    <div class="two-col" style="align-items:flex-start;">
+      <div class="panel" style="display:flex;flex-direction:column;height:500px;padding:0;">
+        <div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:8px;color:var(--teal);letter-spacing:1px;">CLAUDE // SECURITY ANALYST</span>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <select class="field-input" id="ai-target" style="width:130px;margin:0;font-size:8px;" onchange="state.currentTarget=this.value"></select>
+            <button class="btn btn-muted" onclick="clearChat()" style="font-size:7px;padding:2px 6px;">Clear</button>
+          </div>
+        </div>
+        <div class="chat-messages" id="chat-messages">
+          <div class="chat-bubble ai" style="align-self:flex-start;">
+            <div style="color:var(--teal);font-size:7px;margin-bottom:4px;">CLAUDE</div>
+            Select a target and ask me anything. I can summarize findings, suggest next investigation steps, explain vulnerabilities, or help you think through exploit chains.
+          </div>
+        </div>
+        <div class="chat-input-row">
+          <input class="chat-input" id="chat-input" placeholder="Ask Claude about your findings..." onkeydown="if(event.key==='Enter'&amp;&amp;!event.shiftKey){event.preventDefault();sendChat();}">
+          <button class="btn btn-primary" onclick="sendChat()" style="font-size:9px;">Send</button>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="panel">
+          <div class="panel-title">QUICK PROMPTS</div>
+          <div style="display:flex;flex-direction:column;gap:5px;">
+            <button class="btn btn-muted" onclick="quickChat('Summarize the current findings and their impact')" style="text-align:left;font-size:8px;">Summarize findings</button>
+            <button class="btn btn-muted" onclick="quickChat('What should I investigate next based on the current findings?')" style="text-align:left;font-size:8px;">What to investigate next?</button>
+            <button class="btn btn-muted" onclick="quickChat('Are there any obvious exploit chains between these findings?')" style="text-align:left;font-size:8px;">Identify exploit chains</button>
+            <button class="btn btn-muted" onclick="quickChat('Explain the most critical finding in detail')" style="text-align:left;font-size:8px;">Explain critical finding</button>
+            <button class="btn btn-muted" onclick="quickChat('What scope areas have not been covered yet?')" style="text-align:left;font-size:8px;">Coverage gaps?</button>
+            <button class="btn btn-muted" onclick="quickChat('Suggest CVSS scores for each finding based on context')" style="text-align:left;font-size:8px;">Review CVSS scores</button>
+          </div>
+        </div>
+        <div class="panel" style="font-size:8px;color:var(--muted);">
+          <div class="panel-title">MODEL</div>
+          <div id="ai-model-info">claude-haiku-4-5 (fast)</div>
+          <div style="margin-top:6px;font-size:7px;">Context injected automatically:<br>· Target + asset type<br>· Active run status<br>· Last 5 findings<br>· Recent log lines</div>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- SECTION: TOOLS -->
   <section id="section-tools" class="section">
-    <!-- populated by Task 13 -->
+    <div class="section-header">
+      <div class="section-title">⚙ Tools</div>
+      <div class="section-desc">All npm scripts — for power users and manual overrides</div>
+    </div>
+
+    <div id="tools-groups"></div>
   </section>
 
 </main>
@@ -1606,6 +1762,508 @@ async function renderTaintMap() {
     .attr("text-anchor",d=>d.col===0?"end":d.col===2?"start":"middle")
     .attr("font-size","6px").attr("fill",d=>d.color||"#8ea0cb")
     .text(d=>d.label);
+}
+
+// ── INTELLIGENCE ─────────────────────────────────────────────────────────
+function intelTab(tab) {
+  ["overview","scope","history","topology","global"].forEach(t => {
+    document.getElementById(`it-view-${t}`).style.display = t===tab?"block":"none";
+    document.getElementById(`it-tab-${t}`).className = `btn ${t===tab?"btn-primary":"btn-muted"}`;
+  });
+  if (tab==="topology") renderTopologyMap();
+  if (tab==="global") loadGlobalPage(1);
+}
+
+async function loadIntelligence() {
+  const data = await api("/api/target").catch(() => ({}));
+  const local  = data.local  || {};
+  const globalData = data.global || {};
+
+  const m = document.getElementById("intel-metrics");
+  const scopes   = local.scopeSnapshot?.scopes?.length    || 0;
+  const histCount= local.historySnapshot?.history?.length || 0;
+  const skills   = local.skillSnapshot?.skill_suggestions?.length || 0;
+  const disclosed= globalData.counts?.disclosed_reports || 0;
+  m.innerHTML = [
+    ["SCOPES",     scopes,    "var(--teal)"],
+    ["LOCAL HIST", histCount, "var(--cyan)"],
+    ["SKILLS",     skills,    "var(--pink)"],
+    ["DISCLOSED",  disclosed, "var(--amber)"]
+  ].map(([label, val, color]) => `
+    <div class="metric-card">
+      <div class="metric-value" style="color:${color}">${val.toLocaleString()}</div>
+      <div class="metric-label">${label}</div>
+    </div>`).join("");
+
+  const skillEl = document.getElementById("intel-skills");
+  const sk = local.skillSnapshot?.skill_suggestions || [];
+  skillEl.innerHTML = sk.length === 0
+    ? `<span style="color:var(--muted)">No suggestions — run calibration:extract-skills</span>`
+    : sk.slice(0,10).map(s => `<div style="color:var(--ink)">◈ ${escHtml(s.title||s)}</div>`).join("");
+
+  const hist = local.historySnapshot?.history?.slice(0,15) || [];
+  document.getElementById("intel-hist-body").innerHTML = hist.length === 0
+    ? `<tr><td colspan="3" style="color:var(--muted)">No history</td></tr>`
+    : hist.map(h => `<tr>
+        <td style="font-size:8px;">${escHtml((h.title||"").slice(0,50))}</td>
+        <td style="font-size:8px;color:var(--muted)">${escHtml(h.weakness||"—")}</td>
+        <td>${severityBadge(h.severity_rating)}</td>
+      </tr>`).join("");
+
+  const scps = local.scopeSnapshot?.scopes || [];
+  document.getElementById("intel-scope-body").innerHTML = scps.length === 0
+    ? `<tr><td colspan="4" style="color:var(--muted)">No scope data</td></tr>`
+    : scps.slice(0, 50).map(s => `<tr>
+        <td style="color:var(--cyan);font-size:8px;">${escHtml(s.asset_identifier||"")}</td>
+        <td style="font-size:8px;">${escHtml(s.asset_type||"")}</td>
+        <td><span class="badge ${s.eligible_for_submission?"badge-low":"badge-high"}">${s.eligible_for_submission?"YES":"NO"}</span></td>
+        <td style="font-size:8px;">${escHtml(s.max_severity||"—")}</td>
+      </tr>`).join("");
+}
+
+async function intelSync(type) {
+  const scriptMap = { h1: "h1:sync", bbscope: "bbscope:sync", cve: "cve:sync" };
+  await apiPost("/api/script/run", { script: scriptMap[type], target: state.currentTarget });
+  showSection("terminal");
+}
+
+let globalPage = 1;
+let globalOptionsLoaded = false;
+
+async function loadGlobalPage(page) {
+  globalPage = page;
+  const q   = document.getElementById("gq-search")?.value   || "";
+  const prg = document.getElementById("gq-program")?.value  || "";
+  const wk  = document.getElementById("gq-weakness")?.value || "";
+  const sev = document.getElementById("gq-sev")?.value      || "";
+  const url = `/api/global/query?q=${encodeURIComponent(q)}&program=${encodeURIComponent(prg)}&weakness=${encodeURIComponent(wk)}&severity=${encodeURIComponent(sev)}&page=${page}&page_size=25`;
+  const data = await api(url).catch(() => ({}));
+
+  if (!globalOptionsLoaded && data.options) {
+    const pSel = document.getElementById("gq-program");
+    const wSel = document.getElementById("gq-weakness");
+    (data.options.programs||[]).forEach(p => { const o=document.createElement("option"); o.value=p; o.text=p; pSel.appendChild(o); });
+    (data.options.weaknesses||[]).forEach(w => { const o=document.createElement("option"); o.value=w; o.text=w; wSel.appendChild(o); });
+    globalOptionsLoaded = true;
+  }
+
+  const items = data.items || [];
+  document.getElementById("global-results").innerHTML = items.length === 0
+    ? `<div style="color:var(--muted);font-size:8px;">No results</div>`
+    : `<table class="data-table"><thead><tr><th>Program</th><th>Title</th><th>Weakness</th><th>Severity</th><th>Date</th></tr></thead><tbody>`
+    + items.map(r => `<tr>
+        <td style="font-size:8px;color:var(--muted)">${escHtml(r.program_handle||"")}</td>
+        <td style="font-size:8px;"><a href="${escHtml(r.url||"")}" target="_blank" style="color:var(--cyan);text-decoration:none;">${escHtml((r.title||"").slice(0,60))}</a></td>
+        <td style="font-size:8px;color:var(--muted)">${escHtml(r.weakness||"—")}</td>
+        <td>${severityBadge(r.severity_rating)}</td>
+        <td style="font-size:8px;color:var(--border)">${escHtml((r.disclosed_at||"").slice(0,10))}</td>
+      </tr>`).join("")
+    + `</tbody></table>`;
+
+  const total = data.total_pages || 1;
+  const pag   = document.getElementById("global-pagination");
+  pag.innerHTML = "";
+  if (page > 1) { const b=document.createElement("button"); b.className="btn btn-muted"; b.textContent="← Prev"; b.onclick=()=>loadGlobalPage(page-1); pag.appendChild(b); }
+  const info = document.createElement("span"); info.style.color="var(--muted)"; info.style.lineHeight="26px";
+  info.textContent = `Page ${page} / ${total} (${data.total||0} total)`; pag.appendChild(info);
+  if (page < total) { const b=document.createElement("button"); b.className="btn btn-muted"; b.textContent="Next →"; b.onclick=()=>loadGlobalPage(page+1); pag.appendChild(b); }
+}
+
+// ── D3 Attack Surface Topology ────────────────────────────────────────────
+async function renderTopologyMap() {
+  const svg = d3.select("#map-topology");
+  svg.selectAll("*").remove();
+  const W = svg.node().parentElement.clientWidth || 700;
+  const H = 420;
+  svg.attr("viewBox", `0 0 ${W} ${H}`);
+
+  let surfaceData = null;
+  try {
+    const target = state.currentTarget;
+    if (target) {
+      const r = await fetch(`/browse/targets/${encodeURIComponent(target)}/surface_map.json`);
+      if (r.ok) surfaceData = await r.json();
+    }
+  } catch {}
+
+  const entryPoints = surfaceData?.entry_points || [];
+  const ipc         = surfaceData?.ipc_channels  || [];
+  const ext         = surfaceData?.external_comms || [];
+
+  const root = { name: state.currentTarget||"target", children: [
+    { name: "Entry Points", color: "#39ffd4", children: entryPoints.slice(0,12).map(e => ({ name: (e.path||e).slice(0,30), leaf: true })) },
+    { name: "IPC",          color: "#55c7ff", children: ipc.slice(0,8).map(e  => ({ name: (e.channel||e).slice(0,30), leaf: true })) },
+    { name: "External",     color: "#ff6b35", children: ext.slice(0,8).map(e  => ({ name: (e.url||e).slice(0,30), leaf: true })) }
+  ]};
+
+  const layout = d3.tree().size([2 * Math.PI, Math.min(W,H)/2 - 60]);
+  const hroot  = d3.hierarchy(root);
+  layout(hroot);
+
+  const cx = W/2, cy = H/2;
+  const radialPoint = (x, y) => [(y)*Math.cos(x - Math.PI/2), (y)*Math.sin(x - Math.PI/2)];
+
+  const g = svg.append("g").attr("transform", `translate(${cx},${cy})`);
+
+  g.append("g").selectAll("path")
+    .data(hroot.links()).enter().append("path")
+    .attr("fill","none").attr("stroke","var(--border)").attr("stroke-opacity",0.5).attr("stroke-width",1)
+    .attr("d", d3.linkRadial().angle(d => d.x).radius(d => d.y));
+
+  const node = g.append("g").selectAll("g")
+    .data(hroot.descendants()).enter().append("g")
+    .attr("transform", d => { const [nx,ny] = radialPoint(d.x, d.y); return `translate(${nx},${ny})`; })
+    .style("opacity", 0);
+
+  node.append("circle").attr("r", d => d.depth===0?10:d.depth===1?6:4)
+    .attr("fill", d => d.depth===0?"var(--surface)":d.data.color||"var(--border)")
+    .attr("stroke", d => d.depth===0?"var(--teal)":"transparent")
+    .attr("fill-opacity", d => d.data.leaf ? 0.5 : 0.8);
+
+  node.filter(d => d.depth <= 1).append("text")
+    .attr("dy","0.31em")
+    .attr("x", d => d.x < Math.PI === !d.children ? 8 : -8)
+    .attr("text-anchor", d => d.x < Math.PI === !d.children ? "start" : "end")
+    .attr("font-size", d => d.depth===0?8:7)
+    .attr("fill", d => d.depth===0?"var(--teal)":"var(--muted)")
+    .text(d => d.data.name);
+
+  node.each(function(d) {
+    anime({ targets: this, opacity: [0,1], translateX: [10,0], delay: d.depth*120,
+            duration: 500, easing: "easeOutExpo" });
+  });
+}
+
+// ── HISTORY ───────────────────────────────────────────────────────────────
+async function loadHistory() {
+  const jobs = await api("/api/history").catch(() => []);
+
+  const byDay = {};
+  jobs.filter(j => j.status==="done" && j.started).forEach(j => {
+    const day = j.started.slice(0,10);
+    byDay[day] = (byDay[day]||0) + 1;
+  });
+  const days = Object.keys(byDay).sort().slice(-30);
+  const ctx  = document.getElementById("chart-timeline");
+  if (ctx && window.Chart) {
+    if (state.charts.timeline) state.charts.timeline.destroy();
+    state.charts.timeline = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: days,
+        datasets: [{ label: "Runs", data: days.map(d => byDay[d]||0),
+          borderColor: "#39ffd4", backgroundColor: "rgba(57,255,212,0.1)",
+          tension: 0.4, fill: true, pointRadius: 3 }]
+      },
+      options: { plugins:{legend:{display:false}}, scales:{
+        x:{ticks:{color:"#8ea0cb",font:{size:8}},grid:{color:"#1e3a5f"}},
+        y:{ticks:{color:"#8ea0cb",font:{size:8},precision:0},grid:{color:"#1e3a5f"}}
+      }}
+    });
+  }
+
+  const tbody = document.getElementById("hist-table-body");
+  tbody.innerHTML = jobs.length === 0
+    ? `<tr><td colspan="6" style="color:var(--muted);text-align:center;">No run history yet</td></tr>`
+    : jobs.map(j => {
+        const started = j.started ? new Date(j.started).toLocaleString() : "—";
+        const dur = j.started && j.finished
+          ? Math.round((new Date(j.finished)-new Date(j.started))/1000)+"s" : "—";
+        const badge = j.status==="done"?`<span class="badge badge-low">DONE</span>`
+          :j.status==="error"?`<span class="badge badge-crit">ERROR</span>`
+          :j.status==="running"?`<span class="badge badge-info">RUNNING</span>`
+          :`<span class="badge badge-high">${escHtml(j.status.toUpperCase())}</span>`;
+        return `<tr>
+          <td style="color:var(--cyan)">${escHtml(j.target)}</td>
+          <td style="font-size:7px;color:var(--muted)">${escHtml(j.script||"")} ${escHtml((j.args||[]).join(" "))}</td>
+          <td style="font-size:8px;">${escHtml(started)}</td>
+          <td style="font-size:8px;">${escHtml(dur)}</td>
+          <td>${badge}</td>
+          <td>
+            <button class="btn btn-muted" onclick="openLaunchDrawer('${escHtml(j.target)}','whitebox');showSection('targets')" style="font-size:7px;padding:2px 6px;">Re-run</button>
+            <button class="btn btn-muted" onclick="viewJobLog('${escHtml(j.id)}')" style="font-size:7px;padding:2px 6px;">Log</button>
+          </td>
+        </tr>`;
+      }).join("");
+}
+
+function viewJobLog(jobId) {
+  state.currentJobId = jobId;
+  showSection("terminal");
+}
+
+// ── TERMINAL ──────────────────────────────────────────────────────────────
+let termPaused = false;
+let termSseCancels = [];
+
+function appendTermLine(line, cls) {
+  if (termPaused) return;
+  const feed = document.getElementById("term-feed");
+  if (!feed) return;
+  const div = document.createElement("div");
+  const ts  = new Date().toTimeString().slice(0,8);
+  const c   = cls||classifyLog(line);
+  div.innerHTML = `<span style="color:var(--border)">[${ts}]</span> <span class="${c}">${escHtml(line)}</span>`;
+  feed.appendChild(div);
+  if (feed.children.length > 300) feed.removeChild(feed.firstChild);
+  feed.scrollTop = feed.scrollHeight;
+}
+
+function classifyLog(line) {
+  const l = line.toLowerCase();
+  if (l.includes("✓")||l.includes("confirmed")) return "log-find";
+  if (l.includes("candidate"))                   return "log-cand";
+  if (l.includes("error")||l.includes("failed")) return "log-err";
+  return "log-info";
+}
+
+function clearTerminal() {
+  const f = document.getElementById("term-feed");
+  if (f) f.innerHTML = "";
+}
+
+function toggleTermPause() {
+  termPaused = !termPaused;
+  document.getElementById("term-pause-btn").textContent = termPaused ? "▶ Resume" : "⏸ Pause";
+}
+
+async function loadTerminal() {
+  const jobs = await api("/api/jobs").catch(() => []);
+  const sel = document.getElementById("term-job-sel");
+  sel.innerHTML = `<option value="all">All jobs (live)</option>`;
+  jobs.slice(0,20).forEach(j => {
+    const o = document.createElement("option");
+    o.value = j.id;
+    o.textContent = `${j.target} · ${j.status} · ${j.id.slice(-8)}`;
+    sel.appendChild(o);
+  });
+  termSseCancels.forEach(c => c());
+  termSseCancels = [];
+  jobs.filter(j => j.status==="running").forEach(j => {
+    const es = new EventSource(`/api/stream/${j.id}`);
+    es.onmessage = e => {
+      try {
+        const evt = JSON.parse(e.data);
+        if (evt.line) appendTermLine(`[${j.target}] ${evt.line}`);
+      } catch {}
+    };
+    termSseCancels.push(() => es.close());
+  });
+  if (state.currentJobId) {
+    document.getElementById("term-job-sel").value = state.currentJobId;
+    switchTermJob();
+    state.currentJobId = null;
+  }
+}
+
+function switchTermJob() {
+  const jobId = document.getElementById("term-job-sel").value;
+  if (jobId === "all") { loadTerminal(); return; }
+  clearTerminal();
+  termSseCancels.forEach(c => c());
+  termSseCancels = [];
+  const es = new EventSource(`/api/stream/${jobId}`);
+  es.onmessage = e => {
+    try {
+      const evt = JSON.parse(e.data);
+      if (evt.line) appendTermLine(evt.line);
+      if (evt.type === "done") es.close();
+    } catch {}
+  };
+  termSseCancels.push(() => es.close());
+}
+
+const CMD_MAP = {
+  run:       (args) => apiPost("/api/run/start",   { target: args[0], mode: "whitebox" }),
+  stop:      (args) => apiPost(`/api/run/stop/${encodeURIComponent(args[0])}`, {}),
+  sync:      (args) => apiPost("/api/script/run",  { script: `${args[1]||"h1"}:sync`, target: args[0] }),
+  "tools:check": () => apiPost("/api/script/run",  { script: "tools:check" }),
+  "h1:bootstrap":()=> apiPost("/api/script/run",  { script: "h1:bootstrap" }),
+};
+
+async function execTermCmd() {
+  const raw   = document.getElementById("term-cmd").value.trim();
+  if (!raw) return;
+  appendTermLine(`> ${raw}`, "log-find");
+  document.getElementById("term-cmd").value = "";
+  const parts = raw.split(/\s+/);
+  const cmd   = CMD_MAP[parts[0]] || CMD_MAP[raw];
+  if (cmd) {
+    try { const r = await cmd(parts.slice(1)); appendTermLine(JSON.stringify(r), "log-info"); }
+    catch(e) { appendTermLine(`error: ${e.message}`, "log-err"); }
+  } else {
+    try { await apiPost("/api/script/run", { script: raw }); appendTermLine(`queued: npm run ${raw}`, "log-info"); }
+    catch(e) { appendTermLine(`unknown command: ${raw}`, "log-err"); }
+  }
+}
+
+// ── AI ASSISTANT ──────────────────────────────────────────────────────────
+async function loadAssistant() {
+  const sel = document.getElementById("ai-target");
+  if (sel.options.length === 0) {
+    const targets = await api("/api/targets").catch(() => []);
+    targets.forEach(t => {
+      const o = document.createElement("option");
+      o.value = t.name; o.textContent = t.name;
+      sel.appendChild(o);
+    });
+    if (state.currentTarget) sel.value = state.currentTarget;
+  }
+}
+
+function clearChat() {
+  const el = document.getElementById("chat-messages");
+  el.innerHTML = `<div class="chat-bubble ai"><div style="color:var(--teal);font-size:7px;margin-bottom:4px;">CLAUDE</div>Chat cleared. Ask me anything about your findings.</div>`;
+}
+
+function quickChat(msg) {
+  document.getElementById("chat-input").value = msg;
+  sendChat();
+}
+
+async function sendChat() {
+  const input   = document.getElementById("chat-input");
+  const message = input.value.trim();
+  if (!message) return;
+  input.value = "";
+  const target   = document.getElementById("ai-target")?.value || state.currentTarget;
+  const messages = document.getElementById("chat-messages");
+  const userBubble = document.createElement("div");
+  userBubble.className = "chat-bubble user";
+  userBubble.textContent = message;
+  messages.appendChild(userBubble);
+  messages.scrollTop = messages.scrollHeight;
+  const aiBubble = document.createElement("div");
+  aiBubble.className = "chat-bubble ai";
+  aiBubble.innerHTML = `<div style="color:var(--teal);font-size:7px;margin-bottom:4px;">CLAUDE</div><span id="ai-cursor">▋</span>`;
+  messages.appendChild(aiBubble);
+  messages.scrollTop = messages.scrollHeight;
+  let text = "";
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, target })
+    });
+    if (!res.ok) throw new Error(`${res.status}`);
+    const reader = res.body.getReader();
+    const dec    = new TextDecoder();
+    let buf      = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        try {
+          const evt = JSON.parse(line.slice(6));
+          if (evt.type === "chunk" && evt.text) {
+            text += evt.text;
+            aiBubble.innerHTML = `<div style="color:var(--teal);font-size:7px;margin-bottom:4px;">CLAUDE</div>${markdownToHtml(text)}<span>▋</span>`;
+            messages.scrollTop = messages.scrollHeight;
+          }
+          if (evt.type === "error") {
+            aiBubble.innerHTML = `<div style="color:var(--pink)">Error: ${escHtml(evt.error||"unknown")}</div>`;
+          }
+        } catch {}
+      }
+    }
+    aiBubble.innerHTML = `<div style="color:var(--teal);font-size:7px;margin-bottom:4px;">CLAUDE</div>${markdownToHtml(text)}`;
+  } catch (e) {
+    aiBubble.innerHTML = `<div style="color:var(--pink)">Failed to reach AI: ${escHtml(e.message)}</div>`;
+  }
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function markdownToHtml(md) {
+  return md
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/`([^`]+)`/g, `<code style="background:var(--surface);padding:1px 4px;border-radius:2px;font-size:8px;">$1</code>`)
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/^- (.+)$/gm, `<div style="padding-left:10px;">· $1</div>`)
+    .replace(/\n/g, "<br>");
+}
+
+// ── TOOLS ─────────────────────────────────────────────────────────────────
+const TOOL_GROUPS = [
+  { label: "Pipeline", scripts: [
+    { name: "pipeline",         desc: "Run full pipeline for default target" },
+    { name: "target:new",       desc: "Create new target workspace" },
+    { name: "target:reset",     desc: "Wipe findings/logs (preserves src)" },
+    { name: "target:setup",     desc: "Detect + configure assets" },
+    { name: "target:profile",   desc: "Build target profile JSON" }
+  ]},
+  { label: "Intelligence — HackerOne", scripts: [
+    { name: "h1:doctor",        desc: "Check H1 API credentials" },
+    { name: "h1:sync",          desc: "Sync target scope + history from H1" },
+    { name: "h1:disclosed",     desc: "Incremental sync of global disclosed reports" },
+    { name: "h1:bootstrap",     desc: "Full history backfill (run once)" }
+  ]},
+  { label: "Intelligence — Scope & CVE", scripts: [
+    { name: "bbscope:doctor",   desc: "Check bbscope connectivity" },
+    { name: "bbscope:sync",     desc: "Sync scope from bbscope.com" },
+    { name: "cve:sync",         desc: "Sync CVE intel for default target" },
+    { name: "cve:query",        desc: "Query CVE intel" }
+  ]},
+  { label: "Calibration & Skills", scripts: [
+    { name: "calibration:sync", desc: "Classify disclosed reports into patterns" },
+    { name: "calibration:query",desc: "Query calibration dataset" },
+    { name: "calibration:extract-skills", desc: "Extract hacker skill patterns (LLM)" },
+    { name: "skills:query",     desc: "Query the skill library" }
+  ]},
+  { label: "Output & Validation", scripts: [
+    { name: "reports:render",   desc: "Render H1-ready markdown reports" },
+    { name: "poc:render",       desc: "Extract PoC files + summary.md" },
+    { name: "triage:local",     desc: "Run deterministic local triage" },
+    { name: "validate:bundle",  desc: "Validate report_bundle.json" },
+    { name: "validate:triage",  desc: "Validate triage_result.json" },
+    { name: "validate:target",  desc: "Validate target.json" }
+  ]},
+  { label: "Dataset & Notifications", scripts: [
+    { name: "dataset:export",      desc: "Append all sessions to dataset/" },
+    { name: "dataset:stats",       desc: "Show training example counts" },
+    { name: "notify:test",         desc: "Send test notification" },
+    { name: "interactsh:start",    desc: "Start local interactsh server" },
+    { name: "interactsh:stop",     desc: "Stop local interactsh server" },
+    { name: "tools:check",         desc: "Check all required tools installed" },
+    { name: "tools:install",       desc: "Install missing tools" },
+    { name: "apis:check",          desc: "Check all external API endpoints" }
+  ]}
+];
+
+function loadTools() {
+  const container = document.getElementById("tools-groups");
+  container.innerHTML = TOOL_GROUPS.map(g => `
+    <div class="panel" style="margin-bottom:12px;">
+      <div class="panel-title">${escHtml(g.label)}</div>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        ${g.scripts.map(s => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 6px;background:var(--bg);border-radius:3px;">
+            <div>
+              <span style="color:var(--cyan);font-size:8px;font-family:var(--font-mono);">${escHtml(s.name)}</span>
+              <span style="color:var(--muted);font-size:7px;margin-left:8px;">${escHtml(s.desc)}</span>
+            </div>
+            <button class="btn btn-muted" onclick="runToolScript('${escHtml(s.name)}')" style="font-size:7px;padding:3px 8px;">▶ Run</button>
+          </div>
+          <div id="tool-result-${escHtml(s.name.replace(/[:]/g,'-'))}" style="display:none;padding:3px 6px;font-size:7px;color:var(--teal);background:var(--surface);border-radius:3px;"></div>
+        `).join("")}
+      </div>
+    </div>`).join("");
+}
+
+async function runToolScript(script) {
+  const safeId = script.replace(/[:]/g,"-");
+  const el = document.getElementById(`tool-result-${safeId}`);
+  if (el) { el.style.display="block"; el.textContent="Starting..."; el.style.color="var(--teal)"; }
+  try {
+    const r = await apiPost("/api/script/run", { script, target: state.currentTarget });
+    if (el) el.textContent = `✓ Job started: ${r.job_id} — see Terminal for output`;
+    setTimeout(() => { state.currentJobId = r.job_id; showSection("terminal"); }, 1200);
+  } catch(e) {
+    if (el) { el.textContent = `Error: ${e.message}`; el.style.color = "var(--pink)"; }
+  }
 }
 </script>
 
