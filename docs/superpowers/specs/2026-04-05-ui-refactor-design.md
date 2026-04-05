@@ -1,6 +1,6 @@
 # UI Refactor Design — Agentic BugBounty
 **Date:** 2026-04-05
-**Status:** Approved for implementation
+**Status:** Approved for implementation — split into 2 milestones
 
 ---
 
@@ -16,98 +16,122 @@ The current UI was added on top of a CLI pipeline. The result is a job monitor t
 
 ## 2. Architecture Overview
 
-### 2.1 Session File + Checkpoint Protocol
+### 2.1 Session Contract — Two-File Protocol
 
-The pipeline communicates with the UI through a structured `session.json` file per target. This reuses the existing checkpoint system with a formal schema.
+Pipeline and UI never write the same file simultaneously. Two dedicated files per target eliminate race conditions and ambiguous acks:
+
+| File | Writer | Reader | Purpose |
+|------|--------|--------|---------|
+| `targets/{name}/session.json` | pipeline only | UI server | State, plan, progress |
+| `targets/{name}/session-response.json` | UI server only | pipeline | Approval, selections, skip |
 
 **Mechanism:**
-1. Pipeline writes `session.json` with `status: "awaiting_*"` and pauses (500ms polling loop)
-2. UI server watches `session.json` via `fs.watch`, pushes SSE event to browser
-3. User approves/modifies in UI → UI writes response to `session.json`
-4. Pipeline detects status change, reads approved options, resumes
+1. Pipeline writes `session.json` with `status: "awaiting_*"` + `request_id` + `written_at`, then enters polling loop on `session-response.json`
+2. UI server detects change (see §2.2), reads `session.json`, pushes SSE event to browser
+3. User approves in UI → server writes `session-response.json` with matching `request_id`
+4. Pipeline reads response, verifies `request_id` matches, resumes
 
-This is activated only when `--hitl` flag is passed to `run-pipeline.js`. Without it, the pipeline runs exactly as today (zero regression).
+`request_id` is a monotonically incrementing integer per run. Pipeline rejects any response whose `request_id` doesn't match the current checkpoint — stale acks are ignored.
 
-### 2.2 Frontend Stack
+### 2.2 Change Detection — fs.watch + Polling Fallback
 
-**Vite + vanilla JS** (no framework). The existing Node server serves only the API. In development, Vite proxies API calls to the Node server. In production, `npm run build` outputs `ui/dist/` which the Node server serves as static files.
+`fs.watch` is used as a low-latency trigger only, not as a source of truth. The UI server also polls `session.json` every 2 seconds via `mtime` comparison. On each poll, if `mtime` has advanced, the file is re-read and the SSE event is emitted. This means:
+
+- Normal case: fs.watch fires within ~100ms, instant UI update
+- Degraded case (fs.watch miss, NFS, WSL): polling catches the change within 2s
+- Source of truth: always the file content + mtime, never the watch event itself
+
+### 2.3 Frontend Stack
+
+**Vite + vanilla JS** (no framework). In development, `npm run ui:dev` starts Vite dev server with proxy to the Node API. In production, `npm run ui:build` outputs `ui/dist/` which the Node server serves as static files.
 
 ```
-ui/                         ← new Vite project root
+ui/
   src/
-    main.js                 ← entry point
+    main.js
     modules/
-      window-manager.js     ← drag, resize, min/max/close, dock
-      theme.js              ← light/dark toggle, CSS variables
-      modal.js              ← replaces all browser alert/confirm/prompt
+      window-manager.js     ← drag, resize, min/max/close, dock, localStorage persist
+      theme.js              ← light/dark toggle, CSS custom properties
+      modal.js              ← showAlert / showConfirm / showPrompt (no browser dialogs)
+      api.js                ← fetch wrapper + SSE client
     panels/
-      run-control.js        ← wizard stepper + approval UI
+      run-control.js        ← wizard stepper + plan approval
       metrics.js            ← live counters + log feed
-      tech-stack.js         ← asset × tech matrix with 0-day filter
-      data-flow.js          ← input→sink animated graph (SVG)
-      intelligence.js       ← scope, history, skills tabs
-      findings.js           ← confirmed findings review
-      settings.js           ← env vars, API keys
-      targets.js            ← target list + create flow
+      tech-stack.js         ← asset × tech matrix + CVE filter
+      data-flow.js          ← input→sink animated SVG graph
+      intelligence.js       ← scope, history, skills tabs + target selector
+      findings.js           ← confirmed findings review + pre-triage editing
+      settings.js           ← env vars, API keys editor
+      targets.js            ← target list + create wizard
     style/
-      base.css              ← CSS variables, reset
-      theme-dark.css        ← dark theme (default)
-      theme-light.css       ← light theme
-      scrollbars.css        ← theme-aware scrollbar styles
+      base.css              ← CSS custom properties, reset
+      theme-dark.css        ← dark theme variables (default)
+      theme-light.css       ← light theme variables
+      scrollbars.css        ← theme-aware ::-webkit-scrollbar + scrollbar-color
       window-manager.css    ← floater, dock, topbar
   index.html
-  vite.config.js
+  vite.config.js            ← proxy /api → Node server, build → ui/dist/
 ```
 
 ---
 
-## 3. Session Contract
+## 3. Session Contract Schema
 
-**File location:** `targets/{name}/session.json`
+**Schema:** `schemas/session.schema.json` (AJV validated on every write by both writer)
 
-**Schema:** `schemas/session.schema.json` (AJV validated on every write)
-
-### 3.1 Pipeline writes
+### 3.1 session.json (pipeline → UI)
 
 ```jsonc
-// Phase: asset selection
+// Checkpoint: asset selection
 {
   "schema_version": "1.0",
+  "request_id": 1,
+  "written_at": "2026-04-05T10:00:00.000Z",
+  "written_by": "pipeline",
   "status": "awaiting_assets",
   "phase": "setup",
   "asset_type": "browserext",
   "available_assets": [
-    { "id": "ext-main", "label": "Extension main process", "mandatory": true },
-    { "id": "content-scripts", "label": "Content scripts", "mandatory": false }
+    { "id": "ext-main",        "label": "Extension main process", "mandatory": true },
+    { "id": "content-scripts", "label": "Content scripts",        "mandatory": false }
   ]
 }
 
-// Phase: plan approval (before researcher)
+// Checkpoint: researcher plan approval
 {
   "schema_version": "1.0",
+  "request_id": 2,
+  "written_at": "2026-04-05T10:05:00.000Z",
+  "written_by": "pipeline",
   "status": "awaiting_approval",
   "phase": "researcher",
   "asset_type": "browserext",
   "context": "Found 3 content scripts, 2 background workers, 1 popup",
   "plan": [
-    { "id": "postmessage",     "label": "postMessage vulnerabilities",   "mandatory": true,  "reason": null },
-    { "id": "dom_xss",         "label": "DOM XSS",                       "mandatory": true,  "reason": null },
-    { "id": "content_script",  "label": "Content script injection",      "mandatory": false, "reason": "requires user interaction" },
-    { "id": "supply_chain",    "label": "Supply chain",                  "mandatory": false, "reason": "no npm deps found" }
+    { "id": "postmessage",    "label": "postMessage vulnerabilities",  "mandatory": true,  "reason": null },
+    { "id": "dom_xss",        "label": "DOM XSS",                      "mandatory": true,  "reason": null },
+    { "id": "content_script", "label": "Content script injection",     "mandatory": false, "reason": "requires user interaction" },
+    { "id": "supply_chain",   "label": "Supply chain",                 "mandatory": false, "reason": "no npm deps found" }
   ]
 }
 
-// Phase: findings review (before triage)
+// Checkpoint: findings review (before triage)
 {
   "schema_version": "1.0",
+  "request_id": 3,
+  "written_at": "2026-04-05T10:30:00.000Z",
+  "written_by": "pipeline",
   "status": "awaiting_approval",
   "phase": "triage",
-  "findings": [ /* array of confirmed findings from report_bundle */ ]
+  "findings": [ /* confirmed findings array from report_bundle.findings */ ]
 }
 
-// Runtime progress (UI reads for live monitor)
+// Runtime progress (polled by UI every 2s for live monitor)
 {
   "schema_version": "1.0",
+  "request_id": 2,
+  "written_at": "2026-04-05T10:10:00.000Z",
+  "written_by": "pipeline",
   "status": "running",
   "phase": "researcher",
   "current_op": "postmessage",
@@ -116,63 +140,89 @@ ui/                         ← new Vite project root
 }
 ```
 
-### 3.2 UI writes (response)
+### 3.2 session-response.json (UI → pipeline)
 
 ```jsonc
-// Asset selection response
-{ "status": "assets_selected", "selected_assets": ["ext-main"] }
+// Asset selection
+{
+  "schema_version": "1.0",
+  "request_id": 1,
+  "written_at": "2026-04-05T10:01:00.000Z",
+  "written_by": "ui",
+  "status": "assets_selected",
+  "selected_assets": ["ext-main"]
+}
 
-// Plan approval response
-{ "status": "approved", "approved_ops": ["postmessage", "dom_xss", "content_script"] }
+// Plan approval
+{
+  "schema_version": "1.0",
+  "request_id": 2,
+  "written_at": "2026-04-05T10:06:00.000Z",
+  "written_by": "ui",
+  "status": "approved",
+  "approved_ops": ["postmessage", "dom_xss", "content_script"]
+}
 
 // Skip at runtime
-{ "status": "skip_requested", "skip_op": "content_script" }
+{
+  "schema_version": "1.0",
+  "request_id": 2,
+  "written_at": "2026-04-05T10:12:00.000Z",
+  "written_by": "ui",
+  "status": "skip_requested",
+  "skip_op": "content_script"
+}
 ```
 
 ### 3.3 Domain map by asset_type
 
-The `buildPlanForAssetType(assetType, surfaceMap)` function in `session.js` generates the plan based on:
+`buildPlanForAssetType(assetType, surfaceMap)` in `session.js` generates the plan. Mandatory ops are fixed per type; optional ops are filtered by surface map evidence.
 
-| asset_type   | domains / operations |
-|--------------|---------------------|
-| `webapp`     | AUTH, INJECT, CLIENT, ACCESS, MEDIA, INFRA |
-| `browserext` | postmessage, dom_xss, content_script, supply_chain, permissions |
-| `mobileapp`  | deep_links, intent, storage, network, crypto |
-| `executable` | memory_corruption, binary_analysis, input_validation, priv_esc |
-
-Mandatory ops per type are defined in a config map. Optional ops are filtered by surface map evidence (e.g. MEDIA only suggested if file upload endpoints found).
+| asset_type   | mandatory | optional (surface-gated) |
+|--------------|-----------|--------------------------|
+| `webapp`     | AUTH, INJECT | CLIENT, ACCESS, MEDIA (if uploads), INFRA |
+| `browserext` | postmessage, dom_xss | content_script, supply_chain, permissions |
+| `mobileapp`  | deep_links, intent | storage, network, crypto |
+| `executable` | memory_corruption, binary_analysis | input_validation, priv_esc |
 
 ---
 
 ## 4. Pipeline Changes
 
-Minimal surgical changes to `run-pipeline.js` — all gated behind `isHitlMode(args)`.
-
 ### 4.1 New module: `scripts/lib/session.js`
 
 ```js
-writeCheckpoint(sessionPath, payload)   // writes + validates session.json
-waitForApproval(sessionPath, timeoutMs) // polls every 500ms, resolves with UI response; default timeout 30min
+writeState(sessionPath, payload)           // writes + AJV-validates session.json
+writeResponse(responsePath, payload)       // writes + AJV-validates session-response.json
+waitForResponse(responsePath, requestId, timeoutMs=1800000)
+                                           // polls every 500ms; rejects stale request_id; default 30min timeout
 buildPlanForAssetType(assetType, surfaceMap) // returns { plan, context }
-isHitlMode(args)                        // true if --hitl in args
+isHitlMode(args)                           // true if args.hitl === true
 ```
 
-### 4.2 Three insertion points in `run-pipeline.js`
+### 4.2 Changes to run-pipeline.js
 
-1. **Before pipeline start** — asset selection checkpoint
-2. **After explorer, before researcher** — researcher plan approval
-3. **After researcher, before triage** — findings review approval
+The file already has `--hitl` flag parsing (line 84) and three `checkpoint1/2/3` calls from `lib/hitl.js` (line 47, 1423). The new implementation **replaces** the existing `hitl.js` checkpoint calls with `session.js` calls — it does not add on top of them.
 
-~50 lines added total. All wrapped in `if (isHitlMode(args)) { ... }`.
+The existing `hitl.js` checkpoints use `readline` (interactive terminal). The new session checkpoints write files and poll. The two modes are mutually exclusive: `--hitl` now means file-based session protocol; the old `readline` path is retired.
 
-### 4.3 New API endpoints in `serve-intel-ui.js`
+Realistic estimate: **~150–200 lines** of net change in `run-pipeline.js` (replacing hitl.js calls, adding asset selection loop, adapting the existing domain filtering logic to use approved_ops).
+
+Three logical insertion points:
+1. **Asset selection** — before `allAssets` loop starts (~line 1896 area)
+2. **Researcher plan approval** — replaces `checkpoint1_postExplorer` call (~line 1423)
+3. **Findings review** — replaces `checkpoint2_postResearcher` / `checkpoint3_preTriage` calls (~line 1620/1680)
+
+### 4.3 New API endpoints in serve-intel-ui.js
 
 ```
-GET  /api/session/:target          → current session.json state
-POST /api/session/:target/respond  → write UI response to session.json
+GET  /api/session/:target           → current session.json (pipeline state)
+POST /api/session/:target/respond   → write session-response.json (UI approval)
+GET  /api/settings                  → masked .env key/value pairs
+POST /api/settings                  → write single key to .env (whitelist validated)
 ```
 
-The server uses `fs.watch` on `session.json` to push SSE events to connected browser clients when the pipeline writes a new checkpoint.
+SSE notification: server watches `session.json` (fs.watch + 2s polling fallback) and pushes `{ type: "session_update", data: <session.json content> }` to all SSE connections for that target.
 
 ---
 
@@ -180,100 +230,100 @@ The server uses `fs.watch` on `session.json` to push SSE events to connected bro
 
 ### 5.1 Window Manager
 
-Every panel is a floating window. Capabilities:
-- **Drag:** grab title bar, move freely within viewport
-- **Resize:** drag handle at bottom-right corner
-- **Minimize (−):** collapses to title bar only, persists in dock
-- **Maximize (+):** fills viewport (minus topbar + dock), toggle to restore
-- **Close (×):** hides window, dock button turns highlighted to indicate closed state
-- **Restore:** click dock button to reopen at last position/size
-- **Focus:** click any window to bring to front (z-index management)
-- **Responsive fallback:** on viewport < 768px, windows stack vertically as normal block elements (no drag/resize)
+Every panel is a floating window. State persisted to `localStorage` (position, size, open/closed/minimized).
 
-Window state (position, size, open/closed, minimized) is persisted to `localStorage` keyed by panel id.
+- **Drag:** title bar grab
+- **Resize:** bottom-right handle
+- **Minimize (−):** collapses to title bar, docked
+- **Maximize (+):** fills viewport minus topbar+dock; toggle restores
+- **Close (×):** hides; dock button highlighted
+- **Restore:** click dock button
+- **Focus:** click to front (z-index stack)
+- **Responsive:** viewport < 768px → windows become stacked block elements, no drag/resize
 
 ### 5.2 Wizard Flow (Run Control panel)
 
-The Run Control panel is always available and shows:
-1. **Stepper** — 6 steps: Setup → Assets → Explorer → Researcher → Review → Submit. Current step highlighted with pulse animation.
-2. **Approval panel** — appears when `session.json` has `status: "awaiting_*"`. Shows plan with REQUIRED/optional badges and checkboxes. Mandatory ops have disabled checkboxes.
-3. **Live feed** — log lines from SSE stream, last 5 lines visible.
+1. **Stepper** — 6 steps: Setup → Assets → Explorer → Researcher → Review → Submit
+2. **Approval panel** — shown when `session.json.status === "awaiting_*"`. REQUIRED badges on mandatory ops (checkbox disabled), optional ops user-selectable
+3. **Live feed** — last 5 log lines from SSE stream
 
 ### 5.3 Graphs
 
 **Data Flow (input → sink):**
-- SVG-based, nodes positioned in columns: Inputs → Transforms → Sinks
-- Animated dashed paths between nodes (CSS `stroke-dashoffset` animation)
-- Node colors: blue = input, purple = transform, green = sanitized, red = critical sink, amber = potential sink
-- Critical nodes pulse with glow animation
-- Click node → opens modal with source file path and line number
-- Data source: `surface_map.json` (explorer output), enriched by researcher findings
+- SVG nodes in columns: Inputs → Transforms → Sinks
+- Animated `stroke-dashoffset` paths, color-coded by safety (blue/purple/green/amber/red)
+- Glow + pulse on critical sinks
+- Click node → modal with file:line
+- Data source: `surface_map.json` enriched by researcher findings
 
-**Tech Stack (asset × technology matrix):**
-- Table: rows = domains/assets, columns = detected technologies
-- Cells with detected version glow; vulnerable cells (CVE match) pulse red
-- CVE filter bar: type a technology name → highlights all matching cells across assets
-- Data source: `hybrid-recon.js` fingerprinting output, stored in `intelligence/tech_stack.json`. This file does not exist yet — `hybrid-recon.js` must be extended to write it as part of this implementation.
+**Tech Stack matrix:**
+- Rows = assets, columns = detected technologies
+- Vulnerable cells pulse red; CVE filter highlights affected assets
+- Data source: `intelligence/tech_stack.json` — **new file** that `hybrid-recon.js` must be extended to write
 
 ### 5.4 Settings Panel
 
-Reads/writes `.env` file in project root via new API endpoint.
+`.env` editor. **Changes take effect only for future jobs** (environment is loaded at process startup — running pipeline processes are not affected). A server restart is required for changes to propagate to the Node server itself.
 
-```
-GET  /api/settings        → masked key/value pairs ({ key, masked_value, is_set })
-POST /api/settings        → write one key/value to .env (server validates key whitelist)
-```
+Keys managed:
+- `H1_API_TOKEN`, `H1_API_USERNAME`
+- `OPENROUTER_API_KEY` + `OPENROUTER_API_KEY_1` through `OPENROUTER_API_KEY_5` (rotation pool)
+- `BBSCOPE_API_KEY`
+- `NOTIFY_WEBHOOK_URL`
 
-Keys shown:
-- `H1_API_TOKEN`, `H1_API_USERNAME` — HackerOne API
-- `OPENROUTER_API_KEY` — LLM fallback
-- `BBSCOPE_API_KEY` — bbscope.com
-- `NOTIFY_WEBHOOK_URL` — optional webhook
-
-Display: masked value (`••••••••`), status indicator (✓ set / ⚠ partial / ✕ missing), edit inline.
+Display: masked value, status badge, inline edit. Explicit banner: "Changes apply to the next run. Restart the server to apply to the UI itself."
 
 ### 5.5 Theme System
 
-CSS custom properties on `:root`. Two themes: `dark` (default) and `light`. Toggle button in topbar. Preference persisted to `localStorage`.
-
-Theme-aware scrollbars via `::-webkit-scrollbar` + `scrollbar-color` (Firefox). Scrollbar styles defined in `scrollbar.css`, inherit CSS variables from active theme.
+CSS custom properties on `:root`. Dark (default) and light. Toggle in topbar. `localStorage` persisted. Scrollbars via `::-webkit-scrollbar` + `scrollbar-color` inheriting theme variables.
 
 ### 5.6 Modals
 
-`modal.js` exports `showAlert(msg)`, `showConfirm(msg)` → Promise<bool>, `showPrompt(msg, defaultVal)` → Promise<string|null>. All browser `alert`/`confirm`/`prompt` calls replaced with these throughout the codebase. Modals are theme-aware floating panels (not windows — they have an overlay backdrop and cannot be moved).
+`modal.js`: `showAlert(msg)`, `showConfirm(msg) → Promise<bool>`, `showPrompt(msg, default) → Promise<string|null>`. Theme-aware, backdrop overlay, not draggable. Zero browser `alert/confirm/prompt` calls anywhere in the codebase.
 
 ---
 
 ## 6. Files Changed / Added
 
-### New files
+### New
 ```
-ui/                               ← Vite project (all new)
+ui/                               ← Vite project
 scripts/lib/session.js
 schemas/session.schema.json
 tests/session.test.js
 ```
 
-### Modified files
+### Modified
 ```
-scripts/run-pipeline.js           ← +~50 lines (3 HITL checkpoints)
-scripts/serve-intel-ui.js         ← +2 session endpoints, +settings endpoint, serve ui/dist/
-package.json                      ← +ui:dev script (vite dev), update ui:start to serve dist
+scripts/run-pipeline.js           ← ~150–200 lines (replace hitl.js calls, add session protocol)
+scripts/lib/hitl.js               ← retired (readline path removed; file kept for reference until M1 ships)
+scripts/serve-intel-ui.js         ← session + settings endpoints; serve ui/dist/
+package.json                      ← ui:dev (vite), ui:build (vite build), update ui:start
 ```
 
 ### Deleted / replaced
 ```
-docs/intel-ui.html                ← replaced by ui/dist/index.html (built output)
-docs/intel-ui.css                 ← replaced by ui/src/style/
+docs/intel-ui.html → ui/dist/index.html (built)
+docs/intel-ui.css  → ui/src/style/
 ```
 
 ---
 
-## 7. Out of Scope
+## 7. Milestones
+
+### M1 — Functional workflow (de-risk first)
+Session contract, `session.js`, schema, API endpoints, pipeline HITL replacement, Vite scaffold with Run Control + Metrics panels functional. At the end of M1 the pipeline can be driven entirely from the UI: target setup, asset selection, plan approval, execution monitoring, findings review.
+
+### M2 — Visual layer
+Window manager, animated graphs (Data Flow + Tech Stack), Settings editor, light theme, full panel set. M2 is additive — M1 remains stable throughout.
+
+---
+
+## 8. Out of Scope
 
 - Rewriting researcher / triager / chain-coordinator agents
-- WebSocket (SSE is sufficient for this use case)
-- Multi-user / auth (single-user local tool)
+- WebSocket (SSE sufficient)
+- Multi-user / auth
 - Mobile native app
-- Migrating from SQLite to a different DB
-- CI/CD pipeline changes
+- SQLite migration
+- CI/CD changes
