@@ -222,7 +222,16 @@ GET  /api/settings                  → masked .env key/value pairs
 POST /api/settings                  → write single key to .env (whitelist validated)
 ```
 
-SSE notification: server watches `session.json` (fs.watch + 2s polling fallback) and pushes `{ type: "session_update", data: <session.json content> }` to all SSE connections for that target.
+**SSE streams — two distinct channels, not unified:**
+
+| Stream | Endpoint | Events | Consumer |
+|--------|----------|--------|----------|
+| Job log stream | `GET /api/stream/:job_id` | `{ type, line, offset, ts }` — existing | Terminal panel, Metrics log feed |
+| Session stream | `GET /api/session/:target/stream` | `{ type: "session_update", data }` — new | Run Control approval panel |
+
+They are kept separate deliberately: the job stream is per-job-id and carries raw log lines; the session stream is per-target and carries structured state. The UI subscribes to both independently. `api.js` in the frontend wraps both with the same SSE client helper.
+
+Session stream change detection: server watches `session.json` (fs.watch + 2s polling fallback on `mtime`) and pushes `{ type: "session_update", data: <session.json content> }` to all active session stream connections for that target.
 
 ---
 
@@ -296,7 +305,7 @@ tests/session.test.js
 ### Modified
 ```
 scripts/run-pipeline.js           ← ~150–200 lines (replace hitl.js calls, add session protocol)
-scripts/lib/hitl.js               ← retired (readline path removed; file kept for reference until M1 ships)
+scripts/lib/hitl.js               ← retired: the `require('./lib/hitl')` import is removed from run-pipeline.js as part of M1. The file may be kept on disk temporarily for reference but must not be imported anywhere by end of M1. Delete in M2 cleanup.
 scripts/serve-intel-ui.js         ← session + settings endpoints; serve ui/dist/
 package.json                      ← ui:dev (vite), ui:build (vite build), update ui:start
 ```
@@ -312,7 +321,17 @@ docs/intel-ui.css  → ui/src/style/
 ## 7. Milestones
 
 ### M1 — Functional workflow (de-risk first)
-Session contract, `session.js`, schema, API endpoints, pipeline HITL replacement, Vite scaffold with Run Control + Metrics panels functional. At the end of M1 the pipeline can be driven entirely from the UI: target setup, asset selection, plan approval, execution monitoring, findings review.
+
+Deliverables:
+- `session.js` + `session.schema.json` + `session-response.schema.json`
+- `GET/POST /api/session/:target` + `GET /api/session/:target/stream` (SSE)
+- Pipeline HITL replacement (remove `hitl.js` import, add three session checkpoints)
+- Vite scaffold with two functional panels: Run Control (stepper + approval) and Metrics (live feed)
+- `targets.js` panel: existing target create/list flow migrated to Vite — this includes the `/api/targets`, `/api/targets/create`, and auto-sync jobs already implemented. The scope selection step (asset checkbox before run start) is also part of M1 since it's gated on the session contract.
+
+**M1 does not include:** new target setup wizard beyond what already exists in the current UI (program URL → sync scope → sync intel). That flow already works end-to-end; M1 migrates it to Vite without expanding it.
+
+At the end of M1: target creation, asset selection, plan approval, execution monitoring, and findings review all work from the browser. Terminal is optional.
 
 ### M2 — Visual layer
 Window manager, animated graphs (Data Flow + Tech Stack), Settings editor, light theme, full panel set. M2 is additive — M1 remains stable throughout.
