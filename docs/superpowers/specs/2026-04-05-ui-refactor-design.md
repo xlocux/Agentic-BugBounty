@@ -282,7 +282,75 @@ Keys managed:
 
 Display: masked value, status badge, inline edit. Explicit banner: "Changes apply to the next run. Restart the server to apply to the UI itself."
 
-### 5.5 Theme System
+### 5.5 Source Fetching
+
+When creating a target, the user can optionally provide a GitHub URL for the source code. Two paths:
+
+Many H1 programs have 5–20 GitHub repos in scope. The user needs help deciding which ones to analyze first. The flow has two sub-phases:
+
+#### Phase A — Repo Discovery & AI Ranking
+
+After scope sync completes, the system scans the in-scope assets for GitHub URLs (from `h1_scope_snapshot.json` and the program policy page). For each discovered public GitHub repo it fetches lightweight metadata via the GitHub API (no auth required for public repos):
+
+```
+GET https://api.github.com/repos/{owner}/{repo}
+→ language, size, stargazers_count, pushed_at, topics, description
+GET https://api.github.com/repos/{owner}/{repo}/contents (root listing)
+→ detect package.json, pom.xml, go.mod, requirements.txt, etc.
+```
+
+This metadata is stored in `intelligence/github_repos.json`. Then a lightweight LLM call (optional, skipped if no API key) ranks the repos by attack surface priority using:
+- Recency (`pushed_at`) — recently active repos are higher priority
+- Language/stack — web-facing stacks (Node, PHP, Python/Django, Java/Spring) ranked higher
+- Size — very small repos (< 50 files) deprioritized
+- Topics — keywords like `api`, `auth`, `payments` boost ranking
+- In-scope asset match — repos whose name matches an in-scope domain ranked higher
+
+The result is a ranked list with a short rationale per repo.
+
+#### Phase B — User Selection
+
+The create wizard shows the ranked repo list as a checklist (AI suggestion pre-selected, user can override). For each repo: name, language, last push date, size, AI rationale, and a link to GitHub.
+
+User selects one or more repos → system spawns one `git clone` job per selected repo into `targets/<name>/src/<repo-name>/`. Each clone job is tracked independently.
+
+#### Path B — No repos found / manual source
+
+If no GitHub repos are found in scope, or the user skips selection, Run Control shows `⚠ Source missing` before whitebox runs. Blackbox mode is unaffected.
+
+**Private repos:** user clones manually into `./src` — out of scope for auto-fetch.
+
+**target.json additions:**
+```jsonc
+{
+  "github_repos": [
+    {
+      "url": "https://github.com/duckduckgo/zeroclickinfo-goodies",
+      "source_path": "./src/zeroclickinfo-goodies",
+      "cloned_at": "2026-04-05T10:05:00.000Z"
+    }
+  ]
+}
+```
+
+**New API endpoints:**
+```
+GET  /api/targets/:target/repos          → github_repos.json (ranked list)
+POST /api/targets/:target/repos/clone    → spawn clone jobs for selected repos
+     body: { urls: ["https://github.com/..."] }
+     response: { clone_jobs: [{ url, job_id }] }
+```
+
+**New script:** `scripts/scan-github-repos.js` — fetches metadata + writes `github_repos.json`. Called as a job from `/api/targets/create` after intel sync, or on-demand from the UI.
+
+**`/api/targets/create` response extended:**
+```jsonc
+{ "job_id": "...", "sync_job_id": "...", "intel_job_id": "...", "repo_scan_job_id": "..." }
+// clone_job_id is NOT in the create response — cloning is triggered separately
+// after the user reviews the repo list
+```
+
+### 5.6 Theme System
 
 CSS custom properties on `:root`. Dark (default) and light. Toggle in topbar. `localStorage` persisted. Scrollbars via `::-webkit-scrollbar` + `scrollbar-color` inheriting theme variables.
 
@@ -304,6 +372,7 @@ tests/session.test.js
 
 ### Modified
 ```
+scripts/new-target.js             ← accept --github-url, store in target.json
 scripts/run-pipeline.js           ← ~150–200 lines (replace hitl.js calls, add session protocol)
 scripts/lib/hitl.js               ← retired: the `require('./lib/hitl')` import is removed from run-pipeline.js as part of M1. The file may be kept on disk temporarily for reference but must not be imported anywhere by end of M1. Delete in M2 cleanup.
 scripts/serve-intel-ui.js         ← session + settings endpoints; serve ui/dist/
@@ -327,9 +396,10 @@ Deliverables:
 - `GET/POST /api/session/:target` + `GET /api/session/:target/stream` (SSE)
 - Pipeline HITL replacement (remove `hitl.js` import, add three session checkpoints)
 - Vite scaffold with two functional panels: Run Control (stepper + approval) and Metrics (live feed)
-- `targets.js` panel: existing target create/list flow migrated to Vite — this includes the `/api/targets`, `/api/targets/create`, and auto-sync jobs already implemented. The scope selection step (asset checkbox before run start) is also part of M1 since it's gated on the session contract.
+- `targets.js` panel: target create/list flow migrated to Vite, extended with GitHub auto-clone. Create wizard fields: program URL (H1/bbscope), target name (auto-filled), GitHub URL (optional). Four jobs spawned on create: scaffold + scope sync + intel sync + git clone (if GitHub URL provided). Progress shown inline with per-job status indicators.
+- Run Control panel shows `⚠ Source missing` warning for whitebox runs when `./src` is empty and no `github_url` is set.
 
-**M1 does not include:** new target setup wizard beyond what already exists in the current UI (program URL → sync scope → sync intel). That flow already works end-to-end; M1 migrates it to Vite without expanding it.
+**M1 does not include:** private repo auth, drag-and-drop source upload.
 
 At the end of M1: target creation, asset selection, plan approval, execution monitoring, and findings review all work from the browser. Terminal is optional.
 
