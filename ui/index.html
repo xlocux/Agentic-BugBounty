@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agentic BugBounty</title>
+  <link rel="stylesheet" href="/src/style/base.css" />
+  <link rel="stylesheet" href="/src/style/theme-dark.css" />
+  <link rel="stylesheet" href="/src/style/scrollbars.css" />
+</head>
+<body>
+  <div id="topbar">
+    <span class="topbar-logo">ABB</span>
+    <nav id="main-nav">
+      <button class="nav-btn active" data-panel="targets">Targets</button>
+      <button class="nav-btn" data-panel="run-control">Run Control</button>
+      <button class="nav-btn" data-panel="metrics">Metrics</button>
+      <button class="nav-btn" data-panel="settings">Settings</button>
+    </nav>
+    <button id="theme-toggle" title="Toggle theme">&#9680;</button>
+  </div>
+
+  <main id="panel-container"></main>
+
+  <div id="modal-overlay" class="hidden">
+    <div id="modal-box">
+      <p id="modal-message"></p>
+      <div id="modal-input-row" class="hidden">
+        <input id="modal-input" type="text" />
+      </div>
+      <div id="modal-actions">
+        <button id="modal-cancel" class="hidden">Cancel</button>
+        <button id="modal-ok">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
