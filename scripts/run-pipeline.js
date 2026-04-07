@@ -44,7 +44,7 @@ const {
 const { callLLMJson, callResearcherModel } = require("./lib/llm");
 const { runHybridRecon, formatReconContextForPrompt } = require("./lib/hybrid-recon");
 const { runExplorer } = require("./lib/explorer");
-const { checkpoint1_postExplorer, checkpoint2_postResearcher, checkpoint3_preTriage } = require("./lib/hitl");
+const { writeState, waitForResponse, buildPlanForAssetType } = require("./lib/session");
 const { detectAssetsInSrcDir, describeAsset } = require("./lib/detect-assets");
 const { runFileTriage } = require("./lib/file-triage");
 const { buildEmptySurface, mergeSurface, normalizeSurface, buildSurfacePrompt } = require("./lib/surface-map");
@@ -1420,10 +1420,30 @@ async function runResearcherPhase(cli, assetContext, args, bundlePath, isAdditio
   if (explorerHint) extraText += explorerHint;
   if (reconText) extraText += reconText;
 
-  // HITL Checkpoint 1 — show surface map, receive focus directives
-  if (args.hitl) {
-    const hitlHint = await checkpoint1_postExplorer(explorerHint, assetContext);
-    if (hitlHint) extraText += hitlHint;
+  // Session Checkpoint 1 — plan approval (pre-researcher)
+  if (args.hitl && assetContext.targetDir) {
+    const sessionPath  = path.join(assetContext.targetDir, "session.json");
+    const responsePath = path.join(assetContext.targetDir, "session-response.json");
+    const { plan, context: planContext } = buildPlanForAssetType(assetContext.asset, {});
+    writeState(sessionPath, {
+      schema_version: "1.0",
+      request_id: 1,
+      written_at: new Date().toISOString(),
+      written_by: "pipeline",
+      status: "awaiting_approval",
+      phase: "researcher",
+      asset_type: assetContext.asset,
+      context: planContext || explorerHint || null,
+      plan
+    });
+    logEvent(runLog, `Session checkpoint 1: awaiting plan approval for ${assetContext.asset}`);
+    const response = await waitForResponse(responsePath, 1);
+    const approvedOps = response.approved_ops || plan.map((op) => op.id);
+    if (approvedOps.length > 0) {
+      extraText += `\n\nUI PLAN APPROVAL — approved operations: ${approvedOps.join(", ")}\n`;
+      extraText += `Focus exclusively on these vulnerability classes. Skip others.\n`;
+    }
+    logEvent(runLog, `Session checkpoint 1: approved ops = ${approvedOps.join(", ")}`);
   }
 
   // SessionLimitError propagates to main() — do not catch here
@@ -2175,18 +2195,32 @@ async function main() {
     }
   }
 
-  // HITL Checkpoint 2 — review candidates, guide chain synthesis
-  if (args.hitl && fs.existsSync(bundlePath)) {
-    const unconfirmedPath = path.join(context.findingsDir, "unconfirmed", "candidates.json");
-    const { chainHints } = await checkpoint2_postResearcher(bundlePath, unconfirmedPath);
-    if (chainHints) {
-      // Save chain hints to intelligence dir for dual researcher pass
+  // Session Checkpoint 2 — candidate review (pre-chain)
+  if (args.hitl && context.targetDir && fs.existsSync(bundlePath)) {
+    const sessionPath  = path.join(context.targetDir, "session.json");
+    const responsePath = path.join(context.targetDir, "session-response.json");
+    const bundle   = JSON.parse(fs.readFileSync(bundlePath, "utf8"));
+    const findings = (bundle && bundle.findings) || [];
+    writeState(sessionPath, {
+      schema_version: "1.0",
+      request_id: 2,
+      written_at: new Date().toISOString(),
+      written_by: "pipeline",
+      status: "awaiting_approval",
+      phase: "chain",
+      findings_so_far: findings.length,
+      findings
+    });
+    logEvent(runLog, `Session checkpoint 2: awaiting chain review (${findings.length} findings)`);
+    const response = await waitForResponse(responsePath, 2);
+    if (response.status === "approved" && Array.isArray(response.approved_ops)) {
+      const chainHints = response.approved_ops.join(", ");
       const chainHintPath = context.intelligenceDir
         ? path.join(context.intelligenceDir, "hitl_chain_hints.txt")
         : null;
-      if (chainHintPath) {
-        fs.writeFileSync(chainHintPath, chainHints, "utf8");
-        logEvent(runLog, `HITL chain hints saved to ${chainHintPath}`);
+      if (chainHintPath && chainHints) {
+        fs.writeFileSync(chainHintPath, `UI chain hints: ${chainHints}\n`, "utf8");
+        logEvent(runLog, `Session checkpoint 2: chain hints saved`);
       }
     }
   }
@@ -2255,9 +2289,35 @@ async function main() {
     logEvent(runLog, `PoC artifact rendering failed: ${err.message}`);
   }
 
-  // HITL Checkpoint 3 (--hitl) or classic review (--interactive)
-  if (args.hitl) {
-    await checkpoint3_preTriage(bundlePath, runLog);
+  // Session Checkpoint 3 — findings review (pre-triage)
+  if (args.hitl && context.targetDir) {
+    const sessionPath  = path.join(context.targetDir, "session.json");
+    const responsePath = path.join(context.targetDir, "session-response.json");
+    const bundle   = fs.existsSync(bundlePath) ? JSON.parse(fs.readFileSync(bundlePath, "utf8")) : {};
+    const findings = (bundle && bundle.findings) || [];
+    writeState(sessionPath, {
+      schema_version: "1.0",
+      request_id: 3,
+      written_at: new Date().toISOString(),
+      written_by: "pipeline",
+      status: "awaiting_approval",
+      phase: "triage",
+      findings
+    });
+    logEvent(runLog, `Session checkpoint 3: awaiting findings review (${findings.length} findings)`);
+    const response = await waitForResponse(responsePath, 3);
+    if (response.approved_ops) {
+      const approvedIds = new Set(response.approved_ops);
+      bundle.findings = findings.filter((f) => approvedIds.has(f.report_id));
+      bundle.unconfirmed_candidates = [
+        ...(bundle.unconfirmed_candidates || []),
+        ...findings
+          .filter((f) => !approvedIds.has(f.report_id))
+          .map((f) => ({ ...f, reason_not_confirmed: "rejected by operator at session checkpoint 3" }))
+      ];
+      fs.writeFileSync(bundlePath, JSON.stringify(bundle, null, 2), "utf8");
+      logEvent(runLog, `Session checkpoint 3: ${bundle.findings.length} approved, ${findings.length - bundle.findings.length} rejected`);
+    }
   } else if (args.interactive) {
     await reviewFindings(bundlePath, runLog);
   }
