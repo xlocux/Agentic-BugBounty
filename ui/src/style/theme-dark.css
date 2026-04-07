@@ -1,0 +1,20 @@
+/* Dark theme — default. Variables already defined in base.css :root. */
+[data-theme="dark"] {
+  --bg:          #0d1117;
+  --bg-panel:    #161b22;
+  --bg-elevated: #1c2128;
+  --border:      #30363d;
+  --text:        #c9d1d9;
+  --text-dim:    #8b949e;
+}
+
+[data-theme="light"] {
+  --bg:          #f6f8fa;
+  --bg-panel:    #ffffff;
+  --bg-elevated: #f0f2f5;
+  --border:      #d0d7de;
+  --text:        #1f2328;
+  --text-dim:    #57606a;
+  --accent:      #0969da;
+  --accent-dim:  #0550ae;
+}
