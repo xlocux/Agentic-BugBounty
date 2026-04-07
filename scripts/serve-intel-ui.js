@@ -16,10 +16,130 @@ const { createJob, startJob, stopJob, getJob, listJobs, tailJob } = require("./l
 const { streamChatResponse } = require("./lib/ui-chat");
 const { serveBrowse } = require("./lib/ui-static");
 
+const PID_FILE  = path.resolve("logs", "ui", "serve-intel-ui.pid");
+const ENV_PATH  = path.resolve(".env");
+const UI_DIST   = path.resolve("ui", "dist");
+
+const SETTINGS_WHITELIST = new Set([
+  "H1_API_TOKEN", "H1_API_USERNAME",
+  "OPENROUTER_API_KEY",
+  "OPENROUTER_API_KEY_1", "OPENROUTER_API_KEY_2", "OPENROUTER_API_KEY_3",
+  "OPENROUTER_API_KEY_4", "OPENROUTER_API_KEY_5",
+  "BBSCOPE_API_KEY",
+  "NOTIFY_WEBHOOK_URL"
+]);
+
+function readEnvFile() {
+  if (!fs.existsSync(ENV_PATH)) return {};
+  const entries = {};
+  for (const line of fs.readFileSync(ENV_PATH, "utf8").split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    const val = trimmed.slice(eq + 1).trim();
+    if (key) entries[key] = val;
+  }
+  return entries;
+}
+
+function writeEnvKey(key, value) {
+  const entries = readEnvFile();
+  entries[key] = value;
+  const lines = Object.entries(entries).map(([k, v]) => `${k}=${v}`);
+  fs.writeFileSync(ENV_PATH, lines.join("\n") + "\n", "utf8");
+}
+
+function maskValue(val) {
+  if (!val || val.length < 8) return val ? "****" : "";
+  return val.slice(0, 4) + "****" + val.slice(-4);
+}
+
+function serveStatic(req, res) {
+  const urlPath = req.url.split("?")[0];
+  let filePath = path.join(UI_DIST, urlPath === "/" ? "index.html" : urlPath);
+  if (!path.extname(filePath) || !fs.existsSync(filePath)) {
+    filePath = path.join(UI_DIST, "index.html");
+  }
+  if (!fs.existsSync(filePath)) { res.writeHead(404); res.end("Not found"); return; }
+  const ext  = path.extname(filePath).slice(1);
+  const mime = {
+    html: "text/html", js: "application/javascript", css: "text/css",
+    svg:  "image/svg+xml", png: "image/png", ico: "image/x-icon",
+    json: "application/json", woff2: "font/woff2", woff: "font/woff",
+    ttf:  "font/ttf", map: "application/json"
+  };
+  res.writeHead(200, { "Content-Type": mime[ext] || "application/octet-stream" });
+  fs.createReadStream(filePath).pipe(res);
+}
+
+// SSE session watchers: target → { watcher, clients: Set<res>, lastMtime, pollInterval }
+const sessionWatchers = new Map();
+
+function getSessionWatcher(target) {
+  if (sessionWatchers.has(target)) return sessionWatchers.get(target);
+  const sessionPath = path.resolve("targets", target, "session.json");
+  const entry = { watcher: null, clients: new Set(), lastMtime: 0, pollInterval: null };
+  sessionWatchers.set(target, entry);
+
+  function broadcast() {
+    if (!fs.existsSync(sessionPath)) return;
+    try {
+      const stat = fs.statSync(sessionPath);
+      if (stat.mtimeMs <= entry.lastMtime) return;
+      entry.lastMtime = stat.mtimeMs;
+      const data  = fs.readFileSync(sessionPath, "utf8");
+      const event = `data: ${JSON.stringify({ type: "session_update", data: JSON.parse(data) })}\n\n`;
+      for (const client of entry.clients) {
+        try { client.write(event); } catch { entry.clients.delete(client); }
+      }
+    } catch { /* file may be mid-write */ }
+  }
+
+  try { entry.watcher = fs.watch(sessionPath, () => broadcast()); } catch { /* polling covers it */ }
+  entry.pollInterval = setInterval(broadcast, 2000);
+  return entry;
+}
+
+function readPidFile() {
+  try {
+    const raw = fs.readFileSync(PID_FILE, "utf8").trim();
+    const [pid, port] = raw.split(":").map(Number);
+    return { pid, port };
+  } catch {
+    return null;
+  }
+}
+
+function writePidFile(port) {
+  fs.mkdirSync(path.dirname(PID_FILE), { recursive: true });
+  fs.writeFileSync(PID_FILE, `${process.pid}:${port}`, "utf8");
+}
+
+function removePidFile() {
+  try { fs.unlinkSync(PID_FILE); } catch { /* ignore */ }
+}
+
+function isProcessAlive(pid) {
+  try { process.kill(pid, 0); return true; } catch { return false; }
+}
+
+function checkSingleInstance(preferredPort) {
+  const existing = readPidFile();
+  if (existing && isProcessAlive(existing.pid)) {
+    const url = `http://127.0.0.1:${existing.port}`;
+    console.log(`Intel UI is already running at ${url} (pid ${existing.pid})`);
+    if (preferredPort) openBrowser(url);
+    process.exit(0);
+  }
+  removePidFile();
+}
+
 function parseArgs(argv) {
   const parsed = {
     port: 31337,
-    target: "duckduckgo",
+    target: null,
     globalDir: path.resolve("data", "global-intelligence"),
     open: false
   };
@@ -255,11 +375,12 @@ function openBrowser(url) {
 
 function main() {
   const args = parseArgs(process.argv);
+  checkSingleInstance(args.open);
   const appHtmlPath = path.resolve("docs", "intel-ui.html");
-  const targetContext = getTargetContext(args.target);
+  const targetContext = args.target ? getTargetContext(args.target) : null;
   const roots = {
     global: args.globalDir,
-    target: targetContext.intelligenceDir,
+    target: targetContext ? targetContext.intelligenceDir : path.resolve("targets"),
     targets: path.resolve("targets")
   };
 
@@ -267,6 +388,149 @@ function main() {
     const parsedUrl = new URL(request.url, `http://${request.headers.host || "127.0.0.1"}`);
     const method = request.method;
     const url    = parsedUrl.pathname;
+
+    // ── Static UI (ui/dist/) ───────────────────────────────────────────────
+    if (method === "GET" && !url.startsWith("/api/") && !url.startsWith("/static/")) {
+      if (fs.existsSync(UI_DIST)) { serveStatic(request, response); return; }
+      // fall through to legacy HTML if ui/dist/ not built yet
+    }
+
+    // ── Settings ───────────────────────────────────────────────────────────
+    if (method === "GET" && url === "/api/settings") {
+      const raw = readEnvFile();
+      const settings = {};
+      for (const key of SETTINGS_WHITELIST) {
+        settings[key] = { masked: maskValue(raw[key] || ""), set: Boolean(raw[key]) };
+      }
+      return sendJson(response, settings);
+    }
+
+    if (method === "POST" && url === "/api/settings") {
+      let body = "";
+      request.on("data", (d) => { body += d; });
+      request.on("end", () => {
+        let parsed;
+        try { parsed = JSON.parse(body); } catch {
+          response.writeHead(400, { "Content-Type": "application/json" });
+          response.end(JSON.stringify({ error: "invalid JSON" })); return;
+        }
+        const { key, value } = parsed;
+        if (!key || !SETTINGS_WHITELIST.has(key)) {
+          response.writeHead(400, { "Content-Type": "application/json" });
+          response.end(JSON.stringify({ error: `key "${key}" not allowed` })); return;
+        }
+        writeEnvKey(key, String(value));
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ ok: true, key, masked: maskValue(String(value)) }));
+      });
+      return;
+    }
+
+    // ── Session ────────────────────────────────────────────────────────────
+    if (method === "GET" && /^\/api\/session\/[^/]+$/.test(url)) {
+      const target = url.replace("/api/session/", "");
+      const sessionPath = path.resolve("targets", target, "session.json");
+      if (!fs.existsSync(sessionPath)) {
+        response.writeHead(404, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ error: "no session" })); return;
+      }
+      try {
+        const data = JSON.parse(fs.readFileSync(sessionPath, "utf8"));
+        return sendJson(response, data);
+      } catch {
+        response.writeHead(500, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ error: "could not read session" })); return;
+      }
+    }
+
+    if (method === "POST" && /^\/api\/session\/[^/]+\/respond$/.test(url)) {
+      const target = url.replace("/api/session/", "").replace("/respond", "");
+      const responsePath = path.resolve("targets", target, "session-response.json");
+      let body = "";
+      request.on("data", (d) => { body += d; });
+      request.on("end", () => {
+        let payload;
+        try { payload = JSON.parse(body); } catch {
+          response.writeHead(400, { "Content-Type": "application/json" });
+          response.end(JSON.stringify({ error: "invalid JSON" })); return;
+        }
+        try {
+          fs.mkdirSync(path.dirname(responsePath), { recursive: true });
+          fs.writeFileSync(responsePath, JSON.stringify(payload, null, 2), "utf8");
+          response.writeHead(200, { "Content-Type": "application/json" });
+          response.end(JSON.stringify({ ok: true }));
+        } catch (err) {
+          response.writeHead(500, { "Content-Type": "application/json" });
+          response.end(JSON.stringify({ error: err.message }));
+        }
+      });
+      return;
+    }
+
+    if (method === "GET" && /^\/api\/session\/[^/]+\/stream$/.test(url)) {
+      const target = url.replace("/api/session/", "").replace("/stream", "");
+      response.writeHead(200, {
+        "Content-Type":  "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection":    "keep-alive"
+      });
+      response.write(": connected\n\n");
+      const entry = getSessionWatcher(target);
+      entry.clients.add(response);
+      request.on("close", () => entry.clients.delete(response));
+      return;
+    }
+
+    // ── GitHub Repos ───────────────────────────────────────────────────────
+    if (method === "GET" && /^\/api\/targets\/[^/]+\/repos$/.test(url)) {
+      const target = url.split("/")[3];
+      const reposPath = path.resolve("targets", target, "intelligence", "github_repos.json");
+      if (!fs.existsSync(reposPath)) {
+        return sendJson(response, { repos: [], scanned_at: null });
+      }
+      try {
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(fs.readFileSync(reposPath, "utf8"));
+      } catch {
+        response.writeHead(500, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ error: "could not read repos" }));
+      }
+      return;
+    }
+
+    if (method === "POST" && /^\/api\/targets\/[^/]+\/repos\/clone$/.test(url)) {
+      const target = url.split("/")[3];
+      let body = "";
+      request.on("data", (d) => { body += d; });
+      request.on("end", () => {
+        let parsed;
+        try { parsed = JSON.parse(body); } catch {
+          response.writeHead(400, { "Content-Type": "application/json" });
+          response.end(JSON.stringify({ error: "invalid JSON" })); return;
+        }
+        const urls = Array.isArray(parsed.urls) ? parsed.urls : [];
+        if (urls.length === 0) {
+          response.writeHead(400, { "Content-Type": "application/json" });
+          response.end(JSON.stringify({ error: "urls array required" })); return;
+        }
+        const cloneJobs = [];
+        for (const repoUrl of urls) {
+          const repoName = repoUrl.split("/").slice(-1)[0].replace(/\.git$/, "");
+          const destPath = path.resolve("targets", target, "src", repoName);
+          const job = createJob({
+            target,
+            script: "git",
+            args: ["clone", repoUrl, destPath],
+            label: `git clone ${repoName}`
+          });
+          startJob(job);
+          cloneJobs.push({ url: repoUrl, job_id: job.id });
+        }
+        response.writeHead(200, { "Content-Type": "application/json" });
+        response.end(JSON.stringify({ clone_jobs: cloneJobs }));
+      });
+      return;
+    }
 
     // ── Targets ────────────────────────────────────────────────────────────
     if (method === "GET" && url === "/api/targets") {
@@ -277,13 +541,35 @@ function main() {
       const body = await readBody(request);
       const { name, program_url } = body;
       if (!name) return sendJson(response, { error: "name required" });
-      const job = createJob({
-        target: name,
-        script: "node",
-        args: ["scripts/new-target.js", name, "--program-url", program_url || ""]
-      });
-      startJob(job);
-      return sendJson(response, { job_id: job.id });
+
+      const scaffoldArgs = ["scripts/new-target.js", name];
+      if (program_url) scaffoldArgs.push("--program-url", program_url);
+      const scaffoldJob = createJob({ target: name, script: "node", args: scaffoldArgs });
+      startJob(scaffoldJob);
+
+      const response_payload = { job_id: scaffoldJob.id, sync_job_id: null, intel_job_id: null };
+
+      if (program_url) {
+        // Auto-sync scope from program URL
+        const scopeJob = createJob({
+          target: name,
+          script: "node",
+          args: ["scripts/sync-program-scope.js", "--url", program_url]
+        });
+        startJob(scopeJob);
+        response_payload.sync_job_id = scopeJob.id;
+
+        // Auto-sync H1 intel (scope snapshot + disclosed reports) into target intelligence dir
+        const intelJob = createJob({
+          target: name,
+          script: "node",
+          args: ["scripts/sync-hackerone-intel.js", "--target", name]
+        });
+        startJob(intelJob);
+        response_payload.intel_job_id = intelJob.id;
+      }
+
+      return sendJson(response, response_payload);
     }
 
     if (method === "POST" && /^\/api\/targets\/([^/]+)\/reset$/.test(url)) {
@@ -372,6 +658,23 @@ function main() {
       return sendJson(response, listJobs().slice(0, 50));
     }
 
+    // ── Per-target intelligence ────────────────────────────────────────────
+    if (method === "GET" && /^\/api\/intelligence\/(.+)$/.test(url)) {
+      const tgt = url.replace("/api/intelligence/", "");
+      if (tgt.includes("/") || tgt.includes("..") || tgt.includes("\\")) {
+        response.writeHead(400); response.end("invalid target name"); return;
+      }
+      try {
+        const ctx = getTargetContext(tgt);
+        return sendJson(response, {
+          config: ctx.config,
+          local: loadProgramIntel(ctx.intelligenceDir, ctx.programHandle)
+        });
+      } catch {
+        return sendJson(response, { config: null, local: null });
+      }
+    }
+
     // ── Findings ───────────────────────────────────────────────────────────
     if (method === "GET" && /^\/api\/findings\/(.+)$/.test(url)) {
       const target = url.replace("/api/findings/", "");
@@ -452,6 +755,7 @@ function main() {
     }
 
     if (parsedUrl.pathname === "/api/target") {
+      if (!targetContext) { sendJson(response, { config: null, local: null, global: null }); return; }
       const globalDataset = loadDisclosedDataset(args.globalDir);
       sendJson(response, {
         config: targetContext.config,
@@ -462,6 +766,7 @@ function main() {
     }
 
     if (parsedUrl.pathname === "/api/local") {
+      if (!targetContext) { sendJson(response, null); return; }
       sendJson(response, loadProgramIntel(targetContext.intelligenceDir, targetContext.programHandle));
       return;
     }
@@ -492,14 +797,19 @@ function main() {
     });
   });
 
+  for (const sig of ["exit", "SIGINT", "SIGTERM"]) {
+    process.on(sig, removePidFile);
+  }
+
   listenWithFallback(server, args.port)
     .then((actualPort) => {
+      writePidFile(actualPort);
       const url = `http://127.0.0.1:${actualPort}`;
       console.log(`Intel UI available at ${url}`);
       if (actualPort !== args.port) {
         console.log(`- requested port ${args.port} was busy, using ${actualPort} instead`);
       }
-      console.log(`- target: ${args.target}`);
+      if (args.target) console.log(`- target: ${args.target}`);
       console.log(`- global dir: ${args.globalDir}`);
       if (args.open) {
         openBrowser(url);
