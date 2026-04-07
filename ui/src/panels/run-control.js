@@ -1,4 +1,4 @@
-import { apiFetch, openSSE } from "../modules/api.js";
+import { apiFetch, openSSE, stripAnsi } from "../modules/api.js";
 import { showAlert, showConfirm } from "../modules/modal.js";
 
 const STEPS = ["Setup", "Assets", "Explorer", "Researcher", "Review", "Submit"];
@@ -167,7 +167,7 @@ let jobSSE = null;
 function subscribeJobLog(jobId) {
   if (jobSSE) { jobSSE.close(); jobSSE = null; }
   jobSSE = openSSE(`/api/stream/${jobId}`, (msg) => {
-    if (msg.line) pushLogLine(msg.line);
+    if (msg.line) pushLogLine(stripAnsi(msg.line));
   }, () => {});
 }
 

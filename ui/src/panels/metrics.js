@@ -1,4 +1,4 @@
-import { apiFetch, openSSE } from "../modules/api.js";
+import { apiFetch, openSSE, stripAnsi } from "../modules/api.js";
 import { pushLogLine } from "./run-control.js";
 
 let logSSE = null;
@@ -73,11 +73,12 @@ window.abbTailJob = function(jobId, label) {
     `/api/stream/${jobId}`,
     (msg) => {
       if (msg.line) {
-        const line = document.createElement("div");
-        line.textContent = msg.line;
+        const clean = stripAnsi(msg.line);
+        const line  = document.createElement("div");
+        line.textContent = clean;
         logEl.appendChild(line);
         logEl.scrollTop = logEl.scrollHeight;
-        pushLogLine(msg.line);
+        pushLogLine(clean);
       }
     },
     () => {} // ignore connection errors

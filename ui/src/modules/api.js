@@ -20,6 +20,12 @@ export async function apiFetch(path, options = {}) {
   return res.text();
 }
 
+/** Strip ANSI escape sequences from a log line before displaying in browser. */
+// eslint-disable-next-line no-control-regex
+export function stripAnsi(str) {
+  return String(str).replace(/\x1b\[[0-9;]*[A-Za-z]/g, "").replace(/\x1b\][^\x07]*\x07/g, "");
+}
+
 /**
  * Open an SSE connection. Returns an object with a close() method.
  * onMessage is called with parsed data objects.
