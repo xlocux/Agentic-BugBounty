@@ -45,3 +45,4 @@ yarn-error.log*
 *.user
 .claude\settings.json
 docs/superpowers/*
+ui/dist/
