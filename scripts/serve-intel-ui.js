@@ -15,6 +15,11 @@ const {
 const { createJob, startJob, stopJob, getJob, listJobs, tailJob } = require("./lib/ui-jobs");
 const { streamChatResponse } = require("./lib/ui-chat");
 const { serveBrowse } = require("./lib/ui-static");
+const {
+  openDatabase, resolveGlobalDatabasePath,
+  getFindingsSummary, getTopVulnClasses, listFindings, listTargets,
+} = require("./lib/db");
+const { syncTarget, syncAll } = require("./lib/pipeline-sync");
 
 const PID_FILE  = path.resolve("logs", "ui", "serve-intel-ui.pid");
 const ENV_PATH  = path.resolve(".env");
@@ -26,7 +31,8 @@ const SETTINGS_WHITELIST = new Set([
   "OPENROUTER_API_KEY_1", "OPENROUTER_API_KEY_2", "OPENROUTER_API_KEY_3",
   "OPENROUTER_API_KEY_4", "OPENROUTER_API_KEY_5",
   "BBSCOPE_API_KEY",
-  "NOTIFY_WEBHOOK_URL"
+  "NOTIFY_WEBHOOK_URL",
+  "GEMINI_API_KEY",
 ]);
 
 function readEnvFile() {
@@ -574,16 +580,156 @@ function main() {
 
     if (method === "POST" && /^\/api\/targets\/([^/]+)\/reset$/.test(url)) {
       const name = url.split("/")[3];
-      const job  = createJob({ target: name, script: "node", args: ["scripts/reset-target.js", "--target", name] });
+      if (!name || name.includes("/") || name.includes("..") || name.includes("\\")) {
+        response.writeHead(400); response.end("invalid target name"); return;
+      }
+      const job  = createJob({ target: name, script: "node", args: ["scripts/reset-target.js", "--target", name, "--yes"] });
       startJob(job);
       return sendJson(response, { job_id: job.id });
+    }
+
+    // ── Artifact upload ────────────────────────────────────────────────────
+    // POST /api/targets/:name/upload?assetType=mobileapp
+    // Content-Type: multipart/form-data (or application/octet-stream with ?filename=)
+    if (method === "POST" && /^\/api\/targets\/([^/]+)\/upload$/.test(url)) {
+      const name      = url.split("/")[3];
+      const assetType = (parsedUrl.searchParams.get("assetType") || "mobileapp").replace(/[^a-z]/g, "");
+      const ALLOWED_ASSET_TYPES = new Set(["webapp", "browserext", "mobileapp", "executable"]);
+      if (!ALLOWED_ASSET_TYPES.has(assetType)) {
+        response.writeHead(400); response.end("invalid assetType"); return;
+      }
+      if (!name || name.includes("/") || name.includes("..") || name.includes("\\")) {
+        response.writeHead(400); response.end("invalid target name"); return;
+      }
+
+      const targetDir = path.resolve("targets", name);
+      if (!fs.existsSync(targetDir)) {
+        response.writeHead(404); response.end("target not found"); return;
+      }
+
+      const destDir = path.join(targetDir, `src-${assetType}`);
+      fs.mkdirSync(destDir, { recursive: true });
+
+      const ct = request.headers["content-type"] || "";
+
+      if (ct.includes("multipart/form-data")) {
+        // Parse multipart manually — extract boundary
+        const boundaryMatch = ct.match(/boundary=([^\s;]+)/);
+        if (!boundaryMatch) { response.writeHead(400); response.end("missing boundary"); return; }
+        const boundary = "--" + boundaryMatch[1];
+
+        await new Promise((resolve) => {
+          const chunks = [];
+          request.on("data", (c) => chunks.push(c));
+          request.on("end", () => {
+            const buf       = Buffer.concat(chunks);
+            const raw       = buf.toString("binary");
+            const partStart = raw.indexOf("\r\n\r\n");
+            // Parse filename from Content-Disposition header
+            const headerBlock = raw.slice(0, partStart);
+            const nameMatch   = headerBlock.match(/filename="([^"]+)"/);
+            const origName    = nameMatch ? nameMatch[1].replace(/[/\\]/g, "_") : `artifact.${assetType === "mobileapp" ? "apk" : "bin"}`;
+            // Body starts after \r\n\r\n, ends before final boundary
+            const bodyStart = partStart + 4;
+            const bodyEnd   = raw.lastIndexOf("\r\n" + boundary);
+            if (bodyEnd <= bodyStart) { response.writeHead(400); response.end("empty upload"); resolve(); return; }
+            const fileBuf   = buf.slice(bodyStart, bodyEnd);
+            fs.writeFileSync(path.join(destDir, origName), fileBuf);
+            sendJson(response, { ok: true, filename: origName, bytes: fileBuf.length, dest: `src-${assetType}/${origName}` });
+            resolve();
+          });
+          request.on("error", () => { response.writeHead(500); response.end("stream error"); resolve(); });
+        });
+      } else {
+        // Raw octet-stream — use ?filename= query param
+        const rawFilename = parsedUrl.searchParams.get("filename") || `artifact.bin`;
+        const safeFilename = path.basename(rawFilename).replace(/[/\\]/g, "_");
+        await new Promise((resolve) => {
+          const chunks = [];
+          request.on("data", (c) => chunks.push(c));
+          request.on("end", () => {
+            const buf = Buffer.concat(chunks);
+            fs.writeFileSync(path.join(destDir, safeFilename), buf);
+            sendJson(response, { ok: true, filename: safeFilename, bytes: buf.length, dest: `src-${assetType}/${safeFilename}` });
+            resolve();
+          });
+          request.on("error", () => { response.writeHead(500); response.end("stream error"); resolve(); });
+        });
+      }
+      return;
+    }
+
+    // ── List uploaded artifacts ────────────────────────────────────────────
+    // GET /api/targets/:name/artifacts
+    if (method === "GET" && /^\/api\/targets\/([^/]+)\/artifacts$/.test(url)) {
+      const name = url.split("/")[3];
+      if (!name || name.includes("/") || name.includes("..") || name.includes("\\")) {
+        response.writeHead(400); response.end("invalid target name"); return;
+      }
+      const targetDir = path.resolve("targets", name);
+      const results = [];
+      for (const assetType of ["mobileapp", "executable", "browserext", "webapp"]) {
+        const dir = path.join(targetDir, `src-${assetType}`);
+        if (!fs.existsSync(dir)) continue;
+        for (const f of fs.readdirSync(dir)) {
+          try {
+            const stat = fs.statSync(path.join(dir, f));
+            if (stat.isFile()) results.push({ assetType, filename: f, bytes: stat.size, dir: `src-${assetType}` });
+          } catch { /* skip */ }
+        }
+      }
+      return sendJson(response, results);
+    }
+
+    // DELETE /api/targets/:name/artifacts/:filename?assetType=mobileapp
+    if (method === "DELETE" && /^\/api\/targets\/([^/]+)\/artifacts\/(.+)$/.test(url)) {
+      const parts    = url.split("/");
+      const name     = parts[3];
+      const filename = decodeURIComponent(parts.slice(5).join("/"));
+      const assetType = (parsedUrl.searchParams.get("assetType") || "").replace(/[^a-z]/g, "");
+      if (!name || name.includes("..") || !assetType || !filename || filename.includes("..") || filename.includes("/")) {
+        response.writeHead(400); response.end("invalid params"); return;
+      }
+      const filePath = path.resolve("targets", name, `src-${assetType}`, filename);
+      // Safety: must be inside targets/{name}/src-{assetType}/
+      if (!filePath.startsWith(path.resolve("targets", name) + path.sep)) {
+        response.writeHead(403); response.end("forbidden"); return;
+      }
+      try {
+        fs.rmSync(filePath, { force: true });
+        return sendJson(response, { ok: true });
+      } catch (e) {
+        response.writeHead(500); response.end(e.message); return;
+      }
+    }
+
+    // DELETE /api/targets/:name  — remove entire target workspace
+    if (method === "DELETE" && /^\/api\/targets\/([^/]+)$/.test(url)) {
+      const name = url.split("/")[3];
+      if (!name || name.includes("/") || name.includes("..") || name.includes("\\")) {
+        response.writeHead(400); response.end("invalid target name"); return;
+      }
+      const targetDir = path.resolve("targets", name);
+      if (!fs.existsSync(path.join(targetDir, "target.json"))) {
+        response.writeHead(404); response.end("target not found"); return;
+      }
+      try {
+        fs.rmSync(targetDir, { recursive: true, force: true });
+        return sendJson(response, { ok: true });
+      } catch (e) {
+        response.writeHead(500); response.end(e.message); return;
+      }
     }
 
     // ── Run control ────────────────────────────────────────────────────────
     if (method === "POST" && url === "/api/run/start") {
       const body   = await readBody(request);
-      const { target, mode, interactive, hitl, resume, skipIntel } = body;
+      const { target, mode, interactive, hitl, resume, skipIntel, cli, model } = body;
       if (!target) return sendJson(response, { error: "target required" });
+
+      // Validate CLI choice
+      const ALLOWED_CLIS = new Set(["claude", "gemini", "codex", "openrouter"]);
+      const resolvedCli  = ALLOWED_CLIS.has(cli) ? cli : "claude";
 
       if (!skipIntel) {
         const intelJob = createJob({
@@ -594,8 +740,9 @@ function main() {
         startJob(intelJob);
       }
 
-      const args = ["scripts/run-pipeline.js", "--target", target, "--cli", "claude"];
+      const args = ["scripts/run-pipeline.js", "--target", target, "--cli", resolvedCli];
       if (mode)        args.push("--mode", mode);
+      if (model)       args.push("--model", model);
       if (interactive) args.push("--interactive");
       if (hitl)        args.push("--hitl");
       if (resume)      args.push("--resume");
@@ -626,6 +773,122 @@ function main() {
         finding_count:    bundle?.findings?.length ?? 0,
         domains_completed: bundle?.meta?.domains_completed ?? []
       });
+    }
+
+    // ── Findings bundle ────────────────────────────────────────────────────
+    if (method === "GET" && /^\/api\/targets\/[^/]+\/findings$/.test(url)) {
+      const tgt = url.split("/")[3];
+      if (tgt.includes("..") || tgt.includes("\\")) { response.writeHead(400); response.end("invalid"); return; }
+      const bundlePath = path.resolve("targets", tgt, "findings", "confirmed", "report_bundle.json");
+      try {
+        return sendJson(response, JSON.parse(fs.readFileSync(bundlePath, "utf8")));
+      } catch {
+        return sendJson(response, { findings: [] });
+      }
+    }
+
+    // ── Candidates (all pools merged) ──────────────────────────────────────
+    if (method === "GET" && /^\/api\/targets\/[^/]+\/candidates$/.test(url)) {
+      const tgt = url.split("/")[3];
+      if (tgt.includes("..") || tgt.includes("\\")) { response.writeHead(400); response.end("invalid"); return; }
+      const findDir = path.resolve("targets", tgt, "findings");
+      let all = [];
+      for (const agent of ["auth", "inject", "client", "access", "media", "infra"]) {
+        try {
+          const p = JSON.parse(fs.readFileSync(path.join(findDir, `candidates_pool_${agent}.json`), "utf8"));
+          all = all.concat(p.candidates || []);
+        } catch {}
+      }
+      return sendJson(response, { candidates: all, total: all.length });
+    }
+
+    // ── Dashboard ──────────────────────────────────────────────────────────
+    if (method === "POST" && url === "/api/dashboard/sync") {
+      const body = await readBody(request).catch(() => ({}));
+      const target = body?.target;
+      try {
+        const result = target ? [{ name: target, ...syncTarget(target), ok: true }] : syncAll();
+        return sendJson(response, { ok: true, results: result });
+      } catch (err) {
+        return sendJson(response, { ok: false, error: err.message });
+      }
+    }
+
+    if (method === "GET" && url === "/api/dashboard") {
+      let db;
+      try {
+        db = openDatabase(resolveGlobalDatabasePath());
+        const summary  = getFindingsSummary(db);
+        const topVulns = getTopVulnClasses(db);
+        const targets  = listTargets(db);
+        const jobs     = listJobs().slice(-20).reverse();
+        return sendJson(response, { summary, topVulns, targets, jobs });
+      } catch (err) {
+        return sendJson(response, { summary: [], topVulns: [], targets: [], recentRuns: [], jobs: [], error: err.message });
+      } finally {
+        db?.close();
+      }
+    }
+
+    if (method === "GET" && /^\/api\/dashboard\/findings/.test(url)) {
+      const params    = new URLSearchParams(url.split("?")[1] || "");
+      const severity  = params.get("severity") || null;
+      const status    = params.get("status")   || null;
+      const limit     = Math.min(500, parseInt(params.get("limit") || "100", 10));
+      let db;
+      try {
+        db = openDatabase(resolveGlobalDatabasePath());
+        const findings = listFindings(db, { severity, status, limit });
+        return sendJson(response, { findings });
+      } catch (err) {
+        return sendJson(response, { findings: [], error: err.message });
+      } finally {
+        db?.close();
+      }
+    }
+
+    // ── Recon data (tech stack + attack surface + research brief) ──────────
+    if (method === "GET" && /^\/api\/targets\/[^/]+\/recon$/.test(url)) {
+      const tgt = url.split("/")[3];
+      if (tgt.includes("..") || tgt.includes("\\")) { response.writeHead(400); response.end("invalid"); return; }
+      const findDir  = path.resolve("targets", tgt, "findings");
+      const intelDir = path.resolve("targets", tgt, "intelligence");
+
+      // Aggregate language stats from file manifest
+      let lang_stats = {}, relevance_stats = {}, total_files = 0;
+      try {
+        const manifest = JSON.parse(fs.readFileSync(path.join(findDir, "file_manifest.json"), "utf8"));
+        for (const f of (manifest.files || [])) {
+          const lang = f.language || "other";
+          const rel  = f.relevance_tag || "other";
+          lang_stats[lang]   = (lang_stats[lang]   || 0) + 1;
+          relevance_stats[rel] = (relevance_stats[rel] || 0) + 1;
+          total_files++;
+        }
+      } catch {}
+
+      let attack_surface = null;
+      try { attack_surface = JSON.parse(fs.readFileSync(path.join(findDir, "attack_surface.json"), "utf8")); } catch {}
+
+      let research_brief = null;
+      try { research_brief = JSON.parse(fs.readFileSync(path.join(intelDir, "research_brief.json"), "utf8")); } catch {}
+
+      return sendJson(response, { lang_stats, relevance_stats, total_files, attack_surface, research_brief });
+    }
+
+    // ── Checkpoint probe ───────────────────────────────────────────────────
+    if (method === "GET" && /^\/api\/run\/checkpoint\/(.+)$/.test(url)) {
+      const tgt = url.replace("/api/run/checkpoint/", "");
+      if (tgt.includes("/") || tgt.includes("..") || tgt.includes("\\")) {
+        response.writeHead(400); response.end("invalid target"); return;
+      }
+      const cpPath = path.resolve("targets", tgt, "logs", "checkpoint.json");
+      try {
+        const cp = JSON.parse(fs.readFileSync(cpPath, "utf8"));
+        return sendJson(response, { exists: true, phase: cp.phase, asset: cp.asset, savedAt: cp.savedAt });
+      } catch {
+        return sendJson(response, { exists: false });
+      }
     }
 
     // ── SSE stream ─────────────────────────────────────────────────────────

@@ -1,0 +1,337 @@
+[
+  {
+    "id": "job-1775654559973-1-duckduckgo",
+    "target": "duckduckgo",
+    "script": "node",
+    "args": [
+      "scripts/run-pipeline.js",
+      "--target",
+      "duckduckgo",
+      "--cli",
+      "openrouter",
+      "--mode",
+      "whitebox",
+      "--model",
+      "deepseek/deepseek-chat-v3-0324:free"
+    ],
+    "pid": 7868,
+    "started": "2026-04-08T13:22:40.971Z",
+    "finished": "2026-04-08T13:23:22.146Z",
+    "status": "error",
+    "log_file": "D:\\Agentic-BugBounty\\logs\\ui\\job-1775654559973-1-duckduckgo.log",
+    "byte_offset": 9390,
+    "exit_code": 1
+  },
+  {
+    "id": "job-1775638961004-2-duckduckgo",
+    "target": "duckduckgo",
+    "script": "node",
+    "args": [
+      "scripts/run-pipeline.js",
+      "--target",
+      "duckduckgo",
+      "--cli",
+      "claude",
+      "--mode",
+      "whitebox",
+      "--resume"
+    ],
+    "pid": 20616,
+    "started": "2026-04-08T09:02:41.031Z",
+    "finished": "2026-04-08T09:19:58.436Z",
+    "status": "error",
+    "log_file": "D:\\Agentic-BugBounty\\logs\\ui\\job-1775638961004-2-duckduckgo.log",
+    "byte_offset": 32633,
+    "exit_code": 1
+  },
+  {
+    "id": "job-1775638930442-1-duckduckgo",
+    "target": "duckduckgo",
+    "script": "node",
+    "args": [
+      "scripts/run-pipeline.js",
+      "--target",
+      "duckduckgo",
+      "--cli",
+      "claude",
+      "--mode",
+      "blackbox",
+      "--resume"
+    ],
+    "pid": 25008,
+    "started": "2026-04-08T09:02:11.384Z",
+    "finished": "2026-04-08T09:02:37.164Z",
+    "status": "error",
+    "log_file": "D:\\Agentic-BugBounty\\logs\\ui\\job-1775638930442-1-duckduckgo.log",
+    "byte_offset": 7154,
+    "exit_code": 1
+  },
+  {
+    "id": "job-1775636513901-2-duckduckgo",
+    "target": "duckduckgo",
+    "script": "node",
+    "args": [
+      "scripts/run-pipeline.js",
+      "--target",
+      "duckduckgo",
+      "--cli",
+      "claude",
+      "--mode",
+      "whitebox"
+    ],
+    "pid": 26808,
+    "started": "2026-04-08T08:21:53.948Z",
+    "finished": "2026-04-08T08:26:06.650Z",
+    "status": "done",
+    "log_file": "D:\\Agentic-BugBounty\\logs\\ui\\job-1775636513901-2-duckduckgo.log",
+    "byte_offset": 11308,
+    "exit_code": 0
+  },
+  {
+    "id": "job-1775568701935-1-duckduckgo",
+    "target": "duckduckgo",
+    "script": "node",
+    "args": [
+      "scripts/run-pipeline.js",
+      "--target",
+      "duckduckgo",
+      "--cli",
+      "claude",
+      "--mode",
+      "whitebox"
+    ],
+    "pid": 14780,
+    "started": "2026-04-07T13:31:41.956Z",
+    "finished": "2026-04-07T14:02:45.629Z",
+    "status": "error",
+    "log_file": "D:\\Agentic-BugBounty\\logs\\ui\\job-1775568701935-1-duckduckgo.log",
+    "byte_offset": 51027,
+    "exit_code": 1
+  },
+  {
+    "id": "job-1775553552924-1-duckduckgo",
+    "target": "duckduckgo",
+    "script": "node",
+    "args": [
+      "scripts/run-pipeline.js",
+      "--target",
+      "duckduckgo",
+      "--cli",
+      "claude",
+      "--mode",
+      "whitebox"
+    ],
+    "pid": 5020,
+    "started": "2026-04-07T09:19:12.978Z",
+    "finished": "2026-04-07T09:52:26.055Z",
+    "status": "error",
+    "log_file": "D:\\Agentic-BugBounty\\logs\\ui\\job-1775553552924-1-duckduckgo.log",
+    "byte_offset": 57482,
+    "exit_code": 1
+  },
+  {
+    "id": "job-1775552550018-6-duckduckgo",
+    "target": "duckduckgo",
+    "script": "node",
+    "args": [
+      "scripts/sync-hackerone-intel.js",
+      "--target",
+      "duckduckgo"
+    ],
+    "pid": 25304,
+    "started": "2026-04-07T09:02:30.038Z",
+    "finished": "2026-04-07T09:02:34.071Z",
+    "status": "done",
+    "log_file": "D:\\Agentic-BugBounty\\logs\\ui\\job-1775552550018-6-duckduckgo.log",
+    "byte_offset": 0,
+    "exit_code": 0
+  },
+  {
+    "id": "job-1775552549987-5-duckduckgo",
+    "target": "duckduckgo",
+    "script": "node",
+    "args": [
+      "scripts/sync-program-scope.js",
+      "--url",
+      "https://hackerone.com/duckduckgo"
+    ],
+    "pid": 23468,
+    "started": "2026-04-07T09:02:30.006Z",
+    "finished": "2026-04-07T09:02:30.919Z",
+    "status": "error",
+    "log_file": "D:\\Agentic-BugBounty\\logs\\ui\\job-1775552549987-5-duckduckgo.log",
+    "byte_offset": 0,
+    "exit_code": 1
+  },
+  {
+    "id": "job-1775552549934-4-duckduckgo",
+    "target": "duckduckgo",
+    "script": "node",
+    "args": [
+      "scripts/new-target.js",
+      "duckduckgo",
+      "--program-url",
+      "https://hackerone.com/duckduckgo"
+    ],
+    "pid": 24984,
+    "started": "2026-04-07T09:02:29.975Z",
+    "finished": "2026-04-07T09:02:30.070Z",
+    "status": "error",
+    "log_file": "D:\\Agentic-BugBounty\\logs\\ui\\job-1775552549934-4-duckduckgo.log",
+    "byte_offset": 0,
+    "exit_code": 1
+  },
+  {
+    "id": "job-1775552541506-3-duckduckgo",
+    "target": "duckduckgo",
+    "script": "node",
+    "args": [
+      "scripts/sync-hackerone-intel.js",
+      "--target",
+      "duckduckgo"
+    ],
+    "pid": 24116,
+    "started": "2026-04-07T09:02:21.529Z",
+    "finished": "2026-04-07T09:02:27.978Z",
+    "status": "done",
+    "log_file": "D:\\Agentic-BugBounty\\logs\\ui\\job-1775552541506-3-duckduckgo.log",
+    "byte_offset": 0,
+    "exit_code": 0
+  },
+  {
+    "id": "job-1775552541467-2-duckduckgo",
+    "target": "duckduckgo",
+    "script": "node",
+    "args": [
+      "scripts/sync-program-scope.js",
+      "--url",
+      "https://hackerone.com/duckduckgo"
+    ],
+    "pid": 9640,
+    "started": "2026-04-07T09:02:21.493Z",
+    "finished": "2026-04-07T09:02:22.640Z",
+    "status": "error",
+    "log_file": "D:\\Agentic-BugBounty\\logs\\ui\\job-1775552541467-2-duckduckgo.log",
+    "byte_offset": 0,
+    "exit_code": 1
+  },
+  {
+    "id": "job-1775552540505-1-duckduckgo",
+    "target": "duckduckgo",
+    "script": "node",
+    "args": [
+      "scripts/new-target.js",
+      "duckduckgo",
+      "--program-url",
+      "https://hackerone.com/duckduckgo"
+    ],
+    "pid": 25112,
+    "started": "2026-04-07T09:02:21.456Z",
+    "finished": "2026-04-07T09:02:21.559Z",
+    "status": "error",
+    "log_file": "D:\\Agentic-BugBounty\\logs\\ui\\job-1775552540505-1-duckduckgo.log",
+    "byte_offset": 0,
+    "exit_code": 1
+  },
+  {
+    "id": "job-1775377821688-3-duckduckgo",
+    "target": "duckduckgo",
+    "script": "node",
+    "args": [
+      "scripts/sync-hackerone-intel.js",
+      "--target",
+      "duckduckgo"
+    ],
+    "pid": 10868,
+    "started": "2026-04-05T08:30:21.708Z",
+    "finished": "2026-04-05T08:30:25.981Z",
+    "status": "done",
+    "log_file": "D:\\Agentic-BugBounty\\logs\\ui\\job-1775377821688-3-duckduckgo.log",
+    "byte_offset": 0,
+    "exit_code": 0
+  },
+  {
+    "id": "job-1775377821655-2-duckduckgo",
+    "target": "duckduckgo",
+    "script": "node",
+    "args": [
+      "scripts/sync-program-scope.js",
+      "--url",
+      "https://hackerone.com/duckduckgo"
+    ],
+    "pid": 2480,
+    "started": "2026-04-05T08:30:21.676Z",
+    "finished": "2026-04-05T08:30:22.938Z",
+    "status": "error",
+    "log_file": "D:\\Agentic-BugBounty\\logs\\ui\\job-1775377821655-2-duckduckgo.log",
+    "byte_offset": 0,
+    "exit_code": 1
+  },
+  {
+    "id": "job-1775377820728-1-duckduckgo",
+    "target": "duckduckgo",
+    "script": "node",
+    "args": [
+      "scripts/new-target.js",
+      "duckduckgo",
+      "--program-url",
+      "https://hackerone.com/duckduckgo"
+    ],
+    "pid": 8916,
+    "started": "2026-04-05T08:30:21.638Z",
+    "finished": "2026-04-05T08:30:22.586Z",
+    "status": "done",
+    "log_file": "D:\\Agentic-BugBounty\\logs\\ui\\job-1775377820728-1-duckduckgo.log",
+    "byte_offset": 0,
+    "exit_code": 0
+  },
+  {
+    "id": "job-1775341175602-3-global",
+    "target": "global",
+    "script": "npm",
+    "args": [
+      "run",
+      "h1:sync"
+    ],
+    "started": "2026-04-04T22:19:35.648Z",
+    "finished": "2026-04-05T08:00:35.588Z",
+    "status": "error",
+    "log_file": "D:\\Agentic-BugBounty\\logs\\ui\\job-1775341175602-3-global.log",
+    "byte_offset": 0,
+    "exit_code": -1
+  },
+  {
+    "id": "job-1775341120558-2-duckduckgo",
+    "target": "duckduckgo",
+    "script": "node",
+    "args": [
+      "scripts/reset-target.js",
+      "--target",
+      "duckduckgo"
+    ],
+    "pid": 16988,
+    "started": "2026-04-04T22:18:40.592Z",
+    "finished": "2026-04-04T22:18:40.655Z",
+    "status": "done",
+    "log_file": "D:\\Agentic-BugBounty\\logs\\ui\\job-1775341120558-2-duckduckgo.log",
+    "byte_offset": 0,
+    "exit_code": 0
+  },
+  {
+    "id": "job-1775341114260-1-duckduckgo",
+    "target": "duckduckgo",
+    "script": "node",
+    "args": [
+      "scripts/reset-target.js",
+      "--target",
+      "duckduckgo"
+    ],
+    "pid": 9564,
+    "started": "2026-04-04T22:18:35.172Z",
+    "finished": "2026-04-04T22:18:35.244Z",
+    "status": "done",
+    "log_file": "D:\\Agentic-BugBounty\\logs\\ui\\job-1775341114260-1-duckduckgo.log",
+    "byte_offset": 0,
+    "exit_code": 0
+  }
+]

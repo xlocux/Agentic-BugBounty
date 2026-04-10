@@ -1,0 +1,132 @@
+[36m[2026-04-08T08:21:54.225Z][0m Starting pipeline assets=webapp mode=whitebox cli=claude
+
+[35m════════════════════════════════════════════════════════════════════════[0m
+[1m[95mPIPELINE STARTING[0m
+[35m════════════════════════════════════════════════════════════════════════[0m
+
+  [36mTarget[0m      : [1mduckduckgo[0m
+  [36mCLI[0m         : claude
+  [36mMode[0m        : whitebox
+
+  [36mAssets to analyse[0m (1):
+    [33m•[0m [1mwebapp      [0m [2m./src[0m
+
+  [36mPipeline phases:[0m
+    [33m1.[0m Intel sync    — bbscope scope, HackerOne history, CVE intel
+    [33m2.[0m Explorer      — [92menabled[0m (surface mapping: deps, JS endpoints, fingerprinting)
+       [2mRuns in parallel with Hybrid Recon — feeds surface intel to Researcher[0m
+    [33m3.[0m Researcher    — Claude analyses each asset (whitebox/blackbox)
+    [33m3.[0m Dual pass     — [92menabled[0m (6 api key(s) in rotation)
+       [2mModels tried in order: researcher_model → free model fallback chain[0m
+       [2mOn 401/429/busy: rotate to next api key, then next model[0m
+    [33m4.[0m Triager       — validates findings, NMI rounds if needed
+    [33m5.[0m Reports       — H1-ready markdown reports rendered
+
+[35m════════════════════════════════════════════════════════════════════════[0m
+
+[36m[2026-04-08T08:21:54.235Z][0m Syncing bbscope intelligence (no credentials required)
+bbscope sync: duckduckgo (HackerOne)
+Fetching in-scope targets from bbscope.com...
+
+bbscope intelligence synced for duckduckgo
+  platform : HackerOne
+  scopes   : 4
+  snapshot : D:\Agentic-BugBounty\targets\duckduckgo\intelligence\bbscope_scope_snapshot.json
+  database : D:\Agentic-BugBounty\targets\duckduckgo\intelligence\agentic-bugbounty.db
+[92m[2026-04-08T08:21:54.643Z] bbscope intelligence sync complete[0m
+[36m[2026-04-08T08:21:54.648Z][0m Syncing HackerOne intelligence for duckduckgo
+HackerOne intelligence synced for duckduckgo
+- scope snapshot: D:\Agentic-BugBounty\targets\duckduckgo\intelligence\h1_scope_snapshot.json
+- vulnerability history: D:\Agentic-BugBounty\targets\duckduckgo\intelligence\h1_vulnerability_history.json
+- skill suggestions: D:\Agentic-BugBounty\targets\duckduckgo\intelligence\h1_skill_suggestions.json
+- sqlite database: D:\Agentic-BugBounty\targets\duckduckgo\intelligence\agentic-bugbounty.db
+- counts: scopes=4, hacktivity=0, reports=0
+[92m[2026-04-08T08:21:59.610Z] HackerOne intelligence sync complete[0m
+[36m[2026-04-08T08:21:59.627Z][0m Syncing CVE intel for duckduckgo
+  CVE intel for "duckduckgo" is fresh (synced 2026-04-07T13:32:15.691Z). Skipping.
+  Use --max-age-days 0 to force refresh.
+[92m[2026-04-08T08:21:59.760Z] CVE intel sync complete[0m
+[36m[2026-04-08T08:22:00.083Z][0m Research brief refreshed from local/global intelligence
+
+[36m──────────────────────────────────────────────────────────────────────[0m
+  [1m[36mSTAGE 0 — File Triage[0m  [2mclassifying all source files[0m
+[36m──────────────────────────────────────────────────────────────────────[0m
+
+[36m[2026-04-08T08:22:00.104Z][0m Stage 0 — File Triage: classifying source files...
+[36m[2026-04-08T08:22:00.111Z][0m Stage 0 — already complete, using cached manifest
+
+[36m──────────────────────────────────────────────────────────────────────[0m
+  [1m[36mSTAGE 1 — Surface Mapping[0m  [2mbuilding attack surface from manifest[0m
+[36m──────────────────────────────────────────────────────────────────────[0m
+
+[36m[2026-04-08T08:22:00.121Z][0m Stage 1 — Surface Mapping: building attack surface...
+[36m[2026-04-08T08:22:00.129Z][0m Stage 1 — already complete, using cached surface
+
+[36m──────────────────────────────────────────────────────────────────────[0m
+  [1m[36mSTAGE 1.5 — Git Intelligence[0m  [2mmining commits + secret scan[0m
+[36m──────────────────────────────────────────────────────────────────────[0m
+
+[36m[2026-04-08T08:22:00.139Z][0m Stage 1.5 — Git Intelligence: mining commits + scanning secrets...
+[36m[2026-04-08T08:22:00.147Z][0m Stage 1.5 — already complete, using cached intel
+
+[36m──────────────────────────────────────────────────────────────────────[0m
+  [1m[36mSTAGE 2 — Domain Research[0m  [2m6 specialist agents: AUTH INJECT CLIENT ACCESS MEDIA INFRA[0m
+[36m──────────────────────────────────────────────────────────────────────[0m
+
+
+[35m══════════════════════════════════════════════════════════════════════[0m
+[1m[95mRESEARCHER v2[0m — target: [1mD:\Agentic-BugBounty\targets\duckduckgo\src[0m  |  phase: [36mdeep research[0m  |  elapsed: [33m0s[0m
+[35m══════════════════════════════════════════════════════════════════════[0m
+  [90m○[0m  [96m[AUTH][0m  
+  [90m○[0m  [91m[INJECT][0m  
+  [90m○[0m  [95m[CLIENT][0m  
+  [90m○[0m  [93m[ACCESS][0m  
+  [90m○[0m  [92m[MEDIA][0m  
+  [90m○[0m  [36m[INFRA][0m  
+[35m──────────────────────────────────────────────────────────────────────[0m
+  Candidates so far: [1m0[0m  |  Confirmed: [92m0[0m  |  Agents done: [36m0/6[0m
+[35m══════════════════════════════════════════════════════════════════════[0m
+
+[36m[2026-04-08T08:22:00.176Z][0m Starting researcher phase asset=webapp source=D:\Agentic-BugBounty\targets\duckduckgo\src
+[36m[2026-04-08T08:22:00.183Z][0m Running Explorer + Hybrid Recon in parallel (free LLM)...
+  [2m[explorer] starting deterministic surface analysis...[0m
+  [2m[hybrid-recon] starting hybrid recon for webapp at D:\Agentic-BugBounty\targets\duckduckgo\src[0m
+  [2m[hybrid-recon] phase 0: loading calibration briefing for webapp...[0m
+  [2m[hybrid-recon] phase 0: calibration script unavailable — skipping[0m
+  [2m[hybrid-recon] phase 1: walking source tree at D:\Agentic-BugBounty\targets\duckduckgo\src...[0m
+  [2m[hybrid-recon] phase 1: found 300 source files — sampling key files...[0m
+  [2m[hybrid-recon] phase 1: asking free LLM to map attack surface...[0m
+  [2m[llm] gemini on the line. let's see what it says.[0m
+  [2m[llm] gemini: «I'm tired, boss.» *green mile vibes* — rotating out. (ccw cli failed: spawnSync ccw ENOENT)[0m
+  [2m[llm]   6 api key(s) loaded. trying 22 free models...[0m
+  [2m[llm] «Engage.» — calling openai/gpt-oss-120b:free.[0m
+  [2m[explorer] parser done in 31997ms — endpoints:1 secrets:0 tech:0[0m
+  [2m[explorer] total elapsed: 31997ms[0m
+  [2m[llm] openai/gpt-oss-120b:free delivered. done.[0m
+  [2m[hybrid-recon] phase 1: recon map received[0m
+  [2m[hybrid-recon] hybrid recon complete — injecting context into Claude prompt[0m
+[92m[2026-04-08T08:22:34.516Z] Explorer surface analysis injected into researcher prompt[0m
+[92m[2026-04-08T08:22:34.525Z] Hybrid recon injected into researcher prompt[0m
+[36m[2026-04-08T08:22:34.534Z][0m → Starting researcher[webapp] agent
+[2m[35m  » there is no spoon. only buffer overflows.[0m
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      [33m⏱[0m  [1m60s[0m | [2m0 tool call(s)...[0m                                                              [33m⏱[0m  [1m120s[0m | [2m0 tool call(s)...[0m                                                                                                                [33m⏱[0m  [1m180s[0m | [2m0 tool call(s)...[0m                                                              [33m»[0m [2mAPI Error: 529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"},"request_id":"req_011CZqz7EiHyH84KoHXvHCzu"}[0m
+                                                  
+  [92m[done][0m [1m210s[0m | [33m0 tool call(s)[0m | [2mtokens: 0 (in: 0 | out: 0 | cache_read: 0 | cache_write: 0)[0m
+
+                                                  [36m[2026-04-08T08:26:06.631Z][0m SESSION LIMIT: checkpoint saved at asset 0 (0 findings so far)
+[2m[35m  » so you're telling me there's a chance? to resume? yes. load checkpoint.[0m
+
+════════════════════════════════════════════════════════════════════════
+SESSION LIMIT REACHED
+
+Claude Pro usage cap hit during the researcher phase.
+Checkpoint saved — no work lost.
+  Checkpoint : D:\Agentic-BugBounty\targets\duckduckgo\logs\checkpoint.json
+
+When your session resets, resume with:
+
+  node scripts/run-pipeline.js --target duckduckgo --cli claude --resume
+
+The pipeline will pick up exactly where it stopped.
+════════════════════════════════════════════════════════════════════════
+

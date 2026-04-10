@@ -1603,6 +1603,59 @@ function readFpPatterns(db, vulnClass, limit = 20) {
   `).all(vulnClass, limit);
 }
 
+// ── Pipeline findings (confirmed + candidates) ────────────────────────────────
+
+function upsertFinding(db, { targetId, reportId, vulnClass, severity, title, affectedComponent, status, discoveredAt }) {
+  db.prepare(`
+    INSERT INTO findings_history (target_id, report_id, vuln_class, severity, title, affected_component, status, discovered_at)
+    VALUES (?,?,?,?,?,?,?,?)
+    ON CONFLICT(target_id, report_id) DO UPDATE SET
+      severity=excluded.severity, title=excluded.title, status=excluded.status,
+      affected_component=excluded.affected_component
+  `).run(
+    targetId, reportId,
+    sqlValue(vulnClass), sqlValue(severity), sqlValue(title),
+    sqlValue(affectedComponent), sqlValue(status || "confirmed"),
+    sqlValue(discoveredAt || new Date().toISOString())
+  );
+}
+
+function listFindings(db, { targetId, severity, status, limit = 200 } = {}) {
+  const conditions = ["1=1"];
+  const params = [];
+  if (targetId) { conditions.push("f.target_id=?");  params.push(targetId); }
+  if (severity) { conditions.push("f.severity=?");   params.push(severity); }
+  if (status)   { conditions.push("f.status=?");     params.push(status);   }
+  return db.prepare(`
+    SELECT f.*, t.handle AS target_handle
+    FROM   findings_history f
+    JOIN   targets_registry t ON t.id = f.target_id
+    WHERE  ${conditions.join(" AND ")}
+    ORDER BY f.discovered_at DESC
+    LIMIT ?
+  `).all(...params, limit);
+}
+
+function getFindingsSummary(db) {
+  return db.prepare(`
+    SELECT t.handle AS target, f.severity, f.status, COUNT(*) AS count
+    FROM   findings_history f
+    JOIN   targets_registry t ON t.id = f.target_id
+    GROUP  BY t.handle, f.severity, f.status
+  `).all();
+}
+
+function getTopVulnClasses(db, limit = 12) {
+  return db.prepare(`
+    SELECT vuln_class, COUNT(*) AS count
+    FROM   findings_history
+    WHERE  status = 'confirmed'
+    GROUP  BY vuln_class
+    ORDER  BY count DESC
+    LIMIT  ?
+  `).all(limit);
+}
+
 module.exports = {
   initDatabase,
   openDatabase,
@@ -1656,5 +1709,10 @@ module.exports = {
   upsertEndpoint,
   // false positive registry
   writeFpEntry,
-  readFpPatterns
+  readFpPatterns,
+  // pipeline findings
+  upsertFinding,
+  listFindings,
+  getFindingsSummary,
+  getTopVulnClasses,
 };

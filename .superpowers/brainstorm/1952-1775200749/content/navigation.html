@@ -1,0 +1,114 @@
+<h2>Navigation structure</h2>
+<p class="subtitle">How should the dashboard be organized? All three use the same cyberpunk aesthetic — this is about layout and navigation.</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="sidebar" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a0f1e;padding:12px;border-radius:6px;font-family:monospace;font-size:11px;">
+      <div style="display:flex;gap:8px;height:140px;">
+        <div style="width:90px;background:#0d1530;border-right:1px solid #1e3a5f;padding:8px;display:flex;flex-direction:column;gap:6px;border-radius:4px 0 0 4px;">
+          <div style="color:#39ffd4;font-size:9px;font-weight:bold;letter-spacing:2px;">NETRUNNER</div>
+          <div style="color:#55c7ff;font-size:9px;padding:3px 5px;background:#0a2040;border-radius:3px;">⬡ Dashboard</div>
+          <div style="color:#8ea0cb;font-size:9px;padding:3px 5px;">◈ Targets</div>
+          <div style="color:#8ea0cb;font-size:9px;padding:3px 5px;">▶ Run Control</div>
+          <div style="color:#8ea0cb;font-size:9px;padding:3px 5px;">◎ Findings</div>
+          <div style="color:#8ea0cb;font-size:9px;padding:3px 5px;">⬢ Intel</div>
+          <div style="color:#8ea0cb;font-size:9px;padding:3px 5px;">⚙ Config</div>
+        </div>
+        <div style="flex:1;background:#060816;padding:8px;border-radius:0 4px 4px 0;display:flex;flex-direction:column;gap:5px;">
+          <div style="color:#39ffd4;font-size:9px;font-weight:bold;">SYSTEM STATUS</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
+            <div style="background:#0d1530;padding:5px;border-radius:3px;border:1px solid #1e3a5f;"><div style="color:#ff4fd8;font-size:11px;font-weight:bold;">3</div><div style="color:#8ea0cb;font-size:8px;">TARGETS</div></div>
+            <div style="background:#0d1530;padding:5px;border-radius:3px;border:1px solid #1e3a5f;"><div style="color:#39ffd4;font-size:11px;font-weight:bold;">1</div><div style="color:#8ea0cb;font-size:8px;">RUNNING</div></div>
+            <div style="background:#0d1530;padding:5px;border-radius:3px;border:1px solid #1e3a5f;"><div style="color:#55c7ff;font-size:11px;font-weight:bold;">7</div><div style="color:#8ea0cb;font-size:8px;">FINDINGS</div></div>
+            <div style="background:#0d1530;padding:5px;border-radius:3px;border:1px solid #1e3a5f;"><div style="color:#ffd700;font-size:11px;font-weight:bold;">2</div><div style="color:#8ea0cb;font-size:8px;">CHAINS</div></div>
+          </div>
+          <div style="background:#0d1530;border-radius:3px;padding:5px;border-left:2px solid #39ffd4;margin-top:2px;">
+            <div style="color:#39ffd4;font-size:8px;">▶ duckduckgo — Stage 2/INJECT — 14m</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Sidebar navigation</h3>
+      <p>Sezioni sempre visibili a sinistra. Click per navigare. Classico dashboard layout. Sidebar collassabile su schermi piccoli.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="hud" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a0f1e;padding:12px;border-radius:6px;font-family:monospace;font-size:11px;">
+      <div style="height:140px;background:#060816;border-radius:4px;padding:8px;display:flex;flex-direction:column;gap:4px;position:relative;overflow:hidden;">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e3a5f;padding-bottom:4px;">
+          <span style="color:#39ffd4;font-size:9px;font-weight:bold;letter-spacing:3px;">NETRUNNER v2</span>
+          <div style="display:flex;gap:8px;">
+            <span style="color:#55c7ff;font-size:8px;border-bottom:1px solid #55c7ff;padding-bottom:1px;">DASHBOARD</span>
+            <span style="color:#8ea0cb;font-size:8px;">RUNS</span>
+            <span style="color:#8ea0cb;font-size:8px;">FINDINGS</span>
+            <span style="color:#8ea0cb;font-size:8px;">INTEL</span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;flex:1;">
+          <div style="background:#0d1530;border-radius:3px;border:1px solid #1e3a5f;padding:6px;display:flex;flex-direction:column;justify-content:center;align-items:center;">
+            <div style="color:#ff4fd8;font-size:14px;font-weight:bold;">3</div>
+            <div style="color:#8ea0cb;font-size:7px;letter-spacing:1px;">TARGETS</div>
+          </div>
+          <div style="background:#0d1530;border-radius:3px;border:1px solid #39ffd4;padding:6px;display:flex;flex-direction:column;justify-content:center;align-items:center;">
+            <div style="color:#39ffd4;font-size:14px;font-weight:bold;">1</div>
+            <div style="color:#39ffd4;font-size:7px;letter-spacing:1px;">RUNNING</div>
+          </div>
+          <div style="background:#0d1530;border-radius:3px;border:1px solid #1e3a5f;padding:6px;display:flex;flex-direction:column;justify-content:center;align-items:center;">
+            <div style="color:#55c7ff;font-size:14px;font-weight:bold;">7</div>
+            <div style="color:#8ea0cb;font-size:7px;letter-spacing:1px;">FINDINGS</div>
+          </div>
+          <div style="background:#0d1530;border-radius:3px;border:1px solid #1e3a5f;padding:6px;display:flex;flex-direction:column;justify-content:center;align-items:center;">
+            <div style="color:#ffd700;font-size:14px;font-weight:bold;">2</div>
+            <div style="color:#8ea0cb;font-size:7px;letter-spacing:1px;">CHAINS</div>
+          </div>
+        </div>
+        <div style="background:#0a1525;border-radius:3px;padding:4px 6px;border-left:2px solid #39ffd4;">
+          <span style="color:#39ffd4;font-size:8px;">LIVE ▶ duckduckgo</span>
+          <span style="color:#8ea0cb;font-size:8px;"> — Stage 2 · INJECT · 14m elapsed</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Top-tab navigation</h3>
+      <p>Barra in alto sempre visibile. Tab per sezione. Più orizzontale, HUD-style. Massimizza lo spazio verticale per i contenuti.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="terminal" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a0f1e;padding:12px;border-radius:6px;font-family:monospace;font-size:11px;">
+      <div style="height:140px;background:#060816;border-radius:4px;padding:8px;display:flex;flex-direction:column;gap:4px;overflow:hidden;">
+        <div style="display:flex;gap:4px;align-items:center;border-bottom:1px solid #1e3a5f;padding-bottom:4px;">
+          <div style="display:flex;gap:3px;">
+            <div style="width:6px;height:6px;border-radius:50%;background:#ff4fd8;"></div>
+            <div style="width:6px;height:6px;border-radius:50%;background:#ffd700;"></div>
+            <div style="width:6px;height:6px;border-radius:50%;background:#39ffd4;"></div>
+          </div>
+          <span style="color:#55c7ff;font-size:8px;margin-left:6px;">NETRUNNER CONTROL — duckduckgo</span>
+        </div>
+        <div style="flex:1;display:flex;gap:6px;">
+          <div style="flex:1;display:flex;flex-direction:column;gap:3px;">
+            <div style="color:#39ffd4;font-size:8px;">◈ LIVE FEED</div>
+            <div style="color:#8ea0cb;font-size:7px;line-height:1.6;">[14:22] Stage 2/INJECT started<br/>[14:22] Scanning query builders...<br/>[14:23] Candidate: SQLi in search<br/>[14:24] Confirming PoC...</div>
+          </div>
+          <div style="width:80px;display:flex;flex-direction:column;gap:3px;">
+            <div style="color:#39ffd4;font-size:8px;">◎ STATUS</div>
+            <div style="background:#0d1530;padding:3px;border-radius:2px;border-left:2px solid #39ffd4;"><div style="color:#39ffd4;font-size:7px;">AUTH ✓</div></div>
+            <div style="background:#0d1530;padding:3px;border-radius:2px;border-left:2px solid #55c7ff;"><div style="color:#55c7ff;font-size:7px;">INJECT ▶</div></div>
+            <div style="background:#0d1530;padding:3px;border-radius:2px;"><div style="color:#8ea0cb;font-size:7px;">CLIENT —</div></div>
+            <div style="background:#0d1530;padding:3px;border-radius:2px;"><div style="color:#8ea0cb;font-size:7px;">ACCESS —</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Terminal-split layout</h3>
+      <p>Il run attivo domina l'interfaccia: live feed a sinistra, status panel a destra. Navigazione contestuale. Cambia vista in base a cosa sta succedendo.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px;">Clicca la tua preferenza nel browser — o dimmi nel terminale.</p>

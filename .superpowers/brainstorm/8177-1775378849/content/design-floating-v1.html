@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body {
+  background:#050510;
+  font-family:'Courier New',monospace;
+  min-height:100vh;
+  overflow:hidden;
+  user-select:none;
+}
+
+/* ── Grid bg ── */
+body::before {
+  content:'';
+  position:fixed; inset:0; pointer-events:none;
+  background-image:
+    linear-gradient(#00f5ff08 1px, transparent 1px),
+    linear-gradient(90deg, #00f5ff08 1px, transparent 1px);
+  background-size:40px 40px;
+  z-index:0;
+}
+
+/* ── Top bar ── */
+#topbar {
+  position:fixed; top:0; left:0; right:0; height:40px; z-index:1000;
+  background:#080815ee;
+  border-bottom:1px solid #00f5ff22;
+  backdrop-filter:blur(8px);
+  display:flex; align-items:center; padding:0 16px; gap:16px;
+}
+.tb-logo { color:#00f5ff; font-size:13px; letter-spacing:3px; text-transform:uppercase;
+  text-shadow:0 0 10px #00f5ff; }
+.tb-sep { width:1px; height:20px; background:#ffffff15; }
+.tb-target { color:#68d391; font-size:12px; }
+.tb-status { font-size:11px; color:#4a5568; }
+.status-dot { width:7px; height:7px; border-radius:50%; background:#38a169;
+  box-shadow:0 0 6px #38a169; display:inline-block; animation:blink 1.2s step-end infinite; }
+@keyframes blink { 50%{opacity:0} }
+
+/* ── Dock ── */
+#dock {
+  position:fixed; bottom:0; left:0; right:0; height:52px; z-index:1000;
+  background:#080815ee; border-top:1px solid #00f5ff22;
+  backdrop-filter:blur(8px);
+  display:flex; align-items:center; padding:0 16px; gap:8px;
+}
+.dock-btn {
+  padding:6px 14px; border-radius:5px; font-size:12px; cursor:pointer;
+  border:1px solid #ffffff15; background:#0a0a1a; color:#a0aec0;
+  transition:.15s; white-space:nowrap; font-family:inherit;
+}
+.dock-btn:hover { background:#0a1a2a; border-color:#3182ce44; color:#90cdf4;
+  box-shadow:0 0 8px #3182ce33; }
+.dock-btn.minimized { border-color:#805ad544; color:#b794f4; }
+.dock-sep { width:1px; height:28px; background:#ffffff10; }
+
+/* ── Floating window ── */
+.floater {
+  position:fixed; z-index:100;
+  background:#08081aee;
+  border:1px solid #00f5ff22;
+  border-radius:10px;
+  box-shadow:0 8px 40px #00000088, 0 0 0 1px #00f5ff08;
+  backdrop-filter:blur(12px);
+  display:flex; flex-direction:column;
+  min-width:280px; min-height:120px;
+  transition: box-shadow .2s;
+}
+.floater:hover { box-shadow:0 8px 48px #000000aa, 0 0 0 1px #00f5ff22; }
+.floater.focused { border-color:#00f5ff44; box-shadow:0 8px 48px #000000bb, 0 0 20px #00f5ff11; z-index:200; }
+
+/* Title bar */
+.floater-bar {
+  display:flex; align-items:center; gap:8px;
+  padding:8px 12px;
+  background:#0a0a20;
+  border-bottom:1px solid #00f5ff15;
+  border-radius:10px 10px 0 0;
+  cursor:grab; flex-shrink:0;
+}
+.floater-bar:active { cursor:grabbing; }
+.floater-title { font-size:11px; text-transform:uppercase; letter-spacing:2px; color:#00f5ff;
+  text-shadow:0 0 8px #00f5ff88; flex:1; }
+.floater-controls { display:flex; gap:5px; }
+.wbtn {
+  width:13px; height:13px; border-radius:50%; border:none; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; font-size:8px; color:transparent;
+  transition:.15s; flex-shrink:0;
+}
+.wbtn:hover { color:#000; }
+.wbtn-min { background:#d69e2e; } .wbtn-min:hover { background:#f6e05e; }
+.wbtn-max { background:#38a169; } .wbtn-max:hover { background:#68d391; }
+.wbtn-close { background:#e53e3e; } .wbtn-close:hover { background:#fc8181; }
+
+/* Resize handle */
+.floater-resize {
+  position:absolute; bottom:0; right:0;
+  width:16px; height:16px; cursor:se-resize;
+  opacity:.3;
+}
+.floater-resize::before, .floater-resize::after {
+  content:''; position:absolute; background:#00f5ff;
+}
+.floater-resize::before { right:3px; bottom:7px; width:10px; height:1px; }
+.floater-resize::after  { right:7px; bottom:3px; width:1px; height:10px; }
+
+/* Content area */
+.floater-body {
+  padding:14px; overflow:auto; flex:1; font-size:13px;
+  color:#a0aec0; font-family:sans-serif; line-height:1.6;
+}
+.floater.minimized .floater-body,
+.floater.minimized .floater-resize { display:none; }
+.floater.minimized { min-height:0; }
+.floater.minimized .floater-bar { border-radius:10px; border-bottom:none; }
+
+/* ── Content styles ── */
+.cyber-label { font-size:10px; text-transform:uppercase; letter-spacing:2px; color:#718096; margin-bottom:8px; }
+.metric-row { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+.metric { flex:1; min-width:80px; background:#0a0a1a; border:1px solid #00f5ff15; border-radius:6px;
+  padding:10px; text-align:center; }
+.metric-val { font-size:22px; font-weight:700; color:#00f5ff; text-shadow:0 0 10px #00f5ff88; font-family:monospace; }
+.metric-lbl { font-size:10px; color:#4a5568; text-transform:uppercase; letter-spacing:1px; margin-top:2px; }
+
+.op-row { display:flex; align-items:center; gap:10px; padding:8px 10px;
+  background:#0a0a1a; border-radius:5px; margin-bottom:5px; }
+.op-check { width:15px; height:15px; flex-shrink:0; }
+.badge-req { background:#4a0000; color:#fc8181; font-size:10px; padding:1px 6px; border-radius:3px; flex-shrink:0; }
+.badge-opt { background:#2d2000; color:#fbd38d; font-size:10px; padding:1px 6px; border-radius:3px; flex-shrink:0; }
+.op-label { flex:1; font-size:13px; color:#e2e8f0; }
+.op-hint { font-size:11px; color:#4a5568; }
+
+.stepper { display:flex; align-items:center; gap:0; margin-bottom:10px; }
+.step { text-align:center; flex:1; }
+.step-dot { width:22px; height:22px; border-radius:50%; margin:0 auto;
+  display:flex; align-items:center; justify-content:center; font-size:10px; }
+.step-done { background:#276749; color:#fff; }
+.step-active { background:#2b6cb0; color:#fff; border:2px solid #63b3ed;
+  animation:stepPulse 1.5s infinite; }
+.step-todo { background:#1a1a2e; color:#4a5568; }
+@keyframes stepPulse {
+  0%,100%{box-shadow:0 0 0 0 rgba(99,179,237,.4)}
+  50%{box-shadow:0 0 0 6px rgba(99,179,237,0)}
+}
+.step-line { flex:1; height:1px; }
+.step-line-done { background:#276749; }
+.step-line-active { background:#2b6cb0; }
+.step-line-todo { background:#1a1a2e; }
+.step-lbl { font-size:9px; margin-top:3px; }
+
+.btn-primary { background:#2b6cb0; color:#fff; border:none; padding:8px 18px;
+  border-radius:5px; font-size:13px; cursor:pointer; font-family:inherit;
+  box-shadow:0 0 10px #2b6cb066; transition:.15s; }
+.btn-primary:hover { background:#3182ce; box-shadow:0 0 16px #2b6cb0aa; }
+.btn-ghost { background:#0a0a1a; color:#a0aec0; border:1px solid #2d3748;
+  padding:8px 18px; border-radius:5px; font-size:13px; cursor:pointer; font-family:inherit; transition:.15s; }
+.btn-ghost:hover { border-color:#718096; color:#e2e8f0; }
+
+/* scan anim on active floater */
+.floater.focused::after {
+  content:''; position:absolute; left:0; right:0; height:1px; pointer-events:none;
+  background:linear-gradient(90deg,transparent,#00f5ff22,transparent);
+  animation:scanFloat 3s linear infinite; border-radius:10px;
+}
+@keyframes scanFloat { 0%{top:40px} 100%{top:100%} }
+
+/* ── Responsive ── */
+@media(max-width:768px){
+  .floater { position:relative !important; width:100% !important;
+    min-width:0 !important; left:0 !important; top:0 !important;
+    margin-bottom:12px; border-radius:8px; }
+  #topbar,#dock { position:relative; }
+  body { overflow:auto; }
+  #workspace { padding:8px; flex-direction:column; }
+}
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div id="topbar">
+  <span class="tb-logo">Intel<span style="color:#ffffff88">UI</span></span>
+  <div class="tb-sep"></div>
+  <span class="tb-target"><span class="status-dot"></span> &nbsp;duckduckgo · webapp</span>
+  <div class="tb-sep"></div>
+  <span class="tb-status">3 windows · researcher running</span>
+</div>
+
+<!-- Floating windows -->
+
+<!-- Window 1: Run Control -->
+<div class="floater focused" id="w-run" style="left:20px;top:60px;width:380px;">
+  <div class="floater-bar" onmousedown="startDrag(event,'w-run')">
+    <div class="floater-title">▶ Run Control</div>
+    <div class="floater-controls">
+      <div class="wbtn wbtn-min" onclick="toggleMin('w-run')">−</div>
+      <div class="wbtn wbtn-max" onclick="toggleMax('w-run')">+</div>
+      <div class="wbtn wbtn-close" onclick="closeWin('w-run')">×</div>
+    </div>
+  </div>
+  <div class="floater-body">
+    <!-- Stepper -->
+    <div class="cyber-label">Progress</div>
+    <div class="stepper">
+      <div class="step"><div class="step-dot step-done">✓</div><div class="step-lbl" style="color:#68d391">Setup</div></div>
+      <div class="step-line step-line-done"></div>
+      <div class="step"><div class="step-dot step-done">✓</div><div class="step-lbl" style="color:#68d391">Assets</div></div>
+      <div class="step-line step-line-done"></div>
+      <div class="step"><div class="step-dot step-done">✓</div><div class="step-lbl" style="color:#68d391">Explorer</div></div>
+      <div class="step-line step-line-active"></div>
+      <div class="step"><div class="step-dot step-active">⏸</div><div class="step-lbl" style="color:#90cdf4;font-weight:700">Research</div></div>
+      <div class="step-line step-line-todo"></div>
+      <div class="step"><div class="step-dot step-todo">○</div><div class="step-lbl">Review</div></div>
+      <div class="step-line step-line-todo"></div>
+      <div class="step"><div class="step-dot step-todo">○</div><div class="step-lbl">Submit</div></div>
+    </div>
+
+    <div style="background:#0a0a1a;border:1px solid #2b6cb044;border-radius:6px;padding:12px;margin-bottom:12px;">
+      <div style="color:#90cdf4;font-size:14px;font-weight:700;margin-bottom:8px;">⏸ Approval required</div>
+      <div class="op-row"><input type="checkbox" class="op-check" checked disabled><span class="badge-req">REQUIRED</span><span class="op-label">AUTH</span><span class="op-hint">2 OAuth flows</span></div>
+      <div class="op-row"><input type="checkbox" class="op-check" checked disabled><span class="badge-req">REQUIRED</span><span class="op-label">INJECT</span><span class="op-hint">8 form</span></div>
+      <div class="op-row"><input type="checkbox" class="op-check" checked><span class="badge-opt">optional</span><span class="op-label">MEDIA</span><span class="op-hint">3 upload</span></div>
+      <div class="op-row"><input type="checkbox" class="op-check" checked><span class="badge-opt">optional</span><span class="op-label">ACCESS</span><span class="op-hint">auth endpoints</span></div>
+      <div class="op-row" style="opacity:.4"><input type="checkbox" class="op-check"><span class="badge-opt">optional</span><span class="op-label">CLIENT</span><span class="op-hint">no SPA</span></div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-primary">▶ Approve</button>
+      <button class="btn-ghost">✕ Cancel</button>
+    </div>
+  </div>
+  <div class="floater-resize" onmousedown="startResize(event,'w-run')"></div>
+</div>
+
+<!-- Window 2: Metrics -->
+<div class="floater" id="w-metrics" style="left:420px;top:60px;width:300px;">
+  <div class="floater-bar" onmousedown="startDrag(event,'w-metrics')">
+    <div class="floater-title">◈ Live Metrics</div>
+    <div class="floater-controls">
+      <div class="wbtn wbtn-min" onclick="toggleMin('w-metrics')">−</div>
+      <div class="wbtn wbtn-max" onclick="toggleMax('w-metrics')">+</div>
+      <div class="wbtn wbtn-close" onclick="closeWin('w-metrics')">×</div>
+    </div>
+  </div>
+  <div class="floater-body">
+    <div class="metric-row">
+      <div class="metric"><div class="metric-val" id="m-findings">0</div><div class="metric-lbl">Findings</div></div>
+      <div class="metric"><div class="metric-val" style="color:#fbd38d" id="m-cands">0</div><div class="metric-lbl">Candidates</div></div>
+      <div class="metric"><div class="metric-val" style="color:#b794f4" id="m-domains">0/6</div><div class="metric-lbl">Domains</div></div>
+    </div>
+    <div style="background:#0a0a1a;border-radius:6px;padding:10px;font-size:12px;font-family:monospace;color:#4a5568;line-height:2;height:90px;overflow:hidden;" id="log-feed">
+      <span style="color:#718096">Waiting for researcher...</span>
+    </div>
+  </div>
+  <div class="floater-resize" onmousedown="startResize(event,'w-metrics')"></div>
+</div>
+
+<!-- Window 3: Tech Stack -->
+<div class="floater" id="w-stack" style="left:20px;top:420px;width:680px;">
+  <div class="floater-bar" onmousedown="startDrag(event,'w-stack')">
+    <div class="floater-title">⊞ Tech Stack</div>
+    <div class="floater-controls">
+      <div class="wbtn wbtn-min" onclick="toggleMin('w-stack')">−</div>
+      <div class="wbtn wbtn-max" onclick="toggleMax('w-stack')">+</div>
+      <div class="wbtn wbtn-close" onclick="closeWin('w-stack')">×</div>
+    </div>
+  </div>
+  <div class="floater-body" style="padding:10px;">
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="border-bottom:1px solid #00f5ff15;">
+            <th style="text-align:left;padding:6px 10px;color:#4a5568;font-size:11px;letter-spacing:1px;">Asset</th>
+            <th style="padding:6px 10px;color:#4a5568;font-size:11px;text-align:center;">Nginx</th>
+            <th style="padding:6px 10px;color:#4a5568;font-size:11px;text-align:center;">Log4j</th>
+            <th style="padding:6px 10px;color:#4a5568;font-size:11px;text-align:center;">React</th>
+            <th style="padding:6px 10px;color:#4a5568;font-size:11px;text-align:center;">PostgreSQL</th>
+            <th style="padding:6px 10px;color:#4a5568;font-size:11px;text-align:center;">Cloudflare</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid #00f5ff08;">
+            <td style="padding:7px 10px;color:#00f5ff;font-size:12px;text-shadow:0 0 6px #00f5ff66;">duckduckgo.com</td>
+            <td style="text-align:center;color:#38a169;">◉</td>
+            <td style="text-align:center;background:#1a000088;color:#fc8181;font-weight:700;animation:cellP 1.5s infinite;">⚠ 2.14</td>
+            <td style="text-align:center;color:#38a169;">◉</td>
+            <td style="text-align:center;color:#38a169;">◉</td>
+            <td style="text-align:center;color:#38a169;">◉</td>
+          </tr>
+          <tr style="border-bottom:1px solid #00f5ff08;">
+            <td style="padding:7px 10px;color:#00f5ff;font-size:12px;text-shadow:0 0 6px #00f5ff66;">api.duckduckgo.com</td>
+            <td style="text-align:center;color:#38a169;">◉</td>
+            <td style="text-align:center;background:#1a000088;color:#fc8181;font-weight:700;animation:cellP 1.5s infinite;">⚠ 2.14</td>
+            <td style="text-align:center;color:#2d3748;">—</td>
+            <td style="text-align:center;color:#38a169;">◉</td>
+            <td style="text-align:center;color:#38a169;">◉</td>
+          </tr>
+          <tr>
+            <td style="padding:7px 10px;color:#00f5ff;font-size:12px;text-shadow:0 0 6px #00f5ff66;">spread.duckduckgo.com</td>
+            <td style="text-align:center;color:#38a169;">◉</td>
+            <td style="text-align:center;color:#2d3748;">—</td>
+            <td style="text-align:center;color:#38a169;">◉</td>
+            <td style="text-align:center;color:#2d3748;">—</td>
+            <td style="text-align:center;color:#38a169;">◉</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="floater-resize" onmousedown="startResize(event,'w-stack')"></div>
+</div>
+
+<!-- Dock -->
+<div id="dock">
+  <span style="font-size:11px;color:#4a5568;letter-spacing:1px;text-transform:uppercase;">Windows:</span>
+  <button class="dock-btn" onclick="restoreWin('w-run')">▶ Run Control</button>
+  <button class="dock-btn" onclick="restoreWin('w-metrics')">◈ Metrics</button>
+  <button class="dock-btn" onclick="restoreWin('w-stack')">⊞ Tech Stack</button>
+  <div class="dock-sep"></div>
+  <button class="dock-btn" onclick="newWin('flow')">+ Data Flow</button>
+  <button class="dock-btn" onclick="newWin('settings')">+ Settings</button>
+  <button class="dock-btn" onclick="newWin('findings')">+ Findings</button>
+</div>
+
+<style>
+@keyframes cellP { 0%,100%{background:#1a000088} 50%{background:#2a000088} }
+</style>
+
+<script>
+// ── Drag ───────────────────────────────────────────────────────────
+let dragEl=null, dragOx=0, dragOy=0;
+function startDrag(e,id){
+  if(e.target.classList.contains('wbtn')) return;
+  dragEl=document.getElementById(id);
+  focus(id);
+  const r=dragEl.getBoundingClientRect();
+  dragOx=e.clientX-r.left; dragOy=e.clientY-r.top;
+  e.preventDefault();
+}
+document.addEventListener('mousemove',e=>{
+  if(!dragEl) return;
+  const x=Math.max(0,Math.min(e.clientX-dragOx, window.innerWidth-100));
+  const y=Math.max(40,Math.min(e.clientY-dragOy, window.innerHeight-100));
+  dragEl.style.left=x+'px'; dragEl.style.top=y+'px';
+});
+document.addEventListener('mouseup',()=>{ dragEl=null; });
+
+// ── Resize ─────────────────────────────────────────────────────────
+let resizeEl=null, resizeOx=0, resizeOy=0, resizeW=0, resizeH=0;
+function startResize(e,id){
+  resizeEl=document.getElementById(id);
+  const r=resizeEl.getBoundingClientRect();
+  resizeOx=e.clientX; resizeOy=e.clientY;
+  resizeW=r.width; resizeH=r.height;
+  e.preventDefault(); e.stopPropagation();
+}
+document.addEventListener('mousemove',e=>{
+  if(!resizeEl) return;
+  const w=Math.max(280,resizeW+(e.clientX-resizeOx));
+  const h=Math.max(120,resizeH+(e.clientY-resizeOy));
+  resizeEl.style.width=w+'px'; resizeEl.style.height=h+'px';
+});
+document.addEventListener('mouseup',()=>{ resizeEl=null; });
+
+// ── Focus ──────────────────────────────────────────────────────────
+function focus(id){
+  document.querySelectorAll('.floater').forEach(f=>f.classList.remove('focused'));
+  const el=document.getElementById(id);
+  if(el){ el.classList.add('focused'); el.style.zIndex=200; }
+}
+document.querySelectorAll('.floater').forEach(f=>{
+  f.addEventListener('mousedown',()=>focus(f.id));
+});
+
+// ── Min / Max / Close ──────────────────────────────────────────────
+function toggleMin(id){
+  const el=document.getElementById(id);
+  el.classList.toggle('minimized');
+}
+let maxed=null, prevStyle={};
+function toggleMax(id){
+  const el=document.getElementById(id);
+  if(maxed===id){
+    Object.assign(el.style,prevStyle);
+    maxed=null;
+  } else {
+    if(maxed) toggleMax(maxed);
+    prevStyle={left:el.style.left,top:el.style.top,width:el.style.width,height:el.style.height};
+    el.style.left='0px'; el.style.top='40px';
+    el.style.width='100vw'; el.style.height='calc(100vh - 92px)';
+    maxed=id; focus(id);
+  }
+}
+function closeWin(id){
+  const el=document.getElementById(id);
+  el.style.display='none';
+  const btn=document.querySelector(`[onclick="restoreWin('${id}')"]`);
+  if(btn) btn.classList.add('minimized');
+}
+function restoreWin(id){
+  const el=document.getElementById(id);
+  el.style.display='flex';
+  el.classList.remove('minimized');
+  focus(id);
+  const btn=document.querySelector(`[onclick="restoreWin('${id}')"]`);
+  if(btn) btn.classList.remove('minimized');
+}
+function newWin(type){ alert('Window "'+type+'" — will open in full implementation'); }
+
+// ── Fake live metrics ──────────────────────────────────────────────
+let f=0,c=0,d=0;
+const logs=['[AUTH] checking OAuth flows...','[AUTH] testing token rotation...','[INJECT] fuzzing /search endpoint...','[INJECT] testing SQL patterns...','[INJECT] XSS probe on q= param...'];
+let li=0;
+setInterval(()=>{
+  if(Math.random()>.7){ f++; document.getElementById('m-findings').textContent=f; }
+  if(Math.random()>.5){ c++; document.getElementById('m-cands').textContent=c; }
+  if(d<4 && Math.random()>.95){ d++; document.getElementById('m-domains').textContent=d+'/6'; }
+  const feed=document.getElementById('log-feed');
+  const line=document.createElement('div');
+  line.style.color='#4a5568'; line.textContent=logs[li%logs.length]; li++;
+  feed.appendChild(line);
+  if(feed.children.length>4) feed.removeChild(feed.firstChild);
+  feed.children[feed.children.length-1].style.color='#68d391';
+},1800);
+</script>
+</body>
+</html>

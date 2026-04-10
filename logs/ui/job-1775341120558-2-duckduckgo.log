@@ -1,0 +1,21 @@
+
+Target: duckduckgo
+Path:   D:\Agentic-BugBounty\targets\duckduckgo
+
+Will DELETE:
+  ✓ findings/confirmed
+  ✓ findings/unconfirmed
+  ✓ findings/h1_submission_ready
+  · findings/triage_result.json
+  · poc
+  ✓ logs
+  ✓ intelligence
+
+Will PRESERVE:
+  ✓ target.json
+  ✓ CLAUDE.md
+  ✓ run.sh
+  ✓ run.cmd
+  ✓ src/
+
+Reset this target? [y/N] 

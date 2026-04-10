@@ -1,0 +1,94 @@
+<h2>Architettura attuale</h2>
+<p class="subtitle">La UI è stata aggiunta sopra un tool CLI preesistente — ecco dove sono i punti di attrito</p>
+
+<div style="display:flex;flex-direction:column;gap:16px;margin-top:20px;">
+
+  <!-- Layer UI -->
+  <div style="background:#1a1a2e;border:1px solid #4a5568;border-radius:8px;padding:16px;">
+    <div style="font-size:11px;text-transform:uppercase;color:#8ea0cb;letter-spacing:1px;margin-bottom:10px;">Web UI (browser)</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <span style="background:#2d3748;color:#68d391;padding:4px 10px;border-radius:4px;font-size:12px;">Targets</span>
+      <span style="background:#2d3748;color:#68d391;padding:4px 10px;border-radius:4px;font-size:12px;">Intelligence / Scope</span>
+      <span style="background:#2d3748;color:#68d391;padding:4px 10px;border-radius:4px;font-size:12px;">Runs / Logs</span>
+      <span style="background:#2d3748;color:#68d391;padding:4px 10px;border-radius:4px;font-size:12px;">Findings</span>
+      <span style="background:#2d3748;color:#68d391;padding:4px 10px;border-radius:4px;font-size:12px;">AI Chat</span>
+    </div>
+  </div>
+
+  <!-- Freccia + problema -->
+  <div style="display:flex;align-items:center;gap:12px;padding:0 16px;">
+    <div style="flex:1;border-top:2px dashed #e53e3e;"></div>
+    <span style="color:#e53e3e;font-size:11px;white-space:nowrap;">SSE: parse righe di testo per trovare "✓ confirmed"</span>
+    <div style="flex:1;border-top:2px dashed #e53e3e;"></div>
+  </div>
+
+  <!-- Layer Server -->
+  <div style="background:#1a1a2e;border:1px solid #4a5568;border-radius:8px;padding:16px;">
+    <div style="font-size:11px;text-transform:uppercase;color:#8ea0cb;letter-spacing:1px;margin-bottom:10px;">UI Server (serve-intel-ui.js)</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <span style="background:#2d3748;color:#90cdf4;padding:4px 10px;border-radius:4px;font-size:12px;">HTTP API</span>
+      <span style="background:#2d3748;color:#90cdf4;padding:4px 10px;border-radius:4px;font-size:12px;">Job manager (ui-jobs.js)</span>
+      <span style="background:#2d3748;color:#90cdf4;padding:4px 10px;border-radius:4px;font-size:12px;">Log tailer → SSE</span>
+    </div>
+  </div>
+
+  <!-- Freccia + problema -->
+  <div style="display:flex;align-items:center;gap:12px;padding:0 16px;">
+    <div style="flex:1;border-top:2px dashed #e53e3e;"></div>
+    <span style="color:#e53e3e;font-size:11px;white-space:nowrap;">spawn() → attende fine processo, nessun progresso strutturato</span>
+    <div style="flex:1;border-top:2px dashed #e53e3e;"></div>
+  </div>
+
+  <!-- Layer Pipeline -->
+  <div style="background:#1a1a2e;border:1px solid #4a5568;border-radius:8px;padding:16px;">
+    <div style="font-size:11px;text-transform:uppercase;color:#8ea0cb;letter-spacing:1px;margin-bottom:10px;">Pipeline (run-pipeline.js — 2300 righe)</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <span style="background:#2d3748;color:#fbd38d;padding:4px 10px;border-radius:4px;font-size:12px;">Phase 1: Intel sync</span>
+      <span style="background:#2d3748;color:#fbd38d;padding:4px 10px;border-radius:4px;font-size:12px;">Phase 1.5: Explorer</span>
+      <span style="background:#2d3748;color:#fbd38d;padding:4px 10px;border-radius:4px;font-size:12px;">Phase 2: Researcher (6 domain)</span>
+      <span style="background:#2d3748;color:#fbd38d;padding:4px 10px;border-radius:4px;font-size:12px;">Phase 2.5: Chain</span>
+      <span style="background:#2d3748;color:#fbd38d;padding:4px 10px;border-radius:4px;font-size:12px;">Phase 3: Triage</span>
+      <span style="background:#2d3748;color:#fbd38d;padding:4px 10px;border-radius:4px;font-size:12px;">Phase 4: Reports</span>
+    </div>
+  </div>
+
+  <!-- Freccia + problema -->
+  <div style="display:flex;align-items:center;gap:12px;padding:0 16px;">
+    <div style="flex:1;border-top:2px dashed #e53e3e;"></div>
+    <span style="color:#e53e3e;font-size:11px;white-space:nowrap;">invokeAgent() → spawn `claude` CLI → parse stdout JSON + regex</span>
+    <div style="flex:1;border-top:2px dashed #e53e3e;"></div>
+  </div>
+
+  <!-- Layer Agenti -->
+  <div style="background:#1a1a2e;border:1px solid #4a5568;border-radius:8px;padding:16px;">
+    <div style="font-size:11px;text-transform:uppercase;color:#8ea0cb;letter-spacing:1px;margin-bottom:10px;">Agenti Claude Code (CLI — inamovibili)</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <span style="background:#2d3748;color:#fc8181;padding:4px 10px;border-radius:4px;font-size:12px;">/researcher</span>
+      <span style="background:#2d3748;color:#fc8181;padding:4px 10px;border-radius:4px;font-size:12px;">/triager</span>
+      <span style="background:#2d3748;color:#fc8181;padding:4px 10px;border-radius:4px;font-size:12px;">/chain-coordinator</span>
+    </div>
+  </div>
+
+  <!-- File IPC -->
+  <div style="display:flex;align-items:center;gap:12px;padding:0 16px;">
+    <div style="flex:1;border-top:2px dashed #d69e2e;"></div>
+    <span style="color:#d69e2e;font-size:11px;white-space:nowrap;">IPC via file: report_bundle.json, checkpoint.json, jobs.json (no locking)</span>
+    <div style="flex:1;border-top:2px dashed #d69e2e;"></div>
+  </div>
+
+  <!-- Storage -->
+  <div style="background:#1a1a2e;border:1px solid #4a5568;border-radius:8px;padding:16px;">
+    <div style="font-size:11px;text-transform:uppercase;color:#8ea0cb;letter-spacing:1px;margin-bottom:10px;">Storage</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <span style="background:#2d3748;color:#b794f4;padding:4px 10px;border-radius:4px;font-size:12px;">targets/{name}/findings/*.json</span>
+      <span style="background:#2d3748;color:#b794f4;padding:4px 10px;border-radius:4px;font-size:12px;">logs/ui/jobs.json</span>
+      <span style="background:#2d3748;color:#b794f4;padding:4px 10px;border-radius:4px;font-size:12px;">intelligence/*.db (SQLite)</span>
+      <span style="background:#2d3748;color:#b794f4;padding:4px 10px;border-radius:4px;font-size:12px;">checkpoint.json</span>
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:20px;padding:12px;background:#2d1b1b;border:1px solid #e53e3e;border-radius:6px;font-size:12px;color:#fc8181;">
+  <strong>Problema principale:</strong> la UI non ha un contratto strutturato con il pipeline — comunica solo tramite file di log e parsing di testo. Non sa cosa sta succedendo finché non legge una riga con "✓".
+</div>

@@ -1,0 +1,210 @@
+<h2>Dashboard layout — sezioni della sidebar</h2>
+<p class="subtitle">Ogni sezione corrisponde a un gruppo di script/operazioni. Dimmi se manca qualcosa o vuoi riorganizzare.</p>
+
+<div class="mockup">
+  <div class="mockup-header">NETRUNNER CONTROL CENTER — sidebar + contenuto principale</div>
+  <div class="mockup-body" style="padding:0;overflow:hidden;border-radius:0 0 6px 6px;">
+    <div style="display:flex;height:460px;font-family:monospace;font-size:11px;background:#060816;">
+
+      <!-- SIDEBAR -->
+      <div style="width:180px;background:#08101e;border-right:1px solid #1e3a5f;display:flex;flex-direction:column;padding:12px 0;flex-shrink:0;">
+        <div style="padding:0 14px 12px;border-bottom:1px solid #1e3a5f;margin-bottom:8px;">
+          <div style="color:#39ffd4;font-weight:bold;font-size:10px;letter-spacing:3px;">NETRUNNER</div>
+          <div style="color:#8ea0cb;font-size:8px;margin-top:2px;">v2 control center</div>
+        </div>
+
+        <!-- Nav items -->
+        <div style="padding:6px 14px;display:flex;align-items:center;gap:8px;background:#0d1a30;border-left:2px solid #39ffd4;cursor:pointer;">
+          <span style="color:#39ffd4;font-size:12px;">⬡</span>
+          <div>
+            <div style="color:#39ffd4;font-size:9px;font-weight:bold;">Dashboard</div>
+            <div style="color:#8ea0cb;font-size:7px;">sistema + metriche</div>
+          </div>
+        </div>
+
+        <div style="padding:6px 14px;display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:2px;">
+          <span style="color:#8ea0cb;font-size:12px;">◈</span>
+          <div>
+            <div style="color:#8ea0cb;font-size:9px;">Targets</div>
+            <div style="color:#555e7a;font-size:7px;">crea · configura · storico</div>
+          </div>
+        </div>
+
+        <div style="padding:6px 14px;display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:2px;">
+          <span style="color:#8ea0cb;font-size:12px;">▶</span>
+          <div>
+            <div style="color:#8ea0cb;font-size:9px;">Runs</div>
+            <div style="color:#555e7a;font-size:7px;">avvia · monitor live · storico</div>
+          </div>
+        </div>
+
+        <div style="padding:6px 14px;display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:2px;">
+          <span style="color:#8ea0cb;font-size:12px;">◎</span>
+          <div>
+            <div style="color:#8ea0cb;font-size:9px;">Findings</div>
+            <div style="color:#555e7a;font-size:7px;">browse · triage · catene</div>
+          </div>
+        </div>
+
+        <div style="padding:6px 14px;display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:2px;">
+          <span style="color:#8ea0cb;font-size:12px;">⬢</span>
+          <div>
+            <div style="color:#8ea0cb;font-size:9px;">Intelligence</div>
+            <div style="color:#555e7a;font-size:7px;">scope · H1 · CVE · skills</div>
+          </div>
+        </div>
+
+        <div style="padding:6px 14px;display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:2px;">
+          <span style="color:#8ea0cb;font-size:12px;">⌛</span>
+          <div>
+            <div style="color:#8ea0cb;font-size:9px;">History</div>
+            <div style="color:#555e7a;font-size:7px;">storico run dal DB · riesegui</div>
+          </div>
+        </div>
+
+        <div style="padding:6px 14px;display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:2px;">
+          <span style="color:#8ea0cb;font-size:12px;">⚙</span>
+          <div>
+            <div style="color:#8ea0cb;font-size:9px;">Tools</div>
+            <div style="color:#555e7a;font-size:7px;">tutti gli script npm</div>
+          </div>
+        </div>
+
+        <!-- Status bar at bottom -->
+        <div style="margin-top:auto;padding:10px 14px;border-top:1px solid #1e3a5f;">
+          <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;">
+            <div style="width:5px;height:5px;border-radius:50%;background:#39ffd4;box-shadow:0 0 4px #39ffd4;"></div>
+            <span style="color:#39ffd4;font-size:7px;">1 RUN ATTIVO</span>
+          </div>
+          <div style="color:#8ea0cb;font-size:7px;">duckduckgo · INJECT</div>
+        </div>
+      </div>
+
+      <!-- MAIN CONTENT — Dashboard view -->
+      <div style="flex:1;padding:14px;overflow:auto;display:flex;flex-direction:column;gap:10px;">
+
+        <!-- Header row -->
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="color:#e8ecff;font-size:12px;font-weight:bold;">System Overview</div>
+            <div style="color:#8ea0cb;font-size:8px;">ultimo aggiornamento: 14:32:07</div>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <div style="background:#0d1530;border:1px solid #1e3a5f;border-radius:4px;padding:4px 8px;color:#8ea0cb;font-size:8px;cursor:pointer;">⟳ Refresh</div>
+            <div style="background:#1a0a2e;border:1px solid #ff4fd8;border-radius:4px;padding:4px 8px;color:#ff4fd8;font-size:8px;cursor:pointer;">+ Nuovo Target</div>
+          </div>
+        </div>
+
+        <!-- Metric cards -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+          <div style="background:#0d1530;border:1px solid #1e3a5f;border-radius:5px;padding:10px;">
+            <div style="color:#ff4fd8;font-size:18px;font-weight:bold;">4</div>
+            <div style="color:#8ea0cb;font-size:7px;letter-spacing:1px;margin-top:2px;">TARGETS</div>
+            <div style="color:#555e7a;font-size:7px;margin-top:1px;">3 whitebox · 1 blackbox</div>
+          </div>
+          <div style="background:#0d1530;border:1px solid #39ffd4;border-radius:5px;padding:10px;">
+            <div style="color:#39ffd4;font-size:18px;font-weight:bold;">1</div>
+            <div style="color:#39ffd4;font-size:7px;letter-spacing:1px;margin-top:2px;">RUN ATTIVO</div>
+            <div style="color:#555e7a;font-size:7px;margin-top:1px;">duckduckgo · 22m</div>
+          </div>
+          <div style="background:#0d1530;border:1px solid #1e3a5f;border-radius:5px;padding:10px;">
+            <div style="color:#55c7ff;font-size:18px;font-weight:bold;">12</div>
+            <div style="color:#8ea0cb;font-size:7px;letter-spacing:1px;margin-top:2px;">FINDINGS TOTALI</div>
+            <div style="color:#555e7a;font-size:7px;margin-top:1px;">3 critical · 5 high</div>
+          </div>
+          <div style="background:#0d1530;border:1px solid #1e3a5f;border-radius:5px;padding:10px;">
+            <div style="color:#ffd700;font-size:18px;font-weight:bold;">3</div>
+            <div style="color:#8ea0cb;font-size:7px;letter-spacing:1px;margin-top:2px;">CATENE</div>
+            <div style="color:#555e7a;font-size:7px;margin-top:1px;">2 confermate</div>
+          </div>
+        </div>
+
+        <!-- Two column: live feed + severity chart -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;flex:1;">
+
+          <!-- Live agent feed -->
+          <div style="background:#080e1c;border:1px solid #1e3a5f;border-radius:5px;padding:10px;display:flex;flex-direction:column;gap:5px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <span style="color:#39ffd4;font-size:8px;font-weight:bold;letter-spacing:1px;">◉ LIVE FEED — duckduckgo</span>
+              <span style="color:#8ea0cb;font-size:7px;">Stage 2 / INJECT</span>
+            </div>
+            <!-- domain progress bar -->
+            <div style="display:flex;gap:3px;margin-bottom:4px;">
+              <div style="flex:1;background:#39ffd4;height:4px;border-radius:2px;" title="AUTH ✓"></div>
+              <div style="flex:1;background:#55c7ff;height:4px;border-radius:2px;animation:pulse 1s infinite;" title="INJECT ▶"></div>
+              <div style="flex:1;background:#1e3a5f;height:4px;border-radius:2px;" title="CLIENT —"></div>
+              <div style="flex:1;background:#1e3a5f;height:4px;border-radius:2px;" title="ACCESS —"></div>
+              <div style="flex:1;background:#1e3a5f;height:4px;border-radius:2px;" title="MEDIA —"></div>
+              <div style="flex:1;background:#1e3a5f;height:4px;border-radius:2px;" title="INFRA —"></div>
+            </div>
+            <div style="font-size:7px;color:#555e7a;letter-spacing:1px;display:flex;gap:8px;margin-bottom:2px;">
+              <span style="color:#39ffd4;">AUTH✓</span><span style="color:#55c7ff;">INJECT▶</span><span>CLIENT</span><span>ACCESS</span><span>MEDIA</span><span>INFRA</span>
+            </div>
+            <!-- log lines -->
+            <div style="font-size:8px;line-height:1.8;color:#8ea0cb;overflow:hidden;flex:1;">
+              <div><span style="color:#555e7a;">[14:31:44]</span> <span style="color:#8ea0cb;">scanning query builders in search.js</span></div>
+              <div><span style="color:#555e7a;">[14:31:51]</span> <span style="color:#ffd700;">candidate: potential SQLi — search param</span></div>
+              <div><span style="color:#555e7a;">[14:31:55]</span> <span style="color:#8ea0cb;">confirming PoC for SQLi candidate...</span></div>
+              <div><span style="color:#555e7a;">[14:32:02]</span> <span style="color:#39ffd4;">✓ confirmed: SQLi in /api/search?q=</span></div>
+              <div><span style="color:#555e7a;">[14:32:07]</span> <span style="color:#8ea0cb;">checking SSTI in template renderer</span></div>
+            </div>
+          </div>
+
+          <!-- Severity chart + recent findings -->
+          <div style="background:#080e1c;border:1px solid #1e3a5f;border-radius:5px;padding:10px;display:flex;flex-direction:column;gap:6px;">
+            <span style="color:#e8ecff;font-size:8px;font-weight:bold;letter-spacing:1px;">FINDINGS PER SEVERITY</span>
+            <!-- fake bar chart -->
+            <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:4px;">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <div style="color:#8ea0cb;font-size:7px;width:48px;text-align:right;">Critical</div>
+                <div style="flex:1;background:#1e3a5f;border-radius:2px;height:8px;position:relative;">
+                  <div style="width:25%;background:#ff4fd8;height:100%;border-radius:2px;box-shadow:0 0 6px #ff4fd8;"></div>
+                </div>
+                <div style="color:#ff4fd8;font-size:7px;width:12px;">3</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <div style="color:#8ea0cb;font-size:7px;width:48px;text-align:right;">High</div>
+                <div style="flex:1;background:#1e3a5f;border-radius:2px;height:8px;">
+                  <div style="width:42%;background:#ff6b35;height:100%;border-radius:2px;box-shadow:0 0 6px #ff6b35;"></div>
+                </div>
+                <div style="color:#ff6b35;font-size:7px;width:12px;">5</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <div style="color:#8ea0cb;font-size:7px;width:48px;text-align:right;">Medium</div>
+                <div style="flex:1;background:#1e3a5f;border-radius:2px;height:8px;">
+                  <div style="width:33%;background:#ffd700;height:100%;border-radius:2px;box-shadow:0 0 6px #ffd700;"></div>
+                </div>
+                <div style="color:#ffd700;font-size:7px;width:12px;">4</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <div style="color:#8ea0cb;font-size:7px;width:48px;text-align:right;">Low</div>
+                <div style="flex:1;background:#1e3a5f;border-radius:2px;height:8px;">
+                  <div style="width:8%;background:#39ffd4;height:100%;border-radius:2px;"></div>
+                </div>
+                <div style="color:#39ffd4;font-size:7px;width:12px;">1</div>
+              </div>
+            </div>
+            <!-- recent findings list -->
+            <div style="color:#8ea0cb;font-size:7px;letter-spacing:1px;margin-bottom:2px;">ULTIMI FINDINGS</div>
+            <div style="display:flex;flex-direction:column;gap:3px;">
+              <div style="background:#0d1530;border-radius:3px;padding:4px 6px;display:flex;justify-content:space-between;">
+                <span style="color:#e8ecff;font-size:7px;">SQLi in /api/search</span>
+                <span style="color:#ff4fd8;font-size:7px;">CRIT</span>
+              </div>
+              <div style="background:#0d1530;border-radius:3px;padding:4px 6px;display:flex;justify-content:space-between;">
+                <span style="color:#e8ecff;font-size:7px;">IDOR in /user/:id</span>
+                <span style="color:#ff6b35;font-size:7px;">HIGH</span>
+              </div>
+              <div style="background:#0d1530;border-radius:3px;padding:4px 6px;display:flex;justify-content:space-between;">
+                <span style="color:#e8ecff;font-size:7px;">Stored XSS in comments</span>
+                <span style="color:#ff6b35;font-size:7px;">HIGH</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px;">Questo è il <strong>Dashboard</strong>. Le altre sezioni: Targets, Runs (con live feed completo), Findings, Intelligence, History, Tools. Approvi questa struttura generale?</p>

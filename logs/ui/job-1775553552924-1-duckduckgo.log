@@ -1,0 +1,328 @@
+[36m[2026-04-07T09:19:13.118Z][0m Starting pipeline assets=webapp mode=whitebox cli=claude
+
+[35m════════════════════════════════════════════════════════════════════════[0m
+[1m[95mPIPELINE STARTING[0m
+[35m════════════════════════════════════════════════════════════════════════[0m
+
+  [36mTarget[0m      : [1mduckduckgo[0m
+  [36mCLI[0m         : claude
+  [36mMode[0m        : whitebox
+
+  [36mAssets to analyse[0m (1):
+    [33m•[0m [1mwebapp      [0m [2m./src[0m
+
+  [36mPipeline phases:[0m
+    [33m1.[0m Intel sync    — bbscope scope, HackerOne history, CVE intel
+    [33m2.[0m Explorer      — [92menabled[0m (surface mapping: deps, JS endpoints, fingerprinting)
+       [2mRuns in parallel with Hybrid Recon — feeds surface intel to Researcher[0m
+    [33m3.[0m Researcher    — Claude analyses each asset (whitebox/blackbox)
+    [33m3.[0m Dual pass     — [92menabled[0m (6 api key(s) in rotation)
+       [2mModels tried in order: researcher_model → free model fallback chain[0m
+       [2mOn 401/429/busy: rotate to next api key, then next model[0m
+    [33m4.[0m Triager       — validates findings, NMI rounds if needed
+    [33m5.[0m Reports       — H1-ready markdown reports rendered
+
+[35m════════════════════════════════════════════════════════════════════════[0m
+
+[36m[2026-04-07T09:19:13.126Z][0m Syncing bbscope intelligence (no credentials required)
+bbscope sync: duckduckgo (HackerOne)
+Fetching in-scope targets from bbscope.com...
+
+bbscope intelligence synced for duckduckgo
+  platform : HackerOne
+  scopes   : 4
+  snapshot : D:\Agentic-BugBounty\targets\duckduckgo\intelligence\bbscope_scope_snapshot.json
+  database : D:\Agentic-BugBounty\targets\duckduckgo\intelligence\agentic-bugbounty.db
+[92m[2026-04-07T09:19:13.517Z] bbscope intelligence sync complete[0m
+[36m[2026-04-07T09:19:13.522Z][0m Syncing HackerOne intelligence for duckduckgo
+HackerOne intelligence synced for duckduckgo
+- scope snapshot: D:\Agentic-BugBounty\targets\duckduckgo\intelligence\h1_scope_snapshot.json
+- vulnerability history: D:\Agentic-BugBounty\targets\duckduckgo\intelligence\h1_vulnerability_history.json
+- skill suggestions: D:\Agentic-BugBounty\targets\duckduckgo\intelligence\h1_skill_suggestions.json
+- sqlite database: D:\Agentic-BugBounty\targets\duckduckgo\intelligence\agentic-bugbounty.db
+- counts: scopes=4, hacktivity=0, reports=0
+[92m[2026-04-07T09:19:17.351Z] HackerOne intelligence sync complete[0m
+[36m[2026-04-07T09:19:17.360Z][0m Syncing CVE intel for duckduckgo
+[33m[2026-04-07T09:19:17.475Z] CVE intel sync failed (non-fatal): node exited with status 1
+Error: database disk image is malformed
+    at openDatabase (D:\Agentic-BugBounty\scripts\lib\db.js:18:6)
+    at main (D:\Agentic-BugBounty\scripts\sync-cve-intel.js:85:14)
+    at Object.<anonymous> (D:\Agentic-BugBounty\scripts\sync-cve-intel.js:174:1)
+    at Module._compile (node:internal/modules/cjs/loader:1760:14)
+    at Object..js (node:internal/modules/cjs/loader:1893:10)
+    at Module.load (node:internal/modules/cjs/loader:1480:32)
+    at Module._load (node:internal/modules/cjs/loader:1299:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:244:24)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+[0m
+[36m[2026-04-07T09:19:17.852Z][0m Research brief refreshed from local/global intelligence
+
+[36m──────────────────────────────────────────────────────────────────────[0m
+  [1m[36mSTAGE 0 — File Triage[0m  [2mclassifying all source files[0m
+[36m──────────────────────────────────────────────────────────────────────[0m
+
+[36m[2026-04-07T09:19:17.858Z][0m Stage 0 — File Triage: classifying source files...
+[36m[2026-04-07T09:19:17.882Z][0m Stage 0 — done: 12 files classified
+
+[36m──────────────────────────────────────────────────────────────────────[0m
+  [1m[36mSTAGE 1 — Surface Mapping[0m  [2mbuilding attack surface from manifest[0m
+[36m──────────────────────────────────────────────────────────────────────[0m
+
+[36m[2026-04-07T09:19:17.891Z][0m Stage 1 — Surface Mapping: building attack surface...
+[36m[2026-04-07T09:19:17.898Z][0m Stage 1 — processing 1 security-relevant files in batches of 10
+  [2m[llm] gemini on the line. let's see what it says.[0m
+  [2m[llm] gemini shrugged. trying openrouter. (The argument 'args[2]' must be a string without null bytes. Received 'You are a )[0m
+  [2m[llm]   6 api key(s) loaded. trying 22 free models...[0m
+  [2m[llm] activating openai/gpt-oss-120b:free. *kaio-ken times four*[0m
+  [2m[llm] openai/gpt-oss-120b:free: «I'm the one who knocks.» and knock it did. response ready.[0m
+[36m[2026-04-07T09:19:21.322Z][0m Stage 1 — batch 1/1 done
+[36m[2026-04-07T09:19:21.408Z][0m Stage 1 — done: http_layer=0 auth=0 sinks=0
+
+[36m──────────────────────────────────────────────────────────────────────[0m
+  [1m[36mSTAGE 1.5 — Git Intelligence[0m  [2mmining commits + secret scan[0m
+[36m──────────────────────────────────────────────────────────────────────[0m
+
+[36m[2026-04-07T09:19:21.417Z][0m Stage 1.5 — Git Intelligence: mining commits + scanning secrets...
+[36m[2026-04-07T09:19:21.503Z][0m Stage 1.5 — Task 1: 0 security-relevant commit(s) found
+[36m[2026-04-07T09:19:21.745Z][0m Stage 1.5 — Task 3: 0 potential secret(s) found
+[36m[2026-04-07T09:19:21.766Z][0m Stage 1.5 — done: commits=0 bypasses=0 secrets=0 delta=0
+
+[36m──────────────────────────────────────────────────────────────────────[0m
+  [1m[36mSTAGE 2 — Domain Research[0m  [2m6 specialist agents: AUTH INJECT CLIENT ACCESS MEDIA INFRA[0m
+[36m──────────────────────────────────────────────────────────────────────[0m
+
+
+[35m══════════════════════════════════════════════════════════════════════[0m
+[1m[95mRESEARCHER v2[0m — target: [1mD:\Agentic-BugBounty\targets\duckduckgo\src[0m  |  phase: [36mdeep research[0m  |  elapsed: [33m0s[0m
+[35m══════════════════════════════════════════════════════════════════════[0m
+  [90m○[0m  [96m[AUTH][0m  
+  [90m○[0m  [91m[INJECT][0m  
+  [90m○[0m  [95m[CLIENT][0m  
+  [90m○[0m  [93m[ACCESS][0m  
+  [90m○[0m  [92m[MEDIA][0m  
+  [90m○[0m  [36m[INFRA][0m  
+[35m──────────────────────────────────────────────────────────────────────[0m
+  Candidates so far: [1m0[0m  |  Confirmed: [92m0[0m  |  Agents done: [36m0/6[0m
+[35m══════════════════════════════════════════════════════════════════════[0m
+
+[36m[2026-04-07T09:19:21.775Z][0m Starting researcher phase asset=webapp source=D:\Agentic-BugBounty\targets\duckduckgo\src
+[36m[2026-04-07T09:19:21.782Z][0m Running Explorer + Hybrid Recon in parallel (free LLM)...
+  [2m[explorer] starting deterministic surface analysis...[0m
+  [2m[hybrid-recon] starting hybrid recon for webapp at D:\Agentic-BugBounty\targets\duckduckgo\src[0m
+  [2m[hybrid-recon] phase 0: loading calibration briefing for webapp...[0m
+  [2m[hybrid-recon] phase 0: calibration script unavailable — skipping[0m
+  [2m[hybrid-recon] phase 1: walking source tree at D:\Agentic-BugBounty\targets\duckduckgo\src...[0m
+  [2m[hybrid-recon] phase 1: no source files found — skipping LLM recon[0m
+  [2m[explorer] parser done in 202ms — endpoints:0 secrets:0 tech:0[0m
+  [2m[explorer] total elapsed: 202ms[0m
+  [2m[hybrid-recon] hybrid recon produced no output — Claude will handle Phase 0+1 itself[0m
+[36m[2026-04-07T09:19:21.993Z][0m → Starting researcher[webapp] agent
+[2m[35m  » roads? where we're going, we don't need roads. just raw sockets.[0m
+                                                                                                                                                                                                                                                            [33m»[0m [2mStarting **whitebox** analysis on **webapp** target: `D:\Agentic-BugBounty\targets\duckduckgo\src` ↵ Report prefix: **WEB-NNN** ↵ Output: `D:\Agentic-BugBounty\targets\duckduckgo\findings\confirmed\report_bundle.json` ↵ [0m
+                                                    [90m[  10s][0m [96mSkill     [0m [2m{"skill":"shared:core"}[0m
+                                                                                                                                                                                                                                                            [90m[  13s][0m [96mSkill     [0m [2m{"skill":"shared:researcher_wb"}[0m
+                                                                                                                                                                                                          [90m[  17s][0m [96mSkill     [0m [2m{"skill":"asset:webapp:module"}[0m
+                                                                                                                                                                                                                                                            [90m[  24s][0m [96mBash      [0m [2mcat D:\Agentic-BugBounty\targets\duckduckgo\findings\file_manifest.json 2>/dev/null | head[0m
+                                                    [90m[  25s][0m [96mBash      [0m [2mcat D:\Agentic-BugBounty\targets\duckduckgo\findings\attack_surface.json 2>/dev/null | hea[0m
+                                                    [90m[  25s][0m [96mBash      [0m [2mcat D:\Agentic-BugBounty\targets\duckduckgo\findings\git_intelligence.json 2>/dev/null | h[0m
+                                                                                                                                                                                                          [90m[  46s][0m [96mBash      [0m [2mls D:/Agentic-BugBounty/targets/duckduckgo/findings/ 2>/dev/null || echo "FINDINGS DIR EMP[0m
+                                                    [90m[  47s][0m [96mBash      [0m [2mls D:/Agentic-BugBounty/targets/duckduckgo/ 2>/dev/null[0m
+                                                                                                                                                        [90m[  56s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/findings/file_manifest.json[0m
+                                                    [90m[  57s][0m [96mBash      [0m [2mnode D:/Agentic-BugBounty/scripts/query-calibration.js --asset webapp --json 2>/dev/null |[0m
+  [33m⏱[0m  [1m60s[0m | [2m10 tool call(s)...[0m                                                                                                                                                                                                                    [90m[  73s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/findings/attack_surface.json[0m
+                                                    [90m[  74s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/findings/git_intelligence.json[0m
+                                                                                                                                                        [90m[  82s][0m [96mBash      [0m [2mls D:/Agentic-BugBounty/targets/duckduckgo/src/ 2>/dev/null && echo "---" && ls D:/Agentic[0m
+                                                    [90m[  83s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/target.json[0m
+                                                                                                                                                                                                          [90m[  93s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/intelligence/h1_scope_snapshot.json[0m
+                                                    [90m[  93s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/intelligence/research_brief.json[0m
+                                                                                                                                                                                                          [90m[ 112s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/CLAUDE.md[0m
+                                                    [90m[ 115s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/intelligence/h1_skill_suggestions.json && echo[0m
+                                                    [33m⏱[0m  [1m120s[0m | [2m18 tool call(s)...[0m                                                                                                                                                                  [90m[ 134s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/intelligence/bbscope_scope_snapshot.json[0m
+                                                    [90m[ 134s][0m [96mBash      [0m [2mfind D:/Agentic-BugBounty/targets/duckduckgo/src -type f 2>/dev/null | head -30 || echo "S[0m
+                                                                                                                                                                                                          [33m»[0m [2mThe `src` directory is empty — no source code has been cloned yet. The only public in-scope source is the **duckduckgo-privacy-extension** GitHub repo. I'll clone it and adapt the whitebox analysis to that asset.[0m
+                                                    [90m[ 165s][0m [96mBash      [0m [2mcd D:/Agentic-BugBounty/targets/duckduckgo && git clone --depth=1 https://github.com/duckd[0m
+  [33m⏱[0m  [1m180s[0m | [2m21 tool call(s)...[0m                                                                                                                [90m[ 195s][0m [96mBash      [0m [2mls D:/Agentic-BugBounty/targets/duckduckgo/src/ && echo "---" && cat D:/Agentic-BugBounty/[0m
+                                                                                                                                                        [33m»[0m [2mSource cloned. This is the **DuckDuckGo Privacy Extension** — the only publicly available in-scope source. Analyzing as webapp with JS/browser-extension threat model. Now running Phase 0 calibration.[0m
+                                                    [90m[ 211s][0m [96mBash      [0m [2mcd D:/Agentic-BugBounty && node scripts/query-calibration.js --asset webapp --json 2>/dev/[0m
+                                                    [90m[ 212s][0m [96mBash      [0m [2mls D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/ 2>/dev/null | head -30 && echo "[0m
+                                                                                                                                                        [90m[ 227s][0m [96mBash      [0m [2mfind D:/Agentic-BugBounty/targets/duckduckgo/src -name "*.js" -o -name "*.ts" -o -name "*.[0m
+                                                    [90m[ 228s][0m [96mBash      [0m [2mfind D:/Agentic-BugBounty/targets/duckduckgo/src/browsers -name "*.js" -o -name "*.ts" | g[0m
+                                                                                                                                                        [90m[ 237s][0m [96mBash      [0m [2mfind D:/Agentic-BugBounty/targets/duckduckgo/src/browsers -type f | grep -v node_modules |[0m
+                                                    [90m[ 238s][0m [96mBash      [0m [2mfind D:/Agentic-BugBounty/targets/duckduckgo/src -type f \( -name "*.js" -o -name "*.ts" -[0m
+                                                            [2m[35m  » wtf is taking so long? the results are still being processed.[0m
+  [33m⏱[0m  [1m240s[0m | [2m28 tool call(s)...[0m                                                                                                                                                                  [90m[ 253s][0m [96mBash      [0m [2mfind D:/Agentic-BugBounty/targets/duckduckgo/src -type f \( -name "*.js" -o -name "*.ts" -[0m
+                                                    [90m[ 254s][0m [96mBash      [0m [2mls D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/ 2>/dev/null && echo "---" && ls [0m
+                                                                                                                                                                                                          [90m[ 265s][0m [96mBash      [0m [2mnode D:/Agentic-BugBounty/scripts/query-calibration.js --asset webapp 2>/dev/null | head -[0m
+                                                    [90m[ 265s][0m [96mBash      [0m [2mnode D:/Agentic-BugBounty/scripts/query-skills.js --asset webapp --program duckduckgo --li[0m
+                                                                                                                                                        [90m[ 279s][0m [96mBash      [0m [2mnode D:/Agentic-BugBounty/scripts/query-cve-intel.js --target duckduckgo --min-cvss 6.0 2>[0m
+                                                    [90m[ 279s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/browsers/chrome/manifest.json[0m
+                                                                                                      [33m⏱[0m  [1m300s[0m | [2m34 tool call(s)...[0m                                                                                                                [33m»[0m [2m--- ↵ ``` ↵ CALIBRATION BRIEFING ↵ Asset type: webapp (browser extension - duckduckgo-privacy-extension v2026.1.12)[0m
+                                                    [90m[ 315s][0m [96mBash      [0m [2mgrep -rn "jwt\|JWT\|jsonwebtoken\|session\|cookie\|token\|apiKey\|api_key\|secret\|passwor[0m
+                                                    [90m[ 316s][0m [96mBash      [0m [2mgrep -rn "fetch(\|https\.get\|http\.get\|axios\|XMLHttpRequest\|sendRequest" D:/Agentic-Bu[0m
+                                                                                                                                                        [90m[ 326s][0m [96mBash      [0m [2mgrep -rn "token\|apiKey\|api_key\|secret\|password\|credential\|auth\|bearer\|Authorizatio[0m
+                                                    [90m[ 327s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/atb.js | head -80[0m
+                                                                                                                                                        [90m[ 342s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/components/email-auto[0m
+                                                                                                      [90m[ 351s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/components/email-auto[0m
+                                                    [90m[ 352s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/message-handlers.js |[0m
+                                                                                                      [33m⏱[0m  [1m360s[0m | [2m41 tool call(s)...[0m                                                                                                                [33m»[0m [2mThe `getYouTubeVideoDetails` function is interesting — it takes a `videoURL` parameter and passes it to YouTube's API. Let me investigate this and the `isExpectedSender` authentication check.[0m
+                                                    [90m[ 365s][0m [96mBash      [0m [2mgrep -n "isExpectedSender" D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/backgroun[0m
+                                                    [90m[ 366s][0m [96mBash      [0m [2mgrep -n "isExpectedSender\|sender\.url\|sender\.origin\|sender\.id" D:/Agentic-BugBounty/t[0m
+                                                                                                                                                        [90m[ 376s][0m [96mBash      [0m [2msed -n '318,350p' D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/compone[0m
+                                                    [90m[ 377s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/components/message-ro[0m
+                                                                                                                                                                                                          [90m[ 407s][0m [96mBash      [0m [2mfind D:/Agentic-BugBounty/targets/duckduckgo/src/browsers/chrome/content-scripts D:/Agenti[0m
+                                                    [90m[ 408s][0m [96mBash      [0m [2mfind D:/Agentic-BugBounty/targets/duckduckgo/src -path "*/content-scripts*" -name "*.js" -[0m
+                                                                                                                                                        [90m[ 417s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/content-scripts/content-scope-me[0m
+  [33m⏱[0m  [1m420s[0m | [2m48 tool call(s)...[0m                                                                                                                                                                  [90m[ 456s][0m [96mBash      [0m [2mgrep -rn "innerHTML\|outerHTML\|insertAdjacentHTML\|document\.write\|dangerouslySetInnerHT[0m
+                                                    [90m[ 457s][0m [96mBash      [0m [2mfind D:/Agentic-BugBounty/targets/duckduckgo/src -name "*.html" | grep -v node_modules | g[0m
+                                                                                                                                                        [90m[ 466s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/ui/pages/options.js | head -80[0m
+                                                    [90m[ 467s][0m [96mBash      [0m [2mgrep -rn "addEventListener.*message\|postMessage\|\.source\|\.origin" D:/Agentic-BugBounty[0m
+                                                                                                                                                                [2m[35m  » To infinity and beyond! but the results are only going beyond the horizon. still processing.[0m
+  [33m⏱[0m  [1m480s[0m | [2m52 tool call(s)...[0m                                                                                                                [90m[ 481s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/newtab-tracker-stats.[0m
+                                                    [90m[ 482s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/onboarding.js[0m
+                                                                                                                                                                                                          [90m[ 505s][0m [96mBash      [0m [2msed -n '370,410p' D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/newtab-[0m
+                                                    [90m[ 506s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/components/debugger-c[0m
+                                                                                                                                                                                                          [90m[ 530s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/html/tracker-stats.html[0m
+                                                    [90m[ 530s][0m [96mBash      [0m [2mfind D:/Agentic-BugBounty/targets/duckduckgo/src -name "tracker-stats*" | grep -v node_mod[0m
+                                                                                                                                                                                                          [90m[ 539s][0m [96mBash      [0m [2mfind D:/Agentic-BugBounty/targets/duckduckgo/src -name "newtab.js" -o -name "newtab-tracke[0m
+                                                    [90m[ 540s][0m [96mBash      [0m [2mfind D:/Agentic-BugBounty/targets/duckduckgo/src -name "newtab*" | grep -v node_modules | [0m
+  [33m⏱[0m  [1m540s[0m | [2m60 tool call(s)...[0m                                                                                                                                                                  [90m[ 550s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/newtab/newtab.js[0m
+                                                                                                                                                        [90m[ 567s][0m [96mBash      [0m [2mgrep -n "trackerStats\|allowedOrigin\|clientPortName" D:/Agentic-BugBounty/targets/duckduc[0m
+                                                    [90m[ 567s][0m [96mBash      [0m [2mgrep -rn "allowedOrigin\|trackerStats" D:/Agentic-BugBounty/targets/duckduckgo/src/shared/[0m
+                                                                                                                                                        [90m[ 580s][0m [96mBash      [0m [2msed -n '155,180p' D:/Agentic-BugBounty/targets/duckduckgo/src/shared/data/constants.js[0m
+                                                    [90m[ 582s][0m [96mBash      [0m [2mgrep -rn "web_accessible_resources\|WAR\|webAccessible" D:/Agentic-BugBounty/targets/duckd[0m
+                                                                                                                                                                                                          [90m[ 600s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/click-to-load.js | he[0m
+  [33m⏱[0m  [1m600s[0m | [2m66 tool call(s)...[0m                                                              [90m[ 600s][0m [96mBash      [0m [2mfind D:/Agentic-BugBounty/targets/duckduckgo/src -path "*/web_accessible_resources*" -type[0m
+                                                                                                                                                        [90m[ 611s][0m [96mBash      [0m [2mgrep -rn "innerHTML\|outerHTML\|insertAdjacentHTML\|document\.write\|eval(\|new Function" [0m
+                                                    [90m[ 612s][0m [96mBash      [0m [2mgrep -rn "innerHTML\|outerHTML\|insertAdjacentHTML\|document\.write\|eval(\|new Function" [0m
+                                                                                                                                                        [90m[ 621s][0m [96mBash      [0m [2msed -n '30,45p' D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/ui/pages/options.js[0m
+                                                    [90m[ 622s][0m [96mBash      [0m [2mgrep -rn "t(\|i18n\|getTranslation\|getMessage\|chrome\.i18n" D:/Agentic-BugBounty/targets[0m
+                                                                                                                                                                                                          [90m[ 635s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/amp-protection.js | h[0m
+                                                    [90m[ 636s][0m [96mBash      [0m [2mgrep -rn "fetch(\|load\.JSONfrom\|http\.get\|XMLHttpRequest" D:/Agentic-BugBounty/targets/[0m
+                                                                                                                                                        [90m[ 647s][0m [96mBash      [0m [2msed -n '160,210p' D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/amp-pro[0m
+                                                    [90m[ 647s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/components/resource-l[0m
+                                                                                                                                                                                                          [90m[ 659s][0m [96mBash      [0m [2mgrep -rn "fetchAMPURL\|extractAMPURL\|ampURL" D:/Agentic-BugBounty/targets/duckduckgo/src/[0m
+                                                    [90m[ 660s][0m [96mBash      [0m [2mgrep -rn "fetchAMPURL\|ampProtection\|amp-protection\|amp_protection" D:/Agentic-BugBounty[0m
+  [33m⏱[0m  [1m660s[0m | [2m77 tool call(s)...[0m                                                                                                                                                                  [90m[ 669s][0m [96mBash      [0m [2msed -n '1,120p' D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/before-re[0m
+                                                                                                                                                        [90m[ 688s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/broken-site-report.js[0m
+                                                                                                                                                        [90m[ 703s][0m [96mBash      [0m [2mgrep -rn "getYouTubeVideoDetails\|youTubeVideoDetails\|previewImage\|thumbnail_url" D:/Age[0m
+                                                    [90m[ 704s][0m [96mBash      [0m [2mgrep -rn "getYouTubeVideoDetails\|youTubeVideoDetails\|previewImage\|thumbnail_url" D:/Age[0m
+                                                                                                                                                        [90m[ 714s][0m [96mBash      [0m [2mgrep -rn "getYouTubeVideoDetails\|youTubeVideo\|videoURL\|previewImage\|thumbnail" D:/Agen[0m
+                                                                                                              [2m[35m  » agent smith would be proud. still working.[0m
+  [33m⏱[0m  [1m720s[0m | [2m82 tool call(s)...[0m                                                                                                                [90m[ 728s][0m [96mBash      [0m [2mfind D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/ui -name "*.js" | grep -v node_[0m
+                                                    [90m[ 729s][0m [96mBash      [0m [2mgrep -rn "innerHTML\|outerHTML\|insertAdjacentHTML\|document\.write\|eval(" D:/Agentic-Bug[0m
+                                                                                                                                                        [90m[ 741s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/ui/templates/allowlist.js && ech[0m
+                                                                                                                                                        [90m[ 772s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/ui/models/allowlist.js[0m
+                                                    [90m[ 773s][0m [96mBash      [0m [2mgrep -rn "allowlisted\|allowlist\|setList\|setGlobalAllowlist" D:/Agentic-BugBounty/target[0m
+                                                                                                      [33m⏱[0m  [1m780s[0m | [2m87 tool call(s)...[0m                                                                                                                [90m[ 791s][0m [96mBash      [0m [2msed -n '1,100p' D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/devtools/panel.js[0m
+                                                    [90m[ 792s][0m [96mBash      [0m [2mgrep -rn "__proto__\|constructor\[.*prototype\]\|Object\.assign.*req\|merge(\|deepMerge\|e[0m
+                                                                                                                                                                                                          [90m[ 802s][0m [96mBash      [0m [2mgrep -n "innerHTML\|innerText\|textContent\|createElement\|createTextNode\|insertAdjacentH[0m
+                                                                                                                                                        [90m[ 819s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/load.js[0m
+                                                                                                                                                        [90m[ 838s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/components/resource-l[0m
+                                                    [90m[ 839s][0m [96mBash      [0m [2mgrep -rn "remoteUrl\|configURL\|configUrlOverride\|configURL" D:/Agentic-BugBounty/targets[0m
+  [33m⏱[0m  [1m840s[0m | [2m93 tool call(s)...[0m                                                                                                                                                                  [90m[ 849s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/components/remote-con[0m
+                                                                                                                                                        [90m[ 868s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/components/cpm-standa[0m
+                                                    [90m[ 869s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/components/cookie-pro[0m
+                                                                                                                                                                                                          [90m[ 884s][0m [96mBash      [0m [2msed -n '100,200p' D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/compone[0m
+                                                    [90m[ 884s][0m [96mBash      [0m [2msed -n '200,380p' D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/compone[0m
+                                                                                                      [33m⏱[0m  [1m900s[0m | [2m98 tool call(s)...[0m                                                                                                                [90m[ 914s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/helpers/arguments-obj[0m
+                                                    [90m[ 915s][0m [96mBash      [0m [2mgrep -rn "addDebugFlag\|debugFlag\|debugFlags" D:/Agentic-BugBounty/targets/duckduckgo/src[0m
+                                                                                                                                                        [90m[ 926s][0m [96mBash      [0m [2msed -n '280,300p' D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/message[0m
+                                                    [90m[ 926s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/components/fire-butto[0m
+                                                                                                                                                                                                          [90m[ 949s][0m [96mBash      [0m [2mnode D:/Agentic-BugBounty/scripts/query-calibration.js --asset webapp --vuln xss --behavio[0m
+                                                    [90m[ 951s][0m [96mBash      [0m [2mgrep -rn "\"@duckduckgo\|\"lodash\|\"jquery\|\"angular\|\"react\|\"vue\|\"underscore\|\"ha[0m
+                                                                                                                                                                [2m[35m  » rasengan the analysis. results pending.[0m
+  [33m⏱[0m  [1m960s[0m | [2m104 tool call(s)...[0m                                                              [90m[ 962s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/package.json | python3 -c " import json,sy[0m
+                                                                                                                                                        [90m[ 983s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/url-parameters.js | h[0m
+                                                    [90m[ 983s][0m [96mBash      [0m [2mgrep -n "getExtensionId\|sender\.id\|runtime\.id\|chrome\.runtime\.id" D:/Agentic-BugBount[0m
+                                                                                                                                                        [90m[ 994s][0m [96mBash      [0m [2mgrep -n "sender\.id\|getExtensionId\|runtime\.id" D:/Agentic-BugBounty/targets/duckduckgo/[0m
+                                                    [90m[ 994s][0m [96mBash      [0m [2mgrep -n "onMessage\|sendMessage\|allowedMessages" D:/Agentic-BugBounty/targets/duckduckgo/[0m
+                                                                                                      [33m⏱[0m  [1m1020s[0m | [2m109 tool call(s)...[0m                                                                                                                [90m[1066s][0m [96mBash      [0m [2mgrep -n "devtoolsMessageHandlers\|displayProxyRow\|displayRow\|displayRequest\|displayCook[0m
+                                                    [90m[1066s][0m [96mBash      [0m [2msed -n '200,280p' D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/devtools/panel.js[0m
+                                                                                                      [33m⏱[0m  [1m1080s[0m | [2m111 tool call(s)...[0m                                                                                                                [90m[1086s][0m [96mBash      [0m [2mgrep -n "getBreakageReportValues\|breakageReportResult" D:/Agentic-BugBounty/targets/duckd[0m
+                                                    [90m[1086s][0m [96mBash      [0m [2msed -n '290,360p' D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/message[0m
+                                                                                                                                                                                                          [90m[1096s][0m [96mBash      [0m [2mgrep -n "getSetting\|setSetting\|updateSetting" D:/Agentic-BugBounty/targets/duckduckgo/sr[0m
+                                                    [90m[1096s][0m [96mBash      [0m [2mgrep -n "export function getSetting\|export function updateSetting\|export async function [0m
+                                                                                                                                                        [90m[1104s][0m [96mBash      [0m [2msed -n '218,245p' D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/message[0m
+                                                    [33m⏱[0m  [1m1140s[0m | [2m116 tool call(s)...[0m                                                                      [2m[35m  » no output yet. probably doing something expensive.[0m
+  [33m⏱[0m  [1m1200s[0m | [2m116 tool call(s)...[0m                                                                                                                [90m[1201s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/breakage-report-reque[0m
+                                                    [90m[1201s][0m [96mBash      [0m [2mgrep -rn "breakageData\|pageParams\|jsPerformance\|detectorData" D:/Agentic-BugBounty/targ[0m
+                                                                                                                                                                                                          [90m[1233s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/https-service.js | he[0m
+                                                                                                                                                        [90m[1258s][0m [96mBash      [0m [2mgrep -rn "getBreakageReportValues\|registerMessageHandler.*breakage" D:/Agentic-BugBounty/[0m
+  [33m⏱[0m  [1m1260s[0m | [2m120 tool call(s)...[0m                                                                                                                                                                                                                    [90m[1278s][0m [96mBash      [0m [2mmkdir -p D:/Agentic-BugBounty/targets/duckduckgo/findings[0m
+                                                                                                      [90m[1313s][0m [96mWrite     [0m [2mD:/Agentic-BugBounty/targets/duckduckgo/findings/candidates_pool_client.json[0m
+                                                    [33m⏱[0m  [1m1320s[0m | [2m122 tool call(s)...[0m                                                              [90m[1346s][0m [96mWrite     [0m [2mD:/Agentic-BugBounty/targets/duckduckgo/findings/candidates_pool_infra.json[0m
+                                                                                                      [90m[1349s][0m [96mWrite     [0m [2mD:/Agentic-BugBounty/targets/duckduckgo/findings/candidates_pool_auth.json[0m
+                                                                                                      [90m[1352s][0m [96mWrite     [0m [2mD:/Agentic-BugBounty/targets/duckduckgo/findings/candidates_pool_inject.json[0m
+                                                                                                      [90m[1357s][0m [96mWrite     [0m [2mD:/Agentic-BugBounty/targets/duckduckgo/findings/candidates_pool_access.json[0m
+                                                                                                      [90m[1361s][0m [96mWrite     [0m [2mD:/Agentic-BugBounty/targets/duckduckgo/findings/candidates_pool_media.json[0m
+                                                                                                      [33m»[0m [2mNow Phase 2.6 — Chain Synthesis: ↵ **Candidate Matrix:** ↵ ``` ↵ C-01  info_disclosure      /public/font/* WAR         reveals extension is installed[0m
+                                                    [90m[1373s][0m [96mBash      [0m [2mnode -e " const { mergeShards } = require('./scripts/lib/candidates-shard'); const pool = [0m
+                                                    [33m⏱[0m  [1m1380s[0m | [2m128 tool call(s)...[0m                                                              [90m[1391s][0m [96mWrite     [0m [2mD:/Agentic-BugBounty/targets/duckduckgo/findings/confirmed/report_bundle.json[0m
+                                                                                                      [90m[1436s][0m [96mWrite     [0m [2mD:/Agentic-BugBounty/targets/duckduckgo/findings/unconfirmed/candidates.json[0m
+                                                                                                              [2m[35m  » gum-gum gatling the target. still working.[0m
+  [33m⏱[0m  [1m1440s[0m | [2m130 tool call(s)...[0m                                                              [90m[1446s][0m [96mBash      [0m [2mnode D:/Agentic-BugBounty/scripts/validate-bundle.js D:/Agentic-BugBounty/targets/duckduck[0m
+                                                                                                      [90m[1456s][0m [96mBash      [0m [2mnode D:/Agentic-BugBounty/scripts/validate-bundle.js D:/Agentic-BugBounty/targets/duckduck[0m
+                                                    [33m⏱[0m  [1m1500s[0m | [2m132 tool call(s)...[0m                                                              [90m[1526s][0m [96mWrite     [0m [2mD:/Agentic-BugBounty/targets/duckduckgo/findings/confirmed/report_bundle.json[0m
+                                                                                                      [33m⏱[0m  [1m1560s[0m | [2m133 tool call(s)...[0m            [33m⏱[0m  [1m1620s[0m | [2m133 tool call(s)...[0m                                                                                                                                                                                                                                                                                                                                                                          [33m»[0m [2mThe researcher session completed. Here's the summary: ↵ --- ↵ **Researcher Run — DuckDuckGo Privacy Extension (v2026.1.12)** ↵ **Result: 0 confirmed findings, 3 unconfirmed candidates**[0m
+                                                  
+  [92m[done][0m [1m1653s[0m | [33m133 tool call(s)[0m | [2mtokens: 9162.4k (in: 1.6k | out: 56.3k | cache_read: 8899.6k | cache_write: 204.9k)[0m
+
+                                                  [36m[2026-04-07T09:46:55.695Z][0m ← researcher[webapp] agent done in 1654s
+[2m[35m  » researcher went dark. findings locked. next: the blade.[0m
+[36m[2026-04-07T09:46:55.707Z][0m Adaptive recon: 3 new signal(s) detected after researcher pass
+  [36m[adaptive][0m 3 new recon signal(s) — will focus next pass
+    [2m• New component discovered: shared/js/content-scripts/content-scope-messaging.js:3 (allowedMessages) and shared/js/background/message-handlers.js:165 (unblockClickToLoadContent)[0m
+    [2m• New component discovered: browsers/chrome/manifest.json:97 — web_accessible_resources /public/font/* with use_dynamic_url:false[0m
+    [2m• New component discovered: shared/js/content-scripts/content-scope-messaging.js:42 — window.addEventListener('message') without origin check[0m
+
+[36m──────────────────────────────────────────────────────────────────────[0m
+  [1m[36mSTAGE 2.5 — Chain Coordinator[0m  [2mcross-domain kill chain synthesis[0m
+[36m──────────────────────────────────────────────────────────────────────[0m
+
+[36m[2026-04-07T09:46:55.722Z][0m Stage 2.5 — Chain Coordinator: analyzing cross-agent chains...
+[36m[2026-04-07T09:46:55.737Z][0m Stage 2.5 — skipped: no chain_candidate entries found
+REPORT_BUNDLE valid: D:\Agentic-BugBounty\targets\duckduckgo\findings\confirmed\report_bundle.json
+[33m[2026-04-07T09:46:55.832Z] Skill persistence failed (non-fatal): database disk image is malformed[0m
+[33m[2026-04-07T09:46:55.842Z] FP registry write failed (non-fatal): database disk image is malformed[0m
+[36m[2026-04-07T09:46:55.861Z][0m Report bundle redacted (credentials scrubbed)
+[92m[2026-04-07T09:46:55.870Z] All researcher passes complete with 0 confirmed finding(s)[0m
+
+────────────────────────────────────────────────────────────────────────
+Researcher done — 0 finding(s) confirmed.
+
+To run the triager now:
+  /triager --asset webapp
+
+Or run the full pipeline (researcher + triager) in one shot:
+  node scripts/run-pipeline.js --target duckduckgo --cli claude
+────────────────────────────────────────────────────────────────────────
+
+  poc  WEB-001-CANDIDATE_click_to_load_privacy_bypass_via_content.js
+  poc  WEB-002-CANDIDATE_extension_presence_fingerprinting_via_st.js
+  poc  WEB-003-CANDIDATE_debug_mode_cross_origin_window_postmessa.js
+  md   summary.md
+3 PoC file(s) + summary written to: D:\Agentic-BugBounty\targets\duckduckgo\poc
+[36m[2026-04-07T09:46:56.032Z][0m PoC artifacts written to: D:\Agentic-BugBounty\targets\duckduckgo\poc
+[36m[2026-04-07T09:46:56.040Z][0m Starting triager round 1
+[36m[2026-04-07T09:46:56.045Z][0m → Starting triager[webapp] agent
+[2m[35m  » the validator woke up. it's not in a good mood.[0m
+                                                                                                                                                                                                                                                            [90m[   7s][0m [96mSkill     [0m [2m{"skill":"triager"}[0m
+                                                                                                                                                                                                                                                            [33m»[0m [2mAsset: **webapp**. Let me verify the report bundle and load all required modules.[0m
+                                                    [90m[  12s][0m [96mRead      [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\findings\confirmed\report_bundle.json[0m
+                                                    [90m[  12s][0m [96mSkill     [0m [2m{"skill":"shared:core"}[0m
+                                                                                                                                                                                                                                                            [90m[  17s][0m [96mSkill     [0m [2m{"skill":"shared:triager_base"}[0m
+                                                                                                                                                        [90m[  18s][0m [96mGlob      [0m [2m{"pattern":"intelligence/*.json","path":"D:\\Agentic-BugBounty\\targets\\duckduckgo"}[0m
+                                                                                                                                                                                                          [90m[  23s][0m [96mSkill     [0m [2m{"skill":"triager:calibration:webapp"}[0m
+                                                                                                                                                        [33m⏱[0m  [1m60s[0m | [2m6 tool call(s)...[0m                                                                                                                [33m»[0m [2mAll modules loaded. The bundle has **0 confirmed findings** and **3 unconfirmed candidates**. I'll triage all three. First let me note a key discrepancy: the bundle declares `asset_type: webapp`, but the target is clearl[0m
+                                                    [90m[ 116s][0m [96mSkill     [0m [2m{"skill":"triager:calibration:browserext"}[0m
+                                                                                                                                                        [90m[ 118s][0m [96mBash      [0m [2mnode scripts/query-calibration.js --asset browserext --vuln extension_data_leak --json 2>/[0m
+                                                    [33m⏱[0m  [1m120s[0m | [2m8 tool call(s)...[0m                                                              [33m⏱[0m  [1m180s[0m | [2m8 tool call(s)...[0m                                                                                                                        [2m[35m  » tool calls accumulating. progress being made.[0m
+  [33m⏱[0m  [1m240s[0m | [2m8 tool call(s)...[0m                                                              [33m»[0m [2mNow I have all calibration modules loaded. Calibration DB returned no results (empty). Let me run all 6 checks on all 3 candidates. ↵ --- ↵ ## Pre-Triage Observation — Asset Type Discrepancy ↵ The bundle declares `asset_[0m
+                                                    [90m[ 259s][0m [96mToolSearch[0m [2m{"query":"select:TodoWrite","max_results":1}[0m
+                                                                                                                                                                                                          [90m[ 265s][0m [96mTodoWrite [0m [2m{"todos":[{"content":"Write triage_result.json","status":"in_progress","activeForm":"Writi[0m
+                                                                                                      [33m⏱[0m  [1m300s[0m | [2m10 tool call(s)...[0m                                                              [90m[ 328s][0m [96mWrite     [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\findings\triage_result.json[0m
+                                                                                                                                                                                                                                                          
+  [92m[done][0m [1m330s[0m | [33m11 tool call(s)[0m | [2mtokens: 317.6k (in: 18 | out: 15.0k | cache_read: 259.6k | cache_write: 43.1k)[0m
+
+                                                  claude exited with status 1

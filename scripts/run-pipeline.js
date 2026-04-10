@@ -45,7 +45,28 @@ const { callLLMJson, callResearcherModel } = require("./lib/llm");
 const { runHybridRecon, formatReconContextForPrompt } = require("./lib/hybrid-recon");
 const { runExplorer } = require("./lib/explorer");
 const { writeState, waitForResponse, buildPlanForAssetType } = require("./lib/session");
-const { detectAssetsInSrcDir, describeAsset } = require("./lib/detect-assets");
+
+/**
+ * Write a non-blocking progress update to session.json so the UI stepper
+ * advances even when --hitl is not set. Never throws — pipeline must not block.
+ */
+function writeProgress(context, phase, extra = {}) {
+  if (!context || !context.targetDir) return;
+  try {
+    const sessionPath = path.join(context.targetDir, "session.json");
+    fs.mkdirSync(path.dirname(sessionPath), { recursive: true });
+    fs.writeFileSync(sessionPath, JSON.stringify({
+      schema_version: "1.0",
+      request_id: 0,
+      written_at: new Date().toISOString(),
+      written_by: "pipeline",
+      status: "running",
+      phase,
+      ...extra
+    }, null, 2), "utf8");
+  } catch { /* non-fatal */ }
+}
+const { detectAssetType, detectAssetsInSrcDir, describeAsset } = require("./lib/detect-assets");
 const { runFileTriage } = require("./lib/file-triage");
 const { buildEmptySurface, mergeSurface, normalizeSurface, buildSurfacePrompt } = require("./lib/surface-map");
 const {
@@ -629,6 +650,38 @@ function clearCheckpoint(context) {
   if (fs.existsSync(p)) fs.unlinkSync(p);
 }
 
+// ─── Scan manifest helpers ─────────────────────────────────────────────────────
+// scan_manifest.json tracks which (assetType, sourcePath) pairs have completed
+// a full pipeline run so we never redundantly rescan the same source.
+
+function scanManifestPath(context) {
+  return path.join(context.targetDir || context.logsDir, "scan_manifest.json");
+}
+
+function loadScanManifest(context) {
+  const p = scanManifestPath(context);
+  if (!fs.existsSync(p)) return { scanned: [] };
+  try { return JSON.parse(fs.readFileSync(p, "utf8")); } catch { return { scanned: [] }; }
+}
+
+function markAssetScanned(context, assetType, sourcePath) {
+  if (!context.targetDir) return;
+  const manifest = loadScanManifest(context);
+  const key = `${assetType}::${sourcePath}`;
+  if (!manifest.scanned.find((e) => e.key === key)) {
+    manifest.scanned.push({ key, assetType, sourcePath, completedAt: new Date().toISOString() });
+    try {
+      fs.writeFileSync(scanManifestPath(context), JSON.stringify(manifest, null, 2), "utf8");
+    } catch { /* non-fatal */ }
+  }
+}
+
+function isAssetAlreadyScanned(context, assetType, sourcePath) {
+  const manifest = loadScanManifest(context);
+  const key = `${assetType}::${sourcePath}`;
+  return manifest.scanned.some((e) => e.key === key);
+}
+
 function runCommand(command, args, options = {}) {
   const result = spawnSync(command, args, {
     stdio: "inherit",
@@ -698,10 +751,11 @@ function buildContext(args) {
   }
 
   const targetDir = path.dirname(configPath);
+  const resolvedAsset = args.asset || config.asset_type;
   return {
-    asset: args.asset || config.asset_type,
+    asset: resolvedAsset,
     mode: args.mode || config.default_mode,
-    target: args.target || path.resolve(targetDir, config.source_path),
+    target: args.target || resolveSourceForAsset(resolvedAsset, targetDir, config.source_path),
     findingsDir: path.resolve(targetDir, config.findings_dir),
     reportsDir: path.resolve(targetDir, config.h1_reports_dir),
     logsDir: path.resolve(targetDir, config.logs_dir),
@@ -710,6 +764,58 @@ function buildContext(args) {
     targetDir,
     config
   };
+}
+
+/**
+ * Resolve the source directory for a given asset type.
+ *
+ * Priority:
+ *   1. ./src-{assetType}/   — asset-type-specific directory
+ *   2. ./src/               — if it actually contains the requested type
+ *   3. config.source_path   — with a mismatch warning (don't abort; let researcher handle it)
+ */
+function resolveSourceForAsset(assetType, targetDir, configSourcePath) {
+  // 1. Asset-type-specific directory: src-mobileapp/, src-browserext/, etc.
+  const assetSpecificDir = path.resolve(targetDir, `./src-${assetType}`);
+  if (fs.existsSync(assetSpecificDir)) {
+    return assetSpecificDir;
+  }
+
+  // 2. Check APK files directly in src/ for mobileapp requests
+  if (assetType === "mobileapp") {
+    const srcDir = path.resolve(targetDir, configSourcePath);
+    if (fs.existsSync(srcDir)) {
+      const apkFile = fs.readdirSync(srcDir).find((e) => /\.(apk|apkx)$/i.test(e));
+      if (apkFile) return path.join(srcDir, apkFile);
+    }
+  }
+
+  // 3. Default source path — detect actual type and warn on mismatch
+  const defaultPath = path.resolve(targetDir, configSourcePath);
+  if (fs.existsSync(defaultPath)) {
+    const detectedType = detectAssetType(defaultPath);
+    if (detectedType !== assetType) {
+      // Print a visible warning to stderr so the UI log shows it, then abort.
+      const assetSpecificHint = path.relative(targetDir, assetSpecificDir).replace(/\\/g, "/");
+      process.stderr.write(
+        `\n[pipeline] ASSET TYPE MISMATCH\n` +
+        `  Requested : ${assetType}\n` +
+        `  Found in ${configSourcePath} : ${detectedType}\n\n` +
+        `  To scan a ${assetType}, do ONE of the following:\n` +
+        `    a) Place the source in: ./${assetSpecificHint}/\n` +
+        (assetType === "mobileapp"
+          ? `       Copy the .apk there:  cp target.apk "${path.join(assetSpecificDir, "target.apk")}"\n`
+          : `       Clone the repo there: git clone <url> "${assetSpecificDir}"\n`) +
+        `    b) Update target.json "asset_type" to "${detectedType}" to scan the existing source.\n\n`
+      );
+      throw new Error(
+        `Asset type mismatch: requested "${assetType}" but "${configSourcePath}" contains "${detectedType}". ` +
+        `Create ./src-${assetType}/ with the correct source, or change target.json asset_type.`
+      );
+    }
+  }
+
+  return defaultPath;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -889,6 +995,79 @@ async function spawnClaude(prompt, model, logPath) {
   });
 }
 
+async function spawnGemini(prompt, model, logPath) {
+  const geminiModel = model || "gemini-2.0-flash";
+  // gemini CLI (npm install -g @google/gemini-cli) accepts prompts via stdin with --yolo
+  const geminiArgs = ["--yolo", "--model", geminiModel];
+  const bin = "gemini";
+
+  return new Promise((resolve, reject) => {
+    const proc = spawn(bin, geminiArgs, {
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: false
+    });
+
+    proc.stdin.write(prompt, "utf8");
+    proc.stdin.end();
+
+    const t0 = Date.now();
+    let stderrBuffer = "";
+
+    let heartbeatTick = 0;
+    const heartbeat = setInterval(() => {
+      const elapsed = Math.round((Date.now() - t0) / 1000);
+      heartbeatTick++;
+      if (heartbeatTick % 4 === 0) {
+        process.stdout.write(`\r` + " ".repeat(60) + `\r`);
+        printFlavour("heartbeat");
+      }
+      process.stdout.write(`\r  ${C.yellow}⏱${C.reset}  ${C.bold}${elapsed}s${C.reset} | ${C.dim}gemini (${geminiModel}) running...${C.reset}          `);
+    }, 60000);
+
+    proc.stdout.on("data", (chunk) => {
+      process.stdout.write("\r" + " ".repeat(50) + "\r");
+      const text = chunk.toString("utf8");
+      for (const line of text.split("\n")) {
+        if (!line.trim()) continue;
+        process.stdout.write(`  ${C.dim}${line}${C.reset}\n`);
+        if (logPath) {
+          try { fs.appendFileSync(logPath, line + "\n", "utf8"); } catch { /* non-fatal */ }
+        }
+      }
+    });
+
+    proc.stderr.on("data", (chunk) => {
+      const text = chunk.toString("utf8");
+      process.stderr.write(text);
+      stderrBuffer += text;
+    });
+
+    proc.on("close", (code) => {
+      clearInterval(heartbeat);
+      process.stdout.write("\r" + " ".repeat(50) + "\r");
+      if (code !== 0) {
+        reject(new Error(`gemini exited with status ${code}: ${stderrBuffer.slice(0, 300)}`));
+      } else {
+        resolve();
+      }
+    });
+
+    proc.on("error", (err) => {
+      clearInterval(heartbeat);
+      if (err.code === "ENOENT") {
+        reject(new Error(
+          `gemini CLI not found.\n` +
+          `Install:  npm install -g @google/gemini-cli\n` +
+          `Auth:     gemini auth login\n` +
+          `Or set GEMINI_API_KEY in Settings and run:  export GEMINI_API_KEY=<key>`
+        ));
+      } else {
+        reject(new Error(`Failed to launch gemini: ${err.message}`));
+      }
+    });
+  });
+}
+
 async function invokeAgent(cli, role, context, args, extraText = "", logPath = null) {
   const label = `${role}[${context.asset}]`;
   if (logPath) logEvent(logPath, `→ Starting ${label} agent`);
@@ -935,7 +1114,83 @@ async function invokeAgent(cli, role, context, args, extraText = "", logPath = n
     return;
   }
 
-  throw new Error(`Unsupported CLI '${cli}'. Use --cli claude or --cli codex.`);
+  if (cli === "gemini") {
+    // Build a full text prompt via compose-agent-prompt (slash commands don't exist in Gemini)
+    const fullPrompt = runCommandCapture("node", [
+      "scripts/compose-agent-prompt.js",
+      role,
+      "--asset", context.asset,
+      ...(role === "researcher" ? ["--mode", context.mode] : []),
+      ...(context.targetRef ? ["--target", context.targetRef] : []),
+      ...(role === "researcher" && context.source_name ? ["--source-name", context.source_name] : []),
+    ]);
+    const pathHint = context.findingsDir
+      ? `\n\nOUTPUT PATHS (use these exact absolute paths):\n` +
+        `  report_bundle.json  →  ${path.join(context.findingsDir, "confirmed", "report_bundle.json")}\n` +
+        `  candidates.json     →  ${path.join(context.findingsDir, "unconfirmed", "candidates.json")}\n` +
+        `  triage_result.json  →  ${path.join(context.findingsDir, "triage_result.json")}\n` +
+        `  h1_submission_ready →  ${context.reportsDir}\n`
+      : "";
+    await spawnGemini(fullPrompt + pathHint + (extraText ? `\n\n${extraText}` : ""), args.model, logPath);
+    if (logPath) logEvent(logPath, `← ${label} agent done in ${Math.round((Date.now() - t0) / 1000)}s`);
+    return;
+  }
+
+  if (cli === "openrouter") {
+    const { runOpenRouterAgent } = require("./lib/openrouter-agent");
+    const apiKey = process.env.OPENROUTER_API_KEY
+      || process.env.OPENROUTER_API_KEY_1
+      || "";
+    const orModel = args.model || "deepseek/deepseek-r1:free";
+
+    const fullPrompt = runCommandCapture("node", [
+      "scripts/compose-agent-prompt.js",
+      role,
+      "--asset", context.asset,
+      ...(role === "researcher" ? ["--mode", context.mode] : []),
+      ...(context.targetRef ? ["--target", context.targetRef] : []),
+      ...(role === "researcher" && context.source_name ? ["--source-name", context.source_name] : []),
+    ]);
+    const pathHint = context.findingsDir
+      ? `\n\nOUTPUT PATHS (use these exact absolute paths):\n` +
+        `  report_bundle.json  →  ${path.join(context.findingsDir, "confirmed", "report_bundle.json")}\n` +
+        `  candidates.json     →  ${path.join(context.findingsDir, "unconfirmed", "candidates.json")}\n` +
+        `  triage_result.json  →  ${path.join(context.findingsDir, "triage_result.json")}\n` +
+        `  h1_submission_ready →  ${context.reportsDir}\n`
+      : "";
+
+    let toolCount = 0;
+    const t0or = Date.now();
+    let heartbeatTick = 0;
+    const heartbeat = setInterval(() => {
+      const elapsed = Math.round((Date.now() - t0or) / 1000);
+      heartbeatTick++;
+      if (heartbeatTick % 4 === 0) printFlavour("heartbeat");
+      process.stdout.write(`\r  ${C.yellow}⏱${C.reset}  ${C.bold}${elapsed}s${C.reset} | ${C.dim}openrouter (${orModel}) — ${toolCount} tool call(s)...${C.reset}          `);
+    }, 60000);
+
+    try {
+      await runOpenRouterAgent(
+        fullPrompt + pathHint + (extraText ? `\n\n${extraText}` : ""),
+        orModel,
+        apiKey,
+        (line) => {
+          if (line.startsWith("[tool:")) toolCount++;
+          process.stdout.write("\r" + " ".repeat(50) + "\r");
+          if (line.trim()) process.stdout.write(`  ${C.dim}${line}${C.reset}\n`);
+        },
+        logPath
+      );
+    } finally {
+      clearInterval(heartbeat);
+      process.stdout.write("\r" + " ".repeat(50) + "\r");
+    }
+
+    if (logPath) logEvent(logPath, `← ${label} agent done in ${Math.round((Date.now() - t0) / 1000)}s`);
+    return;
+  }
+
+  throw new Error(`Unsupported CLI '${cli}'. Use --cli claude, --cli codex, --cli gemini, or --cli openrouter.`);
 }
 
 function syncBbscopeIfPossible(context, logPath) {
@@ -2025,10 +2280,24 @@ async function main() {
   // Signal set shared across all asset passes — accumulates during the pipeline
   const globalSignalSet = new Set();
 
+  writeProgress(context, "setup");
+
   for (let index = startAssetIndex; !(checkpoint && checkpoint.phase === "triage") && index < allAssets.length; index += 1) {
     currentAssetIndex = index;
     const assetEntry = allAssets[index];
     let resolvedTarget = assetEntry.target || context.target;
+
+    // Skip if this (assetType, sourcePath) combo was already fully scanned.
+    // On resume we skip the check to allow re-running a previously interrupted scan.
+    const entrySourcePath = assetEntry.source_path || resolvedTarget;
+    if (!args.resume && isAssetAlreadyScanned(context, assetEntry.asset_type, entrySourcePath)) {
+      logEvent(runLog, `Skipping ${assetEntry.asset_type} (${entrySourcePath}) — already scanned (use --resume to force re-run)`);
+      process.stdout.write(
+        `\n  ${C.yellow}[skip]${C.reset} ${C.bold}${assetEntry.asset_type}${C.reset} ${C.dim}${entrySourcePath}${C.reset} — already scanned.\n` +
+        `         Use ${C.cyan}--resume${C.reset} flag to force re-scan.\n\n`
+      );
+      continue;
+    }
 
     // Auto-decompile APK/APKX files before the researcher pass
     if (assetEntry.asset_type === "mobileapp" && /\.(apk|apkx)$/i.test(resolvedTarget)) {
@@ -2093,6 +2362,7 @@ async function main() {
     const gitIntel = await runStage15GitIntel(assetContext, manifest, runLog);
 
     // Stage 2 — Domain Research
+    writeProgress(context, "explorer", { asset_type: assetContext.asset });
     printStageTransition("STAGE 2 — Domain Research", "6 specialist agents: AUTH INJECT CLIENT ACCESS MEDIA INFRA");
     printDomainBoard({
       done:       [],
@@ -2116,8 +2386,12 @@ async function main() {
       }
     }
 
+    writeProgress(assetContext, "researcher", { asset_type: assetContext.asset });
     try {
       await runResearcherPhase(args.cli, assetContext, args, bundlePath, index > 0, runLog, resumeHint, globalSignalSet, gitIntel);
+
+      // Record completed asset so we don't rescan it on the next plain run
+      markAssetScanned(context, assetEntry.asset_type, entrySourcePath);
 
       // Detect new signals from the just-completed pass
       if (fs.existsSync(bundlePath)) {
@@ -2325,6 +2599,7 @@ async function main() {
   // If we resumed from a researcher checkpoint and triage isn't needed yet, skip saving triage checkpoint
   // (triage is a single-target phase — checkpoint just marks it as in-progress)
   currentPhase = "triage";
+  writeProgress(context, "triage");
   try {
     await runTriagePhase(args.cli, context, args, bundlePath, triagePath, runLog);
   } catch (err) {
@@ -2347,6 +2622,7 @@ async function main() {
   }
 
   // Pipeline finished cleanly — remove any stale checkpoint
+  writeProgress(context, "done");
   clearCheckpoint(context);
 
   const readyCount = fs.existsSync(context.reportsDir)

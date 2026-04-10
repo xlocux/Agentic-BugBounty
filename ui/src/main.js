@@ -2,13 +2,13 @@ import { initModal }      from "./modules/modal.js";
 import { initTheme }      from "./modules/theme.js";
 import { initTargets }    from "./panels/targets.js";
 import { initRunControl } from "./panels/run-control.js";
-import { initMetrics }    from "./panels/metrics.js";
+import { initDashboard }  from "./panels/dashboard.js";
 import { initSettings }   from "./panels/settings.js";
 
 const PANELS = [
   { id: "targets",     init: initTargets },
   { id: "run-control", init: initRunControl },
-  { id: "metrics",     init: initMetrics },
+  { id: "dashboard",   init: initDashboard },
   { id: "settings",    init: initSettings }
 ];
 

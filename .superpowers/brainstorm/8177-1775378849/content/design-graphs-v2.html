@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #050510; color: #e2e8f0; font-family: 'Courier New', monospace; padding: 24px; }
+
+  /* ── Cyber typography ── */
+  .section-title {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 3px;
+    color: #00f5ff; margin-bottom: 6px;
+    text-shadow: 0 0 10px #00f5ff88;
+  }
+  .section-sub { font-size: 13px; color: #718096; margin-bottom: 20px; font-family: sans-serif; }
+
+  /* ── GRAPH 1: Flow ── */
+  #flow-canvas { width: 100%; height: 340px; position: relative; overflow: hidden;
+    background: #050510; border: 1px solid #0ff3; border-radius: 12px; }
+
+  .node {
+    position: absolute; border-radius: 6px; padding: 8px 12px;
+    font-size: 12px; text-align: center; cursor: pointer;
+    transition: transform .15s, box-shadow .15s;
+    white-space: nowrap;
+  }
+  .node:hover { transform: scale(1.08); }
+  .node-input  { background:#001a3a; border:1.5px solid #3182ce; color:#90cdf4;
+    box-shadow: 0 0 12px #3182ce66; }
+  .node-transform { background:#180d33; border:1.5px solid #805ad5; color:#d6bcfa;
+    box-shadow: 0 0 12px #805ad566; }
+  .node-safe   { background:#001a12; border:1.5px solid #38a169; color:#68d391;
+    box-shadow: 0 0 12px #38a16966; }
+  .node-critical { background:#1a0000; border:2px solid #e53e3e; color:#fc8181;
+    box-shadow: 0 0 18px #e53e3e88, 0 0 40px #e53e3e33;
+    animation: criticalPulse 1.8s ease-in-out infinite; }
+  .node-warn   { background:#1a1000; border:2px solid #d69e2e; color:#fbd38d;
+    box-shadow: 0 0 14px #d69e2e77; animation: warnPulse 2.4s ease-in-out infinite; }
+
+  .node-label { font-size: 10px; color: #4a5568; margin-top: 3px; }
+
+  @keyframes criticalPulse {
+    0%,100% { box-shadow: 0 0 18px #e53e3e88, 0 0 40px #e53e3e33; }
+    50%      { box-shadow: 0 0 28px #e53e3ecc, 0 0 60px #e53e3e66; }
+  }
+  @keyframes warnPulse {
+    0%,100% { box-shadow: 0 0 14px #d69e2e77; }
+    50%      { box-shadow: 0 0 24px #d69e2eaa; }
+  }
+
+  #flow-svg { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; }
+
+  /* animated dash */
+  .flow-path { fill:none; stroke-width:1.5; stroke-dasharray:6 4; animation: dashFlow 1.2s linear infinite; }
+  .flow-path-danger { stroke:#e53e3e; filter: drop-shadow(0 0 4px #e53e3e); }
+  .flow-path-warn   { stroke:#d69e2e; filter: drop-shadow(0 0 4px #d69e2e); }
+  .flow-path-safe   { stroke:#38a169; filter: drop-shadow(0 0 3px #38a169); animation-duration:1.8s; }
+  @keyframes dashFlow { to { stroke-dashoffset: -20; } }
+
+  /* scan line */
+  .scanline { position:absolute; left:0; right:0; height:1px;
+    background:linear-gradient(90deg,transparent,#00f5ff33,transparent);
+    animation: scan 4s linear infinite; pointer-events:none; }
+  @keyframes scan { 0%{top:0} 100%{top:340px} }
+
+  /* ── GRAPH 2: Tech Matrix ── */
+  #matrix-wrap { border:1px solid #0ff3; border-radius:12px; overflow:hidden;
+    background:#050510; position:relative; }
+
+  .matrix-header { background:#0a0a1a; border-bottom:1px solid #0ff2;
+    padding:14px 20px; display:flex; align-items:center; justify-content:space-between; }
+
+  .alert-bar { background:#1a0000; border:1px solid #e53e3e88;
+    padding:12px 20px; display:flex; align-items:center; gap:14px;
+    animation: alertGlow 2s ease-in-out infinite; }
+  @keyframes alertGlow {
+    0%,100% { border-color:#e53e3e88; background:#1a0000; }
+    50%      { border-color:#e53e3ecc; background:#220000; }
+  }
+
+  .matrix-table { width:100%; border-collapse:collapse; }
+  .matrix-table th {
+    padding:10px 14px; font-size:11px; text-transform:uppercase; letter-spacing:1.5px;
+    color:#4a5568; font-weight:600; text-align:center; border-bottom:1px solid #0ff1;
+    background:#080815;
+  }
+  .matrix-table th.asset-col { text-align:left; }
+  .matrix-table td { padding:10px 14px; border-bottom:1px solid #0ff1; text-align:center;
+    font-size:13px; transition: background .2s; }
+  .matrix-table tr:hover td { background:#0a0a20; }
+  .matrix-table td.asset-name { text-align:left; color:#00f5ff; font-size:13px; font-weight:600;
+    text-shadow:0 0 8px #00f5ff66; }
+
+  .cell-present { color:#38a169; }
+  .cell-empty   { color:#2d3748; }
+  .cell-vuln    { background:#1a0000 !important; color:#fc8181; font-weight:700;
+    text-shadow:0 0 8px #fc818188;
+    animation: cellPulse 1.5s ease-in-out infinite; }
+  @keyframes cellPulse {
+    0%,100% { background:#1a0000; }
+    50%      { background:#280000; }
+  }
+
+  .tech-tag { display:inline-block; padding:2px 8px; border-radius:3px;
+    font-size:11px; cursor:pointer; transition:.15s;
+    background:#0a1a2a; border:1px solid #3182ce44; color:#90cdf4; }
+  .tech-tag:hover { background:#0a2a3a; border-color:#3182ce; box-shadow:0 0 8px #3182ce66; }
+  .tech-tag.active { background:#1a0000; border-color:#e53e3e; color:#fc8181;
+    box-shadow:0 0 12px #e53e3e88; }
+
+  /* corner decoration */
+  .corner { position:absolute; width:16px; height:16px; }
+  .corner-tl { top:8px; left:8px; border-top:2px solid #00f5ff; border-left:2px solid #00f5ff; }
+  .corner-tr { top:8px; right:8px; border-top:2px solid #00f5ff; border-right:2px solid #00f5ff; }
+  .corner-bl { bottom:8px; left:8px; border-bottom:2px solid #00f5ff; border-left:2px solid #00f5ff; }
+  .corner-br { bottom:8px; right:8px; border-bottom:2px solid #00f5ff; border-right:2px solid #00f5ff; }
+
+  .graph-title {
+    font-size:15px; font-weight:700; letter-spacing:2px; text-transform:uppercase;
+    color:#00f5ff; text-shadow:0 0 14px #00f5ffaa;
+  }
+  .status-dot { width:8px; height:8px; border-radius:50%; background:#38a169;
+    box-shadow:0 0 8px #38a169; animation:blink 1.2s step-end infinite; display:inline-block; }
+  @keyframes blink { 50%{opacity:0} }
+
+  .grid-bg {
+    position:absolute; inset:0; pointer-events:none; opacity:.04;
+    background-image: linear-gradient(#00f5ff 1px, transparent 1px),
+                      linear-gradient(90deg, #00f5ff 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── GRAPH 1 ── -->
+<div style="margin-bottom:36px;">
+  <div class="section-title">▸ Data Flow — Input to Sink</div>
+  <div class="section-sub">Traccia ogni parametro utente attraverso trasformazioni fino ai sink pericolosi</div>
+
+  <div id="flow-canvas">
+    <div class="grid-bg"></div>
+    <div class="scanline"></div>
+    <div class="corner corner-tl"></div>
+    <div class="corner corner-tr"></div>
+    <div class="corner corner-bl"></div>
+    <div class="corner corner-br"></div>
+
+    <!-- SVG paths -->
+    <svg id="flow-svg"></svg>
+
+    <!-- Input nodes -->
+    <div class="node node-input" id="n-q"    style="left:24px;top:40px;">GET /search<div class="node-label">?q= param</div></div>
+    <div class="node node-input" id="n-body" style="left:24px;top:130px;">POST /api/query<div class="node-label">body.filter</div></div>
+    <div class="node node-input" id="n-cook" style="left:24px;top:220px;">Cookie: session<div class="node-label">decoded</div></div>
+
+    <!-- Transform nodes -->
+    <div class="node node-transform" id="n-trim" style="left:220px;top:40px;">trim()<div class="node-label">SearchCtrl.php:42</div></div>
+    <div class="node node-transform" id="n-json" style="left:220px;top:130px;">json_decode()<div class="node-label">ApiCtrl.php:18</div></div>
+    <div class="node node-safe"      id="n-san"  style="left:220px;top:220px;">htmlspecialchars()<div class="node-label">sanitized ✓</div></div>
+
+    <!-- Sink nodes -->
+    <div class="node node-critical" id="n-sql" style="left:430px;top:40px;">mysqli_query()<div class="node-label">⚠ SQLi — unsanitized</div></div>
+    <div class="node node-warn"     id="n-eval" style="left:430px;top:130px;">eval($filter)<div class="node-label">? potential SSTI</div></div>
+    <div class="node node-safe"     id="n-echo" style="left:430px;top:220px;">echo $var<div class="node-label">safe ✓</div></div>
+
+    <!-- Labels -->
+    <div style="position:absolute;top:8px;left:24px;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#3182ce88;">INPUTS</div>
+    <div style="position:absolute;top:8px;left:220px;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#805ad588;">TRANSFORMS</div>
+    <div style="position:absolute;top:8px;left:430px;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#e53e3e88;">SINKS</div>
+
+    <div style="position:absolute;bottom:12px;right:16px;font-size:11px;color:#4a5568;">Click nodo → codice sorgente</div>
+  </div>
+</div>
+
+<!-- ── GRAPH 2 ── -->
+<div>
+  <div class="section-title">▸ Asset × Technology Stack</div>
+  <div class="section-sub">Identifica immediatamente quali asset sono esposti a uno 0-day</div>
+
+  <div id="matrix-wrap">
+    <div class="corner corner-tl"></div>
+    <div class="corner corner-tr"></div>
+    <div class="corner corner-bl"></div>
+    <div class="corner corner-br"></div>
+    <div class="grid-bg"></div>
+
+    <div class="matrix-header">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="status-dot"></span>
+        <span class="graph-title">Stack Intelligence</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span style="font-size:12px;color:#718096;">Filter by tech:</span>
+        <span class="tech-tag active" onclick="filterTech(this,'log4j')">log4j</span>
+        <span class="tech-tag" onclick="filterTech(this,'struts')">struts</span>
+        <span class="tech-tag" onclick="filterTech(this,'spring')">spring</span>
+        <span class="tech-tag" onclick="filterTech(this,'imagemagick')">imagemagick</span>
+      </div>
+    </div>
+
+    <div class="alert-bar">
+      <span style="font-size:22px;">🚨</span>
+      <div>
+        <div style="color:#fc8181;font-weight:700;font-size:14px;letter-spacing:1px;">CVE-2024-XXXX — Apache Log4j RCE &nbsp;·&nbsp; CVSS 10.0</div>
+        <div style="color:#a0aec0;font-size:12px;margin-top:3px;">Ricerca attiva: <span style="color:#fbd38d;">log4j</span> &nbsp;·&nbsp; <span style="color:#fc8181;font-weight:600;">2 asset esposti rilevati</span></div>
+      </div>
+    </div>
+
+    <table class="matrix-table" id="matrix">
+      <thead>
+        <tr>
+          <th class="asset-col">Asset / Domain</th>
+          <th>Nginx</th>
+          <th>Java / Log4j</th>
+          <th>React</th>
+          <th>PostgreSQL</th>
+          <th>Redis</th>
+          <th>Cloudflare</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="asset-name">duckduckgo.com</td>
+          <td class="cell-present">◉</td>
+          <td class="cell-vuln" data-tech="log4j">⚠ 2.14.1</td>
+          <td class="cell-present">◉</td>
+          <td class="cell-present">◉</td>
+          <td class="cell-empty">—</td>
+          <td class="cell-present">◉</td>
+        </tr>
+        <tr>
+          <td class="asset-name">api.duckduckgo.com</td>
+          <td class="cell-present">◉</td>
+          <td class="cell-vuln" data-tech="log4j">⚠ 2.14.1</td>
+          <td class="cell-empty">—</td>
+          <td class="cell-present">◉</td>
+          <td class="cell-present">◉</td>
+          <td class="cell-present">◉</td>
+        </tr>
+        <tr>
+          <td class="asset-name">spread.duckduckgo.com</td>
+          <td class="cell-present">◉</td>
+          <td class="cell-empty">—</td>
+          <td class="cell-present">◉</td>
+          <td class="cell-empty">—</td>
+          <td class="cell-empty">—</td>
+          <td class="cell-present">◉</td>
+        </tr>
+        <tr>
+          <td class="asset-name">staticcdn.duckduckgo.com</td>
+          <td class="cell-present">◉</td>
+          <td class="cell-empty">—</td>
+          <td class="cell-empty">—</td>
+          <td class="cell-empty">—</td>
+          <td class="cell-empty">—</td>
+          <td class="cell-present">◉</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div style="padding:12px 20px;border-top:1px solid #0ff1;display:flex;gap:20px;font-size:12px;color:#4a5568;">
+      <span>Fonti: HTTP headers · JS fingerprint · deps scan · Wappalyzer</span>
+      <span style="margin-left:auto;color:#38a16988;">Last scan: 2 min ago</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Draw SVG paths ──────────────────────────────────────────────────
+function center(el) {
+  const r = el.getBoundingClientRect();
+  const p = document.getElementById('flow-canvas').getBoundingClientRect();
+  return { x: r.left - p.left + r.width/2, y: r.top - p.top + r.height/2 };
+}
+
+function makePath(a, b, cls) {
+  const ca = center(a), cb = center(b);
+  const mx = (ca.x + cb.x) / 2;
+  const d  = `M${ca.x},${ca.y} C${mx},${ca.y} ${mx},${cb.y} ${cb.x},${cb.y}`;
+  const p  = document.createElementNS('http://www.w3.org/2000/svg','path');
+  p.setAttribute('d', d);
+  p.setAttribute('class', `flow-path ${cls}`);
+  // stagger animation offset
+  p.style.animationDelay = (Math.random() * -2) + 's';
+  return p;
+}
+
+function drawPaths() {
+  const svg = document.getElementById('flow-svg');
+  svg.innerHTML = '';
+  // Add defs for glow
+  svg.innerHTML = `<defs>
+    <filter id="glow-red"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="glow-yellow"><feGaussianBlur stdDeviation="2.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="glow-green"><feGaussianBlur stdDeviation="2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>`;
+  const pairs = [
+    ['n-q','n-trim','flow-path-danger'], ['n-trim','n-sql','flow-path-danger'],
+    ['n-body','n-json','flow-path-warn'], ['n-json','n-eval','flow-path-warn'],
+    ['n-cook','n-san','flow-path-safe'], ['n-san','n-echo','flow-path-safe'],
+  ];
+  for (const [a,b,cls] of pairs) {
+    const el = makePath(document.getElementById(a), document.getElementById(b), cls);
+    if (cls.includes('danger')) el.style.filter = 'url(#glow-red)';
+    if (cls.includes('warn'))   el.style.filter = 'url(#glow-yellow)';
+    if (cls.includes('safe'))   el.style.filter = 'url(#glow-green)';
+    svg.appendChild(el);
+  }
+}
+setTimeout(drawPaths, 100);
+window.addEventListener('resize', drawPaths);
+
+// ── Tech filter ─────────────────────────────────────────────────────
+function filterTech(el, tech) {
+  document.querySelectorAll('.tech-tag').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.matrix-table td').forEach(td => {
+    if (td.dataset.tech === tech) {
+      td.classList.add('cell-vuln');
+    }
+  });
+}
+</script>
+</body>
+</html>

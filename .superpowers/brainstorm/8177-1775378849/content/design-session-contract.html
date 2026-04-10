@@ -1,0 +1,87 @@
+<h2>Design — Session Contract</h2>
+<p class="subtitle">Il file <code>targets/{name}/session.json</code> è il canale bidirezionale tra pipeline e UI</p>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px;">
+
+  <!-- Pipeline scrive -->
+  <div>
+    <div style="font-size:11px;text-transform:uppercase;color:#90cdf4;letter-spacing:1px;margin-bottom:8px;">Pipeline scrive →</div>
+
+    <div style="background:#1a2744;border-radius:6px;padding:12px;font-size:11px;font-family:monospace;color:#e2e8f0;line-height:1.8;">
+      <span style="color:#68d391;">// Checkpoint: asset selection</span><br>
+      {<br>
+      &nbsp;"status": <span style="color:#fbd38d;">"awaiting_assets"</span>,<br>
+      &nbsp;"phase": <span style="color:#fbd38d;">"setup"</span>,<br>
+      &nbsp;"asset_type": <span style="color:#fbd38d;">"browserext"</span>,<br>
+      &nbsp;"available_assets": [<br>
+      &nbsp;&nbsp;{"id":"ext-main","label":"Extension main","mandatory":true},<br>
+      &nbsp;&nbsp;{"id":"content-scripts","label":"Content scripts","mandatory":false}<br>
+      &nbsp;]<br>
+      }<br><br>
+      <span style="color:#68d391;">// Checkpoint: plan approval</span><br>
+      {<br>
+      &nbsp;"status": <span style="color:#fbd38d;">"awaiting_approval"</span>,<br>
+      &nbsp;"phase": <span style="color:#fbd38d;">"researcher"</span>,<br>
+      &nbsp;"asset_type": <span style="color:#fbd38d;">"browserext"</span>,<br>
+      &nbsp;"plan": [<br>
+      &nbsp;&nbsp;{"id":"postmessage","label":"postMessage vulns","mandatory":true,"reason":null},<br>
+      &nbsp;&nbsp;{"id":"dom_xss","label":"DOM XSS","mandatory":true,"reason":null},<br>
+      &nbsp;&nbsp;{"id":"content_script","label":"Content script injection","mandatory":false,"reason":"requires user interaction"},<br>
+      &nbsp;&nbsp;{"id":"supply_chain","label":"Supply chain","mandatory":false,"reason":"no npm deps found"}<br>
+      &nbsp;],<br>
+      &nbsp;"context": "Found 3 content scripts, 2 background workers, 1 popup"<br>
+      }<br><br>
+      <span style="color:#68d391;">// Progresso (UI lo legge per il monitor)</span><br>
+      {<br>
+      &nbsp;"status": <span style="color:#fbd38d;">"running"</span>,<br>
+      &nbsp;"phase": <span style="color:#fbd38d;">"researcher"</span>,<br>
+      &nbsp;"current_op": <span style="color:#fbd38d;">"postmessage"</span>,<br>
+      &nbsp;"completed_ops": ["dom_xss"],<br>
+      &nbsp;"findings_so_far": 2<br>
+      }
+    </div>
+  </div>
+
+  <!-- UI scrive -->
+  <div>
+    <div style="font-size:11px;text-transform:uppercase;color:#b794f4;letter-spacing:1px;margin-bottom:8px;">← UI scrive (risposta)</div>
+
+    <div style="background:#1a1a2e;border:1px solid #4a2080;border-radius:6px;padding:12px;font-size:11px;font-family:monospace;color:#e2e8f0;line-height:1.8;">
+      <span style="color:#68d391;">// Risposta asset selection</span><br>
+      {<br>
+      &nbsp;"status": <span style="color:#fbd38d;">"assets_selected"</span>,<br>
+      &nbsp;"selected_assets": [<span style="color:#fbd38d;">"ext-main"</span>]<br>
+      }<br><br>
+      <span style="color:#68d391;">// Risposta plan approval</span><br>
+      {<br>
+      &nbsp;"status": <span style="color:#fbd38d;">"approved"</span>,<br>
+      &nbsp;"approved_ops": [<br>
+      &nbsp;&nbsp;<span style="color:#fbd38d;">"postmessage"</span>,<br>
+      &nbsp;&nbsp;<span style="color:#fbd38d;">"dom_xss"</span>,<br>
+      &nbsp;&nbsp;<span style="color:#fbd38d;">"content_script"</span><br>
+      &nbsp;]<br>
+      &nbsp;<span style="color:#718096;">// supply_chain non incluso → skippato</span><br>
+      }<br><br>
+      <span style="color:#68d391;">// Richiesta skip a runtime</span><br>
+      {<br>
+      &nbsp;"status": <span style="color:#fbd38d;">"skip_requested"</span>,<br>
+      &nbsp;"skip_op": <span style="color:#fbd38d;">"content_script"</span><br>
+      }
+    </div>
+
+    <div style="margin-top:12px;background:#1a2744;border-radius:6px;padding:10px;font-size:11px;">
+      <div style="color:#fbd38d;font-weight:600;margin-bottom:6px;">Domini per asset_type</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:10px;color:#a0aec0;">
+        <div><span style="color:#90cdf4;">webapp:</span> AUTH INJECT CLIENT ACCESS MEDIA INFRA</div>
+        <div><span style="color:#90cdf4;">browserext:</span> postMessage DOM-XSS content-script supply-chain permissions</div>
+        <div><span style="color:#90cdf4;">mobileapp:</span> deep-links intent storage network crypto</div>
+        <div><span style="color:#90cdf4;">executable:</span> memory-corruption binary-analysis input-validation priv-esc</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:16px;padding:12px;background:#1a2744;border-radius:6px;font-size:12px;color:#a0aec0;">
+  <strong style="color:#90cdf4;">Meccanismo:</strong> Pipeline scrive session.json con <code>status: "awaiting_*"</code> poi entra in polling loop (ogni 500ms). UI riceve notifica via SSE (server fa watch su session.json), mostra il piano, utente approva → UI scrive <code>status: "approved"</code> → pipeline riprende. Schema formale in <code>schemas/session.schema.json</code>.
+</div>

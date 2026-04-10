@@ -1,0 +1,13 @@
+[36m
+╔══════════════════════════════════════════════════════════╗[0m
+[scope] fetching scope from HackerOne...
+[36m║  SYNC PROGRAM SCOPE                                      ║[0m
+[36m╚══════════════════════════════════════════════════════════╝[0m
+  Platform : [1mHackerOne[0m
+  Handle   : [1mduckduckgo[0m
+  URL      : [90mhttps://hackerone.com/duckduckgo[0m
+
+(node:2480) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[31m
+FATAL: database disk image is malformed[0m

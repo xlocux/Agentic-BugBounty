@@ -1,4 +1,4 @@
-import { apiFetch, openSSE, stripAnsi } from "../modules/api.js";
+import { apiFetch, openSSE, ansiToHtml } from "../modules/api.js";
 import { pushLogLine } from "./run-control.js";
 
 let logSSE = null;
@@ -73,12 +73,12 @@ window.abbTailJob = function(jobId, label) {
     `/api/stream/${jobId}`,
     (msg) => {
       if (msg.line) {
-        const clean = stripAnsi(msg.line);
-        const line  = document.createElement("div");
-        line.textContent = clean;
-        logEl.appendChild(line);
+        const div = document.createElement("div");
+        div.style.whiteSpace = "pre-wrap";
+        div.innerHTML = ansiToHtml(msg.line);
+        logEl.appendChild(div);
         logEl.scrollTop = logEl.scrollHeight;
-        pushLogLine(clean);
+        pushLogLine(msg.line); // raw — run-control handles color
       }
     },
     () => {} // ignore connection errors

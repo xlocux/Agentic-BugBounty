@@ -169,15 +169,19 @@
     <div id="create-target-drawer" style="display:none;margin-top:20px;">
       <div class="panel" style="max-width:480px;">
         <div class="panel-title">NEW TARGET</div>
+        <label class="field-label">Program URL (HackerOne / Bugcrowd / Intigriti)</label>
+        <input class="field-input" id="ct-url" placeholder="https://hackerone.com/acme" oninput="ctUrlChanged(this.value)">
         <label class="field-label">Target name (slug)</label>
-        <input class="field-input" id="ct-name" placeholder="e.g. acme-corp">
-        <label class="field-label">Program URL (optional)</label>
-        <input class="field-input" id="ct-url" placeholder="https://hackerone.com/acme">
+        <input class="field-input" id="ct-name" placeholder="auto-filled from URL">
         <div style="display:flex;gap:8px;">
           <button class="btn btn-primary" onclick="submitCreateTarget()">Create</button>
           <button class="btn btn-muted" onclick="closeCreateTarget()">Cancel</button>
         </div>
         <div id="ct-result" style="margin-top:8px;font-size:11px;color:var(--teal);"></div>
+        <div id="ct-progress" style="display:none;margin-top:10px;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Setting up intelligence...</div>
+          <div id="ct-jobs" style="font-size:11px;line-height:2;"></div>
+        </div>
       </div>
     </div>
 
@@ -190,17 +194,17 @@
           <option value="whitebox">whitebox</option>
           <option value="blackbox">blackbox</option>
         </select>
-        <div style="display:flex;gap:16px;margin-bottom:10px;font-size:9px;color:var(--ink);">
+        <div style="display:flex;gap:16px;margin-bottom:10px;font-size:12px;color:var(--ink);">
           <label><input type="checkbox" id="ld-interactive"> --interactive</label>
           <label><input type="checkbox" id="ld-hitl"> --hitl</label>
           <label><input type="checkbox" id="ld-resume"> --resume</label>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:9px;color:var(--ink);">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px;color:var(--ink);">
           <input type="checkbox" id="ld-intel" checked>
           <label for="ld-intel">Auto-sync intelligence before run (H1 + CVE)</label>
         </div>
         <div style="display:flex;gap:8px;">
-          <button class="btn btn-primary" onclick="submitLaunch()" style="font-size:10px;padding:7px 18px;">▶ Launch</button>
+          <button class="btn btn-primary" onclick="submitLaunch()">▶ Launch</button>
           <button class="btn btn-muted" onclick="closeLaunchDrawer()">Cancel</button>
         </div>
         <div id="ld-result" style="margin-top:8px;font-size:11px;color:var(--teal);"></div>
@@ -347,6 +351,12 @@
       </div>
     </div>
 
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <span style="font-size:11px;color:var(--muted);white-space:nowrap;">Target:</span>
+      <select class="field-input" id="intel-target-select" style="margin:0;width:auto;min-width:160px;font-size:11px;" onchange="intelSelectTarget(this.value)">
+        <option value="">— select target —</option>
+      </select>
+    </div>
     <div style="display:flex;gap:4px;margin-bottom:14px;">
       <button class="btn btn-primary" id="it-tab-overview" onclick="intelTab('overview')">Overview</button>
       <button class="btn btn-muted"   id="it-tab-scope"    onclick="intelTab('scope')">Scope</button>
@@ -373,6 +383,10 @@
     </div>
 
     <div id="it-view-scope" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <span id="intel-scope-label" style="font-size:11px;color:var(--muted);"></span>
+        <button class="btn btn-primary" id="intel-scope-proceed" style="display:none;" onclick="intelProceedWithTarget()">▶ Proceed with this target</button>
+      </div>
       <table class="data-table">
         <thead><tr><th>Asset</th><th>Type</th><th>Eligible</th><th>Max Severity</th></tr></thead>
         <tbody id="intel-scope-body"></tbody>
@@ -446,10 +460,10 @@
     </div>
 
     <div style="display:flex;gap:8px;margin-top:8px;">
-      <span style="color:var(--teal);font-size:10px;line-height:28px;">&gt;</span>
+      <span style="color:var(--teal);font-size:13px;line-height:32px;">&gt;</span>
       <input class="field-input" id="term-cmd" placeholder="run &lt;target&gt; | sync &lt;target&gt; h1 | tools:check"
-             style="margin:0;font-size:9px;" onkeydown="if(event.key==='Enter')execTermCmd()">
-      <button class="btn btn-primary" onclick="execTermCmd()" style="font-size:9px;">↵</button>
+             style="margin:0;" onkeydown="if(event.key==='Enter')execTermCmd()">
+      <button class="btn btn-primary" onclick="execTermCmd()">↵</button>
     </div>
   </section>
 
@@ -477,7 +491,7 @@
         </div>
         <div class="chat-input-row">
           <input class="chat-input" id="chat-input" placeholder="Ask Claude about your findings..." onkeydown="if(event.key==='Enter'&amp;&amp;!event.shiftKey){event.preventDefault();sendChat();}">
-          <button class="btn btn-primary" onclick="sendChat()" style="font-size:9px;">Send</button>
+          <button class="btn btn-primary" onclick="sendChat()">Send</button>
         </div>
       </div>
 
@@ -817,19 +831,20 @@ function renderRecentFindings(findings) {
 function renderMindmap(findings, targets) {
   const svg   = d3.select("#map-mindmap");
   svg.selectAll("*").remove();
-  const W = svg.node().parentElement.clientWidth || 700;
-  const H = 220;
-  svg.attr("viewBox", `0 0 ${W} ${H}`);
+  const container = svg.node().parentElement;
+  const W = container.clientWidth || 700;
+  const H = 260;
+  svg.attr("width", W).attr("height", H).attr("viewBox", `0 0 ${W} ${H}`);
 
   const domains = ["AUTH","INJECT","CLIENT","ACCESS","MEDIA","INFRA"];
   const colors  = ["#55c7ff","#ff4fd8","#ffd700","#39ffd4","#ff6b35","#8ea0cb"];
-  const cx = W / 2, cy = H / 2, R = 80;
+  const cx = W / 2, cy = H / 2, R = 95;
 
   // Center node
-  svg.append("circle").attr("cx",cx).attr("cy",cy).attr("r",18)
+  svg.append("circle").attr("cx",cx).attr("cy",cy).attr("r",22)
     .attr("fill","var(--surface)").attr("stroke","var(--teal)").attr("stroke-width",1.5);
-  svg.append("text").attr("x",cx).attr("y",cy+3).attr("text-anchor","middle")
-    .attr("font-size",7).attr("fill","var(--teal)").text("TARGET");
+  svg.append("text").attr("x",cx).attr("y",cy+4).attr("text-anchor","middle")
+    .attr("font-size",9).attr("fill","var(--teal)").text("TARGET");
 
   domains.forEach((d, i) => {
     const angle  = (i / domains.length) * Math.PI * 2 - Math.PI / 2;
@@ -842,17 +857,16 @@ function renderMindmap(findings, targets) {
     svg.append("line").attr("x1",cx).attr("y1",cy).attr("x2",dx).attr("y2",dy)
       .attr("stroke",color).attr("stroke-opacity",0.4).attr("stroke-width",1);
 
-    // Domain node
-    const g = svg.append("g").attr("transform",`translate(${dx},${dy})`)
-      .style("opacity",0).style("transform",`translate(${dx}px,${dy}px) scale(0)`);
-    g.append("circle").attr("r",12).attr("fill","var(--surface)").attr("stroke",color).attr("stroke-width",1.5);
-    g.append("text").attr("y",3).attr("text-anchor","middle").attr("font-size",5.5).attr("fill",color).text(d);
+    // Domain node — only use SVG attr transform for position; CSS transform-box handles scale origin
+    const g = svg.append("g").attr("transform",`translate(${dx},${dy})`).style("opacity",0);
+    g.append("circle").attr("r",16).attr("fill","var(--surface)").attr("stroke",color).attr("stroke-width",1.5);
+    g.append("text").attr("y",4).attr("text-anchor","middle").attr("font-size",8).attr("fill",color).text(d);
     if (count > 0) {
-      g.append("circle").attr("cx",10).attr("cy",-10).attr("r",6).attr("fill",color).attr("fill-opacity",0.9);
-      g.append("text").attr("x",10).attr("y",-8).attr("text-anchor","middle").attr("font-size",6).attr("fill","#060816").text(count);
+      g.append("circle").attr("cx",13).attr("cy",-13).attr("r",7).attr("fill",color).attr("fill-opacity",0.9);
+      g.append("text").attr("x",13).attr("y",-10).attr("text-anchor","middle").attr("font-size",8).attr("fill","#060816").text(count);
     }
 
-    // Animate in with delay
+    // Animate in with delay — scale from 0 uses transform-box:fill-box so origin = node center
     anime({ targets: g.node(), opacity: [0,1], scale: [0,1], delay: i * 120,
             duration: 600, easing: "easeOutBack" });
   });
@@ -890,23 +904,77 @@ async function loadTargets() {
 
 function openCreateTarget() {
   document.getElementById("create-target-drawer").style.display = "block";
+  document.getElementById("ct-url").value = "";
+  document.getElementById("ct-name").value = "";
+  document.getElementById("ct-result").textContent = "";
+  document.getElementById("ct-progress").style.display = "none";
 }
 function closeCreateTarget() {
   document.getElementById("create-target-drawer").style.display = "none";
 }
 
+function ctUrlChanged(url) {
+  if (!url) return;
+  try {
+    const segs = new URL(url).pathname.replace(/^\//, "").split("/").filter(Boolean);
+    const handle = segs[0];
+    if (handle && !document.getElementById("ct-name").value) {
+      document.getElementById("ct-name").value = handle;
+    }
+  } catch { /* invalid URL, ignore */ }
+}
+
 async function submitCreateTarget() {
   const name = document.getElementById("ct-name").value.trim();
   const url  = document.getElementById("ct-url").value.trim();
-  if (!name) return;
+  if (!name) { document.getElementById("ct-result").textContent = "Target name required."; return; }
   try {
     const r = await apiPost("/api/targets/create", { name, program_url: url });
-    document.getElementById("ct-result").textContent = `Job started: ${r.job_id}. Check Terminal for progress.`;
-    setTimeout(loadTargets, 2000);
+    document.getElementById("ct-result").textContent = "Workspace created — syncing intelligence...";
+
+    if (r.sync_job_id || r.intel_job_id) {
+      document.getElementById("ct-progress").style.display = "block";
+      const jobs = [
+        { id: r.job_id,       label: "scaffold" },
+        { id: r.sync_job_id,  label: "scope sync" },
+        { id: r.intel_job_id, label: "H1 intel" }
+      ].filter(j => j.id);
+      pollCtJobs(jobs, name);
+    } else {
+      setTimeout(loadTargets, 1500);
+    }
   } catch (e) {
     document.getElementById("ct-result").textContent = `Error: ${e.message}`;
     document.getElementById("ct-result").style.color = "var(--pink)";
   }
+}
+
+async function pollCtJobs(jobs, targetName) {
+  const el = document.getElementById("ct-jobs");
+  const render = (statuses) => {
+    el.innerHTML = statuses.map(s => {
+      const icon = s.status === "done" ? "✓" : s.status === "error" ? "✗" : s.status === "running" ? "⟳" : "·";
+      const color = s.status === "done" ? "var(--teal)" : s.status === "error" ? "var(--pink)" : "var(--muted)";
+      return `<div style="color:${color}">${icon} ${escHtml(s.label)}</div>`;
+    }).join("");
+  };
+
+  const statuses = jobs.map(j => ({ ...j, status: "pending" }));
+  render(statuses);
+
+  const interval = setInterval(async () => {
+    const jobList = await api("/api/jobs").catch(() => []);
+    for (const s of statuses) {
+      const job = jobList.find(j => j.id === s.id);
+      if (job) s.status = job.status;
+    }
+    render(statuses);
+    if (statuses.every(s => ["done","error","stopped"].includes(s.status))) {
+      clearInterval(interval);
+      document.getElementById("ct-result").textContent = "Setup complete.";
+      setTimeout(() => { loadTargets(); }, 800);
+    }
+  }, 1500);
 }
 
 function openLaunchDrawer(target, mode) {
@@ -1422,6 +1490,8 @@ async function renderTaintMap() {
 }
 
 // ── INTELLIGENCE ─────────────────────────────────────────────────────────
+let intelCurrentTarget = null;
+
 function intelTab(tab) {
   ["overview","scope","history","topology","global"].forEach(t => {
     document.getElementById(`it-view-${t}`).style.display = t===tab?"block":"none";
@@ -1431,10 +1501,39 @@ function intelTab(tab) {
   if (tab==="global") loadGlobalPage(1);
 }
 
+async function intelSelectTarget(name) {
+  intelCurrentTarget = name || null;
+  await loadIntelligence();
+}
+
+function intelProceedWithTarget() {
+  if (!intelCurrentTarget) return;
+  state.currentTarget = intelCurrentTarget;
+  showSection("targets");
+  openLaunchDrawer(intelCurrentTarget, "whitebox");
+}
+
+async function populateIntelTargetSelect() {
+  const targets = await api("/api/targets").catch(() => []);
+  const sel = document.getElementById("intel-target-select");
+  const current = sel.value;
+  sel.innerHTML = `<option value="">— select target —</option>` +
+    targets.map(t => `<option value="${escHtml(t.name)}"${t.name===current?" selected":""}>${escHtml(t.name)}</option>`).join("");
+  if (!intelCurrentTarget && targets.length === 1) {
+    sel.value = targets[0].name;
+    intelCurrentTarget = targets[0].name;
+  }
+}
+
 async function loadIntelligence() {
-  const data = await api("/api/target").catch(() => ({}));
+  await populateIntelTargetSelect();
+
+  const endpoint = intelCurrentTarget ? `/api/intelligence/${encodeURIComponent(intelCurrentTarget)}` : "/api/target";
+  const data = await api(endpoint).catch(() => ({}));
   const local  = data.local  || {};
-  const globalData = data.global || {};
+
+  // Global counts from /api/target only
+  const globalData = intelCurrentTarget ? {} : (data.global || {});
 
   const m = document.getElementById("intel-metrics");
   const scopes   = local.scopeSnapshot?.scopes?.length    || 0;
@@ -1468,8 +1567,11 @@ async function loadIntelligence() {
       </tr>`).join("");
 
   const scps = local.scopeSnapshot?.scopes || [];
+  const progUrl = data.config?.program_url || "";
+  document.getElementById("intel-scope-label").textContent = progUrl ? `Program: ${progUrl}` : "";
+  document.getElementById("intel-scope-proceed").style.display = intelCurrentTarget ? "inline-block" : "none";
   document.getElementById("intel-scope-body").innerHTML = scps.length === 0
-    ? `<tr><td colspan="4" style="color:var(--muted)">No scope data</td></tr>`
+    ? `<tr><td colspan="4" style="color:var(--muted)">No scope data — create a target with a program URL to auto-sync</td></tr>`
     : scps.slice(0, 50).map(s => `<tr>
         <td style="color:var(--cyan);font-size:11px;">${escHtml(s.asset_identifier||"")}</td>
         <td style="font-size:11px;">${escHtml(s.asset_type||"")}</td>

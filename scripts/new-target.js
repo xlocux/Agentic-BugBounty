@@ -4,12 +4,35 @@
 const path = require("node:path");
 const { ensureDir, writeJson, resolveDatabasePath, openDatabase, initDatabase } = require("./lib/contracts");
 
-const targetName = process.argv[2];
+const args = process.argv.slice(2);
+const targetName = args.find(a => !a.startsWith("--"));
+const programUrl = (() => { const i = args.indexOf("--program-url"); return i !== -1 ? args[i + 1] : null; })();
 
 if (!targetName) {
-  console.error("Usage: node scripts/new-target.js <target-name>");
+  console.error("Usage: node scripts/new-target.js <target-name> [--program-url <url>]");
   process.exit(1);
 }
+
+function detectPlatform(url) {
+  if (!url) return null;
+  const u = url.toLowerCase();
+  if (u.includes("hackerone.com")) return "h1";
+  if (u.includes("bugcrowd.com"))  return "bc";
+  if (u.includes("intigriti.com")) return "it";
+  if (u.includes("yeswehack.com")) return "ywh";
+  return null;
+}
+
+function extractHandle(url) {
+  if (!url) return null;
+  try {
+    const segs = new URL(url).pathname.replace(/^\//, "").split("/").filter(Boolean);
+    return segs[0] || null;
+  } catch { return null; }
+}
+
+const platform = detectPlatform(programUrl);
+const handle   = extractHandle(programUrl);
 
 const targetDir = path.resolve("targets", targetName);
 if (require("node:fs").existsSync(targetDir)) {
@@ -34,7 +57,7 @@ writeJson(path.join(targetDir, "target.json"), {
   asset_type: "webapp",
   default_mode: "whitebox",
   allowed_modes: ["whitebox", "blackbox"],
-  program_url: "https://hackerone.com/[INSERT-PROGRAM]",
+  program_url: programUrl || "https://hackerone.com/[INSERT-PROGRAM]",
   source_path: "./src",
   findings_dir: "./findings",
   h1_reports_dir: "./findings/h1_submission_ready",
@@ -42,7 +65,7 @@ writeJson(path.join(targetDir, "target.json"), {
   intelligence_dir: "./intelligence",
   target_version_hint: "[INSERT VERSION OR WHERE TO READ IT]",
   hackerone: {
-    program_handle: "[INSERT PROGRAM HANDLE]",
+    program_handle: (platform === "h1" && handle) ? handle : "[INSERT PROGRAM HANDLE]",
     sync_enabled: true
   },
   scope: {

@@ -65,12 +65,13 @@ body::after {
 /* ── Sidebar ── */
 #sidebar {
   width: var(--sidebar-w);
-  background: var(--surface2);
+  background: linear-gradient(180deg, #0a1228 0%, var(--surface2) 100%);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
   overflow: hidden;
+  box-shadow: 4px 0 24px rgba(0,0,0,0.4);
 }
 
 #sidebar-header {
@@ -107,15 +108,15 @@ body::after {
   border-left: 2px solid transparent;
   transition: background 0.15s, border-color 0.15s;
 }
-.nav-item:hover { background: rgba(57,255,212,0.05); }
+.nav-item:hover { background: rgba(57,255,212,0.06); border-left-color: rgba(57,255,212,0.3); }
 .nav-item.active {
-  background: linear-gradient(90deg, rgba(57,255,212,0.12), rgba(57,255,212,0.02));
+  background: linear-gradient(90deg, rgba(57,255,212,0.14), rgba(57,255,212,0.02));
   border-left-color: var(--teal);
-  box-shadow: inset 0 0 20px rgba(57,255,212,0.04);
+  box-shadow: inset 0 0 20px rgba(57,255,212,0.05);
 }
-.nav-item.active .nav-label { color: var(--teal); }
+.nav-item.active .nav-label { color: var(--ink); font-weight: 600; }
 .nav-icon  { font-size: 15px; color: var(--muted); width: 16px; text-align: center; }
-.nav-item.active .nav-icon { color: var(--teal); }
+.nav-item.active .nav-icon { color: var(--teal); text-shadow: 0 0 8px var(--teal); }
 .nav-label { font-size: 13px; color: var(--muted); letter-spacing: 0.3px; }
 .nav-sub   { font-size: 11px; color: var(--muted); display: block; }
 
@@ -145,6 +146,9 @@ body::after {
   overflow-y: auto;
   padding: 20px 24px;
   position: relative;
+  /* Subtle dot grid gives depth without clutter */
+  background-image: radial-gradient(circle, rgba(57,255,212,0.05) 1px, transparent 1px);
+  background-size: 28px 28px;
 }
 
 /* ── Sections (hidden by default) ── */
@@ -165,18 +169,26 @@ body::after {
   padding: 16px;
   position: relative;
   overflow: hidden;
-  transition: border-color 0.25s, box-shadow 0.25s;
+  transition: border-color 0.25s, box-shadow 0.25s, transform 0.2s;
   cursor: default;
 }
 .metric-card::before {
   content: "";
   position: absolute; top: 0; left: 0; right: 0; height: 2px;
-  background: linear-gradient(90deg, var(--teal), transparent);
-  opacity: 0.7;
+  background: linear-gradient(90deg, var(--teal), var(--cyan), transparent);
+  opacity: 0.8;
+}
+/* Subtle diagonal highlight */
+.metric-card::after {
+  content: "";
+  position: absolute; top: 0; right: 0; width: 60px; height: 60px;
+  background: radial-gradient(circle at top right, rgba(57,255,212,0.06), transparent);
+  pointer-events: none;
 }
 .metric-card:hover {
-  border-color: rgba(57,255,212,0.35);
-  box-shadow: 0 4px 24px rgba(57,255,212,0.08);
+  border-color: rgba(57,255,212,0.4);
+  box-shadow: 0 6px 28px rgba(57,255,212,0.1), 0 1px 0 rgba(57,255,212,0.15) inset;
+  transform: translateY(-1px);
 }
 .metric-value {
   font-size: 28px;
@@ -217,9 +229,12 @@ body::after {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 14px;
-  transition: border-color 0.2s;
+  transition: border-color 0.25s, box-shadow 0.25s;
 }
-.panel:hover { border-color: rgba(57,255,212,0.2); }
+.panel:hover {
+  border-color: rgba(57,255,212,0.25);
+  box-shadow: 0 4px 32px rgba(0,0,0,0.35), 0 0 0 1px rgba(57,255,212,0.06) inset;
+}
 .panel-title {
   font-size: 11px;
   color: var(--teal);
@@ -411,11 +426,26 @@ body::after {
   border: 1px solid var(--border);
   border-radius: 6px;
   overflow: hidden;
+  position: relative;
 }
 .map-container svg { width: 100%; display: block; }
+/* SVG transforms: use fill-box so scale() animates around element center, not viewport */
+.map-container svg g { transform-box: fill-box; transform-origin: center; }
 .map-container svg text { font-family: var(--font-mono); fill: var(--muted); }
 .map-container svg .node circle { stroke-width: 1.5; }
 .map-container svg .link { stroke: var(--border); stroke-opacity: 0.6; }
+
+/* Dashboard mindmap gets more room and hero treatment */
+#dash-mindmap-panel .map-container { height: 260px; }
+#dash-mindmap-panel {
+  border-color: rgba(57,255,212,0.18);
+  box-shadow: 0 0 40px rgba(57,255,212,0.05);
+}
+#dash-mindmap-panel .panel-title {
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-shadow: 0 0 10px rgba(57,255,212,0.5);
+}
 
 /* ── Custom scrollbars ── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }

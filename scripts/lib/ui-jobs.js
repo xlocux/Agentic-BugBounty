@@ -85,7 +85,24 @@ function getJob(id) {
   return loadJobs().find(j => j.id === id) || null;
 }
 
+function reconcileJobs() {
+  const jobs = loadJobs();
+  let changed = false;
+  for (const job of jobs) {
+    if (job.status !== "running") continue;
+    const alive = job.pid && (() => { try { process.kill(job.pid, 0); return true; } catch { return false; } })();
+    if (!alive) {
+      job.status = "error";
+      job.finished = job.finished || new Date().toISOString();
+      job.exit_code = job.exit_code ?? -1;
+      changed = true;
+    }
+  }
+  if (changed) saveJobs(jobs);
+}
+
 function listJobs() {
+  reconcileJobs();
   return loadJobs();
 }
 

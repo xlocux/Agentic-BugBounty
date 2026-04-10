@@ -1,0 +1,93 @@
+<h2>Design — Modifiche al Pipeline</h2>
+<p class="subtitle">Minimo refactoring di run-pipeline.js + nuovo modulo session.js</p>
+
+<div style="display:flex;flex-direction:column;gap:14px;margin-top:20px;">
+
+  <!-- Nuovo modulo -->
+  <div style="background:#1a1a2e;border:1px solid #276749;border-radius:8px;padding:14px;">
+    <div style="color:#68d391;font-weight:600;font-size:13px;margin-bottom:8px;">+ Nuovo: scripts/lib/session.js</div>
+    <div style="font-size:11px;color:#a0aec0;margin-bottom:8px;">Tutta la logica session in un modulo separato — run-pipeline.js lo chiama, non lo conosce nei dettagli.</div>
+    <div style="background:#0d1117;border-radius:4px;padding:10px;font-size:11px;font-family:monospace;color:#e2e8f0;line-height:1.8;">
+      <span style="color:#68d391;">// Funzioni esportate:</span><br>
+      <span style="color:#b794f4;">writeCheckpoint</span>(sessionPath, payload) <span style="color:#718096;">// scrive session.json</span><br>
+      <span style="color:#b794f4;">waitForApproval</span>(sessionPath, timeoutMs) <span style="color:#718096;">// polling 500ms, risolve con risposta UI</span><br>
+      <span style="color:#b794f4;">buildPlanForAssetType</span>(assetType, surfaceMap) <span style="color:#718096;">// genera lista operazioni</span><br>
+      <span style="color:#b794f4;">isHitlMode</span>(args) <span style="color:#718096;">// true se --hitl flag presente</span>
+    </div>
+  </div>
+
+  <!-- Modifiche run-pipeline.js -->
+  <div style="background:#1a1a2e;border:1px solid #4a5568;border-radius:8px;padding:14px;">
+    <div style="color:#fbd38d;font-weight:600;font-size:13px;margin-bottom:8px;">~ Modifiche run-pipeline.js (3 punti chirurgici)</div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;font-size:11px;font-family:monospace;">
+
+      <div style="background:#0d1117;border-radius:4px;padding:10px;">
+        <div style="color:#718096;margin-bottom:4px;">// 1. Prima di avviare — asset selection checkpoint</div>
+        <div style="color:#fc8181;">- const assetsToAnalyze = config.additional_assets || [];</div>
+        <div style="color:#68d391;">+ if (isHitlMode(args)) {</div>
+        <div style="color:#68d391;">+   const plan = buildPlanForAssetType(config.asset_type, null);</div>
+        <div style="color:#68d391;">+   writeCheckpoint(sessionPath, { status:"awaiting_assets", ...plan });</div>
+        <div style="color:#68d391;">+   const resp = await waitForApproval(sessionPath);</div>
+        <div style="color:#68d391;">+   assetsToAnalyze = resp.selected_assets;</div>
+        <div style="color:#68d391;">+ }</div>
+      </div>
+
+      <div style="background:#0d1117;border-radius:4px;padding:10px;">
+        <div style="color:#718096;margin-bottom:4px;">// 2. Dopo explorer, prima di researcher — plan approval</div>
+        <div style="color:#fc8181;">- const domains = ALL_DOMAINS[config.asset_type];</div>
+        <div style="color:#68d391;">+ let domains = ALL_DOMAINS[config.asset_type];</div>
+        <div style="color:#68d391;">+ if (isHitlMode(args)) {</div>
+        <div style="color:#68d391;">+   const plan = buildPlanForAssetType(config.asset_type, surfaceMap);</div>
+        <div style="color:#68d391;">+   writeCheckpoint(sessionPath, { status:"awaiting_approval", phase:"researcher", ...plan });</div>
+        <div style="color:#68d391;">+   const resp = await waitForApproval(sessionPath);</div>
+        <div style="color:#68d391;">+   domains = domains.filter(d => resp.approved_ops.includes(d.id));</div>
+        <div style="color:#68d391;">+ }</div>
+      </div>
+
+      <div style="background:#0d1117;border-radius:4px;padding:10px;">
+        <div style="color:#718096;margin-bottom:4px;">// 3. Dopo researcher, prima di triage — findings review</div>
+        <div style="color:#68d391;">+ if (isHitlMode(args)) {</div>
+        <div style="color:#68d391;">+   writeCheckpoint(sessionPath, { status:"awaiting_approval", phase:"triage",</div>
+        <div style="color:#68d391;">+     findings: bundle.findings });</div>
+        <div style="color:#68d391;">+   await waitForApproval(sessionPath);</div>
+        <div style="color:#68d391;">+ }</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Modifiche UI server -->
+  <div style="background:#1a1a2e;border:1px solid #4a5568;border-radius:8px;padding:14px;">
+    <div style="color:#90cdf4;font-weight:600;font-size:13px;margin-bottom:8px;">~ Modifiche UI server (2 endpoint nuovi)</div>
+    <div style="font-size:11px;font-family:monospace;color:#e2e8f0;line-height:1.8;background:#0d1117;border-radius:4px;padding:10px;">
+      <span style="color:#68d391;">// Watch session.json → push evento SSE al browser</span><br>
+      GET <span style="color:#fbd38d;">/api/session/:target</span> → stato corrente session.json<br><br>
+      <span style="color:#68d391;">// UI scrive risposta (approvazione / skip)</span><br>
+      POST <span style="color:#fbd38d;">/api/session/:target/respond</span><br>
+      body: { status, approved_ops?, selected_assets?, skip_op? }
+    </div>
+  </div>
+
+  <!-- Schema -->
+  <div style="background:#1a1a2e;border:1px solid #4a5568;border-radius:8px;padding:14px;">
+    <div style="color:#b794f4;font-weight:600;font-size:13px;margin-bottom:6px;">+ Nuovo: schemas/session.schema.json</div>
+    <div style="font-size:11px;color:#a0aec0;">Schema AJV per validare session.json a ogni scrittura — previene stati inconsistenti.</div>
+  </div>
+
+</div>
+
+<div style="margin-top:16px;display:flex;gap:12px;">
+  <div style="flex:1;padding:10px;background:#1a2744;border-radius:6px;font-size:11px;">
+    <div style="color:#68d391;font-weight:600;margin-bottom:4px;">File modificati</div>
+    <div style="color:#a0aec0;">scripts/run-pipeline.js (+~50 righe)<br>scripts/serve-intel-ui.js (+2 endpoint)<br>schemas/ (+session.schema.json)</div>
+  </div>
+  <div style="flex:1;padding:10px;background:#1a2744;border-radius:6px;font-size:11px;">
+    <div style="color:#68d391;font-weight:600;margin-bottom:4px;">File nuovi</div>
+    <div style="color:#a0aec0;">scripts/lib/session.js<br>schemas/session.schema.json<br>tests/session.test.js</div>
+  </div>
+  <div style="flex:1;padding:10px;background:#1a2744;border-radius:6px;font-size:11px;">
+    <div style="color:#68d391;font-weight:600;margin-bottom:4px;">File invariati</div>
+    <div style="color:#a0aec0;">Tutti gli agenti CLI<br>lib/contracts.js<br>lib/ui-jobs.js<br>Tutti i test esistenti</div>
+  </div>
+</div>

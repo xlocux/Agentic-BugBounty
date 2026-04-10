@@ -1,0 +1,154 @@
+<h2>Design — Viste Grafiche</h2>
+<p class="subtitle">Due grafi: data flow input→sink e asset×tech stack per correlazione 0-day</p>
+
+<div style="display:flex;flex-direction:column;gap:28px;margin-top:24px;font-size:14px;">
+
+  <!-- GRAFO 1: Input → Sink -->
+  <div>
+    <div style="font-size:16px;font-weight:700;color:#90cdf4;margin-bottom:6px;">1 — Data Flow: Input → Sink</div>
+    <div style="font-size:13px;color:#a0aec0;margin-bottom:14px;">Traccia ogni input utente attraverso i layer dell'applicazione fino ai sink pericolosi. Nodi cliccabili per vedere il codice sorgente.</div>
+
+    <div style="background:#0d1117;border:1px solid #2d3748;border-radius:10px;padding:20px;position:relative;overflow:hidden;">
+
+      <!-- Legend -->
+      <div style="display:flex;gap:16px;margin-bottom:20px;font-size:12px;">
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;border-radius:50%;background:#3182ce;display:inline-block;"></span>Input</span>
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;border-radius:50%;background:#6b46c1;display:inline-block;"></span>Trasformazione</span>
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;border-radius:50%;background:#276749;display:inline-block;"></span>Sanitizzato</span>
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;border-radius:50%;background:#c53030;display:inline-block;"></span>Sink pericoloso</span>
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;border-radius:50%;background:#d69e2e;display:inline-block;"></span>Sink potenziale</span>
+      </div>
+
+      <!-- Flow graph SVG-style with HTML -->
+      <div style="display:flex;align-items:flex-start;gap:0;overflow-x:auto;">
+
+        <!-- Column 1: Inputs -->
+        <div style="display:flex;flex-direction:column;gap:12px;flex-shrink:0;width:160px;">
+          <div style="background:#1a365d;border:1.5px solid #3182ce;border-radius:6px;padding:8px 12px;font-size:12px;color:#90cdf4;text-align:center;">GET /search<br><span style="color:#718096;font-size:11px;">?q= param</span></div>
+          <div style="background:#1a365d;border:1.5px solid #3182ce;border-radius:6px;padding:8px 12px;font-size:12px;color:#90cdf4;text-align:center;">POST /api/query<br><span style="color:#718096;font-size:11px;">body.filter</span></div>
+          <div style="background:#1a365d;border:1.5px solid #3182ce;border-radius:6px;padding:8px 12px;font-size:12px;color:#90cdf4;text-align:center;">Cookie: session<br><span style="color:#718096;font-size:11px;">decoded value</span></div>
+        </div>
+
+        <!-- Arrow 1 -->
+        <div style="display:flex;flex-direction:column;justify-content:space-around;padding:0 8px;height:140px;flex-shrink:0;">
+          <span style="color:#4a5568;font-size:18px;">→</span>
+          <span style="color:#4a5568;font-size:18px;">→</span>
+          <span style="color:#4a5568;font-size:18px;">→</span>
+        </div>
+
+        <!-- Column 2: Transforms -->
+        <div style="display:flex;flex-direction:column;gap:12px;flex-shrink:0;width:160px;">
+          <div style="background:#2d1b69;border:1.5px solid #6b46c1;border-radius:6px;padding:8px 12px;font-size:12px;color:#d6bcfa;text-align:center;">trim()<br><span style="color:#718096;font-size:11px;">SearchController.php:42</span></div>
+          <div style="background:#2d1b69;border:1.5px solid #6b46c1;border-radius:6px;padding:8px 12px;font-size:12px;color:#d6bcfa;text-align:center;">json_decode()<br><span style="color:#718096;font-size:11px;">ApiController.php:18</span></div>
+          <div style="background:#276749;border:1.5px solid #68d391;border-radius:6px;padding:8px 12px;font-size:12px;color:#9ae6b4;text-align:center;">htmlspecialchars()<br><span style="color:#718096;font-size:11px;">sanitized ✓</span></div>
+        </div>
+
+        <!-- Arrow 2 -->
+        <div style="display:flex;flex-direction:column;justify-content:space-around;padding:0 8px;height:140px;flex-shrink:0;">
+          <span style="color:#4a5568;font-size:18px;">→</span>
+          <span style="color:#4a5568;font-size:18px;">→</span>
+          <span style="color:#718096;font-size:18px;opacity:0.3;">→</span>
+        </div>
+
+        <!-- Column 3: Sinks -->
+        <div style="display:flex;flex-direction:column;gap:12px;flex-shrink:0;width:160px;">
+          <div style="background:#4a0000;border:2px solid #c53030;border-radius:6px;padding:8px 12px;font-size:12px;color:#fc8181;text-align:center;">mysqli_query()<br><span style="color:#718096;font-size:11px;">⚠ unsanitized · SQLi</span></div>
+          <div style="background:#3d2b00;border:2px solid #d69e2e;border-radius:6px;padding:8px 12px;font-size:12px;color:#fbd38d;text-align:center;">eval()<br><span style="color:#718096;font-size:11px;">? potential · SSTI</span></div>
+          <div style="background:#1a1a2e;border:1px dashed #4a5568;border-radius:6px;padding:8px 12px;font-size:12px;color:#4a5568;text-align:center;">echo $var<br><span style="font-size:11px;">safe (sanitized)</span></div>
+        </div>
+
+      </div>
+
+      <!-- Annotation -->
+      <div style="margin-top:16px;padding:10px;background:#1a1a2e;border-radius:6px;font-size:12px;color:#a0aec0;display:flex;gap:16px;">
+        <span style="color:#fc8181;font-weight:600;">1 critical path</span>
+        <span style="color:#fbd38d;">1 potential path</span>
+        <span style="color:#68d391;">1 sanitized (safe)</span>
+        <span style="color:#718096;margin-left:auto;">Click nodo → vai al codice sorgente</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- GRAFO 2: Asset × Tech Stack -->
+  <div>
+    <div style="font-size:16px;font-weight:700;color:#90cdf4;margin-bottom:6px;">2 — Asset × Technology Stack</div>
+    <div style="font-size:13px;color:#a0aec0;margin-bottom:14px;">Mappa ogni dominio/asset al suo stack. Quando esce uno 0-day, cerchi la tecnologia e vedi immediatamente quali asset sono esposti.</div>
+
+    <div style="background:#0d1117;border:1px solid #2d3748;border-radius:10px;padding:20px;">
+
+      <!-- 0-day alert example -->
+      <div style="background:#4a0000;border:1.5px solid #c53030;border-radius:7px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">
+        <span style="font-size:20px;">🚨</span>
+        <div>
+          <div style="color:#fc8181;font-weight:700;font-size:14px;">CVE-2024-XXXX — Apache Log4j RCE (CVSS 10.0)</div>
+          <div style="color:#a0aec0;font-size:12px;margin-top:2px;">Cerco "log4j" nello stack… <strong style="color:#fc8181;">2 asset esposti trovati</strong></div>
+        </div>
+      </div>
+
+      <!-- Matrix table -->
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="border-bottom:1px solid #2d3748;">
+              <th style="text-align:left;padding:8px 12px;color:#718096;font-weight:600;font-size:12px;white-space:nowrap;">Asset / Domain</th>
+              <th style="padding:8px 12px;color:#718096;font-weight:600;font-size:12px;text-align:center;">Nginx</th>
+              <th style="padding:8px 12px;color:#718096;font-weight:600;font-size:12px;text-align:center;">Java / Log4j</th>
+              <th style="padding:8px 12px;color:#718096;font-weight:600;font-size:12px;text-align:center;">React</th>
+              <th style="padding:8px 12px;color:#718096;font-weight:600;font-size:12px;text-align:center;">PostgreSQL</th>
+              <th style="padding:8px 12px;color:#718096;font-weight:600;font-size:12px;text-align:center;">Redis</th>
+              <th style="padding:8px 12px;color:#718096;font-weight:600;font-size:12px;text-align:center;">Cloudflare</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid #1a1a2e;background:#0d1117;">
+              <td style="padding:10px 12px;color:#90cdf4;font-weight:600;">duckduckgo.com</td>
+              <td style="text-align:center;padding:10px;">✓</td>
+              <td style="text-align:center;padding:10px;background:#4a0000;color:#fc8181;font-weight:700;">⚠ 2.14.1</td>
+              <td style="text-align:center;padding:10px;">✓</td>
+              <td style="text-align:center;padding:10px;">✓</td>
+              <td style="text-align:center;padding:10px;color:#4a5568;">—</td>
+              <td style="text-align:center;padding:10px;">✓</td>
+            </tr>
+            <tr style="border-bottom:1px solid #1a1a2e;">
+              <td style="padding:10px 12px;color:#90cdf4;font-weight:600;">api.duckduckgo.com</td>
+              <td style="text-align:center;padding:10px;">✓</td>
+              <td style="text-align:center;padding:10px;background:#4a0000;color:#fc8181;font-weight:700;">⚠ 2.14.1</td>
+              <td style="text-align:center;padding:10px;color:#4a5568;">—</td>
+              <td style="text-align:center;padding:10px;">✓</td>
+              <td style="text-align:center;padding:10px;">✓</td>
+              <td style="text-align:center;padding:10px;">✓</td>
+            </tr>
+            <tr style="border-bottom:1px solid #1a1a2e;background:#0d1117;">
+              <td style="padding:10px 12px;color:#90cdf4;font-weight:600;">spread.duckduckgo.com</td>
+              <td style="text-align:center;padding:10px;">✓</td>
+              <td style="text-align:center;padding:10px;color:#4a5568;">—</td>
+              <td style="text-align:center;padding:10px;">✓</td>
+              <td style="text-align:center;padding:10px;color:#4a5568;">—</td>
+              <td style="text-align:center;padding:10px;color:#4a5568;">—</td>
+              <td style="text-align:center;padding:10px;">✓</td>
+            </tr>
+            <tr style="background:#0d1117;">
+              <td style="padding:10px 12px;color:#90cdf4;font-weight:600;">staticcdn.duckduckgo.com</td>
+              <td style="text-align:center;padding:10px;">✓</td>
+              <td style="text-align:center;padding:10px;color:#4a5568;">—</td>
+              <td style="text-align:center;padding:10px;color:#4a5568;">—</td>
+              <td style="text-align:center;padding:10px;color:#4a5568;">—</td>
+              <td style="text-align:center;padding:10px;color:#4a5568;">—</td>
+              <td style="text-align:center;padding:10px;">✓</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:14px;display:flex;gap:12px;font-size:12px;color:#a0aec0;">
+        <span>🔍 Cerca tecnologia:</span>
+        <span style="background:#1a2744;padding:4px 10px;border-radius:4px;color:#90cdf4;cursor:pointer;">log4j</span>
+        <span style="background:#1a2744;padding:4px 10px;border-radius:4px;color:#90cdf4;cursor:pointer;">struts</span>
+        <span style="background:#1a2744;padding:4px 10px;border-radius:4px;color:#90cdf4;cursor:pointer;">spring</span>
+        <span style="background:#1a2744;padding:4px 10px;border-radius:4px;color:#90cdf4;cursor:pointer;">log4shell</span>
+        <span style="color:#718096;margin-left:auto;">Dati da: http headers · JS fingerprint · deps scan</span>
+      </div>
+    </div>
+  </div>
+
+</div>

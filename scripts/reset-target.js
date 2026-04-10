@@ -88,7 +88,10 @@ async function main() {
     "findings/triage_result.json",
     "poc",
     "logs",
-    "intelligence"
+    "intelligence",
+    "scan_manifest.json",
+    "session.json",
+    "session-response.json"
   ];
 
   const toRecreate = [

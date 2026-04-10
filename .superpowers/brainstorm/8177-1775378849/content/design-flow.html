@@ -1,0 +1,107 @@
+<h2>Design — Flusso Wizard</h2>
+<p class="subtitle">Come la UI guida l'utente dall'inizio alla submission, con controllo su ogni fase</p>
+
+<div style="display:flex;flex-direction:column;gap:0;margin-top:20px;">
+
+  <!-- Step 1 -->
+  <div style="display:flex;gap:0;">
+    <div style="display:flex;flex-direction:column;align-items:center;width:40px;flex-shrink:0;">
+      <div style="width:28px;height:28px;border-radius:50%;background:#2b6cb0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#fff;">1</div>
+      <div style="width:2px;flex:1;background:#2d3748;margin:4px 0;"></div>
+    </div>
+    <div style="background:#1a1a2e;border:1px solid #2d3748;border-radius:8px;padding:12px 16px;margin:0 0 0 12px;flex:1;margin-bottom:8px;">
+      <div style="color:#90cdf4;font-weight:600;font-size:13px;">Target Setup</div>
+      <div style="color:#a0aec0;font-size:11px;margin-top:4px;">Incolla URL programma → nome auto-filled → Create → sync scope + intel automatico</div>
+      <div style="margin-top:6px;font-size:11px;color:#68d391;">⊕ OBBLIGATORIO</div>
+    </div>
+  </div>
+
+  <!-- Step 2 -->
+  <div style="display:flex;gap:0;">
+    <div style="display:flex;flex-direction:column;align-items:center;width:40px;flex-shrink:0;">
+      <div style="width:28px;height:28px;border-radius:50%;background:#2b6cb0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#fff;">2</div>
+      <div style="width:2px;flex:1;background:#2d3748;margin:4px 0;"></div>
+    </div>
+    <div style="background:#1a1a2e;border:1px solid #2d3748;border-radius:8px;padding:12px 16px;margin:0 0 0 12px;flex:1;margin-bottom:8px;">
+      <div style="color:#90cdf4;font-weight:600;font-size:13px;">Asset Selection</div>
+      <div style="color:#a0aec0;font-size:11px;margin-top:4px;">La UI mostra gli asset in-scope con checkbox. Tu selezioni quali testare (es. *.duckduckgo.com ✓, spread.duckduckgo.com ✗). Selezione salvata in session.json.</div>
+      <div style="margin-top:6px;font-size:11px;color:#68d391;">⊕ OBBLIGATORIO — il pipeline non parte senza almeno 1 asset selezionato</div>
+    </div>
+  </div>
+
+  <!-- Step 3 -->
+  <div style="display:flex;gap:0;">
+    <div style="display:flex;flex-direction:column;align-items:center;width:40px;flex-shrink:0;">
+      <div style="width:28px;height:28px;border-radius:50%;background:#553c9a;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#fff;">3</div>
+      <div style="width:2px;flex:1;background:#2d3748;margin:4px 0;"></div>
+    </div>
+    <div style="background:#1a1a2e;border:1px solid #4a2080;border-radius:8px;padding:12px 16px;margin:0 0 0 12px;flex:1;margin-bottom:8px;">
+      <div style="color:#b794f4;font-weight:600;font-size:13px;">⏸ Plan Approval — Explorer</div>
+      <div style="color:#a0aec0;font-size:11px;margin-top:4px;">Pipeline scrive piano in session.json → UI mostra: "Eseguirò surface mapping su 3 assets. Operazioni: [✓ deps scan] [✓ endpoint map] [○ secret scan — opzionale]". Tu approvi/modifichi → pipeline riprende.</div>
+      <div style="margin-top:6px;display:flex;gap:8px;font-size:11px;">
+        <span style="color:#68d391;">⊕ deps scan: obbligatorio</span>
+        <span style="color:#fbd38d;">○ secret scan: opzionale</span>
+        <span style="color:#fbd38d;">○ git intel: opzionale</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 4 -->
+  <div style="display:flex;gap:0;">
+    <div style="display:flex;flex-direction:column;align-items:center;width:40px;flex-shrink:0;">
+      <div style="width:28px;height:28px;border-radius:50%;background:#553c9a;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#fff;">4</div>
+      <div style="width:2px;flex:1;background:#2d3748;margin:4px 0;"></div>
+    </div>
+    <div style="background:#1a1a2e;border:1px solid #4a2080;border-radius:8px;padding:12px 16px;margin:0 0 0 12px;flex:1;margin-bottom:8px;">
+      <div style="color:#b794f4;font-weight:600;font-size:13px;">⏸ Plan Approval — Researcher</div>
+      <div style="color:#a0aec0;font-size:11px;margin-top:4px;">Pipeline analizza gli asset selezionati e scrive: "Per *.duckduckgo.com eseguirò: [✓ AUTH] [✓ INJECT] [✓ ACCESS] [○ MEDIA — no file upload in scope] [○ INFRA — non in scope]". Tu scegli i domini da ricercare.</div>
+      <div style="margin-top:6px;display:flex;gap:8px;font-size:11px;">
+        <span style="color:#68d391;">⊕ AUTH, INJECT: obbligatori</span>
+        <span style="color:#fbd38d;">○ CLIENT, ACCESS, MEDIA, INFRA: opzionali</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 5 -->
+  <div style="display:flex;gap:0;">
+    <div style="display:flex;flex-direction:column;align-items:center;width:40px;flex-shrink:0;">
+      <div style="width:28px;height:28px;border-radius:50%;background:#276749;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#fff;">5</div>
+      <div style="width:2px;flex:1;background:#2d3748;margin:4px 0;"></div>
+    </div>
+    <div style="background:#1a1a2e;border:1px solid #276749;border-radius:8px;padding:12px 16px;margin:0 0 0 12px;flex:1;margin-bottom:8px;">
+      <div style="color:#68d391;font-weight:600;font-size:13px;">Execution Monitor</div>
+      <div style="color:#a0aec0;font-size:11px;margin-top:4px;">Live progress: quale domain sta girando, findings confermati man mano, possibilità di pausare/skippare un domain a runtime.</div>
+    </div>
+  </div>
+
+  <!-- Step 6 -->
+  <div style="display:flex;gap:0;">
+    <div style="display:flex;flex-direction:column;align-items:center;width:40px;flex-shrink:0;">
+      <div style="width:28px;height:28px;border-radius:50%;background:#553c9a;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#fff;">6</div>
+      <div style="width:2px;flex:1;background:#2d3748;margin:4px 0;"></div>
+    </div>
+    <div style="background:#1a1a2e;border:1px solid #4a2080;border-radius:8px;padding:12px 16px;margin:0 0 0 12px;flex:1;margin-bottom:8px;">
+      <div style="color:#b794f4;font-weight:600;font-size:13px;">⏸ Findings Review + Triage Approval</div>
+      <div style="color:#a0aec0;font-size:11px;margin-top:4px;">Prima del triage: UI mostra i finding confermati con severity. Tu puoi: rimuovere falsi positivi, aggiungere note, cambiare severity. Poi approvi il triage.</div>
+    </div>
+  </div>
+
+  <!-- Step 7 -->
+  <div style="display:flex;gap:0;">
+    <div style="display:flex;flex-direction:column;align-items:center;width:40px;flex-shrink:0;">
+      <div style="width:28px;height:28px;border-radius:50%;background:#276749;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#fff;">7</div>
+    </div>
+    <div style="background:#1a1a2e;border:1px solid #276749;border-radius:8px;padding:12px 16px;margin:0 0 0 12px;flex:1;margin-bottom:8px;">
+      <div style="color:#68d391;font-weight:600;font-size:13px;">Submit</div>
+      <div style="color:#a0aec0;font-size:11px;margin-top:4px;">Preview report H1-ready, un click per inviare. Feedback di conferma.</div>
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:16px;padding:12px;background:#1a2744;border-radius:6px;font-size:12px;color:#a0aec0;">
+  <strong style="color:#90cdf4;">Legenda:</strong>
+  <span style="margin-left:12px;color:#68d391;">⊕ obbligatorio</span>
+  <span style="margin-left:12px;color:#fbd38d;">○ opzionale/selezionabile</span>
+  <span style="margin-left:12px;color:#b794f4;">⏸ checkpoint — pipeline pausa, aspetta approvazione UI</span>
+</div>

@@ -1,0 +1,9 @@
+Target workspace created: D:\Agentic-BugBounty\targets\duckduckgo
+- database initialized: D:\Agentic-BugBounty\targets\duckduckgo\intelligence\agentic-bugbounty.db
+Next steps:
+  1. Clone/copy source into: D:\Agentic-BugBounty\targets\duckduckgo\src
+  2. Edit D:\Agentic-BugBounty\targets\duckduckgo\target.json
+  3. Run on Linux/macOS: ./targets/<name>/run.sh
+  4. Run on Windows: targets\<name>\run.cmd
+(node:8916) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)

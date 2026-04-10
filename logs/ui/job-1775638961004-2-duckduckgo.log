@@ -1,0 +1,203 @@
+[36m[2026-04-08T09:02:41.167Z][0m Resuming from checkpoint: phase=researcher assetIndex=0
+[2m[35m  » i'm trying to free your mind, neo. but first, free this session from pause. resuming.[0m
+
+────────────────────────────────────────────────────────────────────────
+RESUME MODE — continuing from checkpoint
+  Phase      : researcher
+  Asset      : 1/1 (webapp)
+  Findings   : 0 confirmed so far
+────────────────────────────────────────────────────────────────────────
+
+[36m[2026-04-08T09:02:41.173Z][0m Starting pipeline assets=webapp mode=whitebox cli=claude
+
+[36m──────────────────────────────────────────────────────────────────────[0m
+  [1m[36mSTAGE 0 — File Triage[0m  [2mclassifying all source files[0m
+[36m──────────────────────────────────────────────────────────────────────[0m
+
+[36m[2026-04-08T09:02:41.187Z][0m Stage 0 — File Triage: classifying source files...
+[36m[2026-04-08T09:02:41.191Z][0m Stage 0 — already complete, using cached manifest
+
+[36m──────────────────────────────────────────────────────────────────────[0m
+  [1m[36mSTAGE 1 — Surface Mapping[0m  [2mbuilding attack surface from manifest[0m
+[36m──────────────────────────────────────────────────────────────────────[0m
+
+[36m[2026-04-08T09:02:41.195Z][0m Stage 1 — Surface Mapping: building attack surface...
+[36m[2026-04-08T09:02:41.199Z][0m Stage 1 — already complete, using cached surface
+
+[36m──────────────────────────────────────────────────────────────────────[0m
+  [1m[36mSTAGE 1.5 — Git Intelligence[0m  [2mmining commits + secret scan[0m
+[36m──────────────────────────────────────────────────────────────────────[0m
+
+[36m[2026-04-08T09:02:41.204Z][0m Stage 1.5 — Git Intelligence: mining commits + scanning secrets...
+[36m[2026-04-08T09:02:41.208Z][0m Stage 1.5 — already complete, using cached intel
+
+[36m──────────────────────────────────────────────────────────────────────[0m
+  [1m[36mSTAGE 2 — Domain Research[0m  [2m6 specialist agents: AUTH INJECT CLIENT ACCESS MEDIA INFRA[0m
+[36m──────────────────────────────────────────────────────────────────────[0m
+
+
+[35m══════════════════════════════════════════════════════════════════════[0m
+[1m[95mRESEARCHER v2[0m — target: [1mD:\Agentic-BugBounty\targets\duckduckgo\src[0m  |  phase: [36mdeep research[0m  |  elapsed: [33m0s[0m
+[35m══════════════════════════════════════════════════════════════════════[0m
+  [90m○[0m  [96m[AUTH][0m  
+  [90m○[0m  [91m[INJECT][0m  
+  [90m○[0m  [95m[CLIENT][0m  
+  [90m○[0m  [93m[ACCESS][0m  
+  [90m○[0m  [92m[MEDIA][0m  
+  [90m○[0m  [36m[INFRA][0m  
+[35m──────────────────────────────────────────────────────────────────────[0m
+  Candidates so far: [1m0[0m  |  Confirmed: [92m0[0m  |  Agents done: [36m0/6[0m
+[35m══════════════════════════════════════════════════════════════════════[0m
+
+[36m[2026-04-08T09:02:41.233Z][0m Starting researcher phase asset=webapp source=D:\Agentic-BugBounty\targets\duckduckgo\src
+[36m[2026-04-08T09:02:41.236Z][0m Running Explorer + Hybrid Recon in parallel (free LLM)...
+  [2m[explorer] starting deterministic surface analysis...[0m
+  [2m[hybrid-recon] starting hybrid recon for webapp at D:\Agentic-BugBounty\targets\duckduckgo\src[0m
+  [2m[hybrid-recon] phase 0: loading calibration briefing for webapp...[0m
+  [2m[hybrid-recon] phase 0: calibration script unavailable — skipping[0m
+  [2m[hybrid-recon] phase 1: walking source tree at D:\Agentic-BugBounty\targets\duckduckgo\src...[0m
+  [2m[hybrid-recon] phase 1: found 300 source files — sampling key files...[0m
+  [2m[hybrid-recon] phase 1: asking free LLM to map attack surface...[0m
+  [2m[llm] «It's not possible.» «No, it's necessary.» — routing to gemini.[0m
+  [2m[llm] «What we've got here is failure to communicate.» gemini silent. (ccw cli failed: spawnSync ccw ENOENT)[0m
+  [2m[llm]   6 api key(s) loaded. trying 22 free models...[0m
+  [2m[llm] openai/gpt-oss-120b:free, i choose you! *pokeball throw*[0m
+  [2m[explorer] parser done in 22644ms — endpoints:1 secrets:0 tech:0[0m
+  [2m[explorer] total elapsed: 22645ms[0m
+  [2m[llm] «It's alive! It's alive!» — openai/gpt-oss-120b:free speaks.[0m
+  [2m[hybrid-recon] phase 1: recon map received[0m
+  [2m[hybrid-recon] hybrid recon complete — injecting context into Claude prompt[0m
+[92m[2026-04-08T09:03:06.343Z] Explorer surface analysis injected into researcher prompt[0m
+[92m[2026-04-08T09:03:06.358Z] Hybrid recon injected into researcher prompt[0m
+[36m[2026-04-08T09:03:06.367Z][0m → Starting researcher[webapp] agent
+[2m[35m  » one does not simply walk into the kernel. but we just did.[0m
+                                                                                                                                                                                                                                                            [33m»[0m [2mStarting whitebox analysis on webapp target: `D:\Agentic-BugBounty\targets\duckduckgo\src` ↵ Report prefix: `WEB-NNN` ↵ Session resume — domains complete: [AUTH], [INJECT], [CLIENT], [ACCESS], [MEDIA], [INFRA]. Loading c[0m
+                                                    [90m[  15s][0m [96mSkill     [0m [2m{"skill":"shared:core"}[0m
+                                                                                                                                                        [90m[  16s][0m [96mRead      [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\findings\confirmed\report_bundle.json[0m
+                                                                                                      [90m[  16s][0m [96mBash      [0m [2mls D:\Agentic-BugBounty\targets\duckduckgo\findings\confirmed\ 2>/dev/null && ls D:\Agenti[0m
+                                                                                                                                                                                                          [90m[  40s][0m [96mSkill     [0m [2m{"skill":"shared:researcher_wb"}[0m
+                                                                                                                                                        [90m[  41s][0m [96mSkill     [0m [2m{"skill":"asset:webapp:module"}[0m
+                                                                                                                                                        [90m[  42s][0m [96mBash      [0m [2mls D:/Agentic-BugBounty/targets/duckduckgo/findings/confirmed/ 2>/dev/null; echo "---"; ls[0m
+                                                                                                                                                        [33m»[0m [2mAll 6 domains are complete. Proceeding directly to Phase 2.6 (Chain Synthesis) → Phase 4 (Live Testing) → Phase 5 (PoC) → Phase 6 (Output). ↵ Let me first review existing shard files to understand all candidates.[0m
+                                                    [90m[  58s][0m [96mBash      [0m [2mls D:/Agentic-BugBounty/targets/duckduckgo/findings/candidates_pool_*.json 2>/dev/null[0m
+  [33m⏱[0m  [1m60s[0m | [2m7 tool call(s)...[0m                                                                                                                [90m[  68s][0m [96mBash      [0m [2mfor f in D:/Agentic-BugBounty/targets/duckduckgo/findings/candidates_pool_*.json; do echo [0m
+                                                                                                                                                                                                          [90m[  99s][0m [96mBash      [0m [2mnode -e " const fs = require('fs'); const files = [ 'D:/Agentic-BugBounty/targets/duckduck[0m
+                                                    [33m⏱[0m  [1m120s[0m | [2m9 tool call(s)...[0m                                                                                                                [33m»[0m [2m**PHASE 2.6 — CHAIN SYNTHESIS** ↵ **Candidate Matrix:** ↵ | ID | vuln_class | component | primitive | ↵ |---|---|---|---|[0m
+                                                    [90m[ 137s][0m [96mBash      [0m [2mcat D:/Agentic-BugBounty/targets/duckduckgo/findings/env_meta.json 2>/dev/null || echo "no[0m
+                                                                                                                                                        [33m»[0m [2mNo live environment. Phase 4.1 and 4.2 skipped — `needs_evidence` candidates remain as-is. Let me attempt deeper static confirmation on the two `needs_evidence` candidates before finalizing output.[0m
+                                                    [90m[ 156s][0m [96mBash      [0m [2m# Check if autofill library source is available in node_modules ls D:/Agentic-BugBounty/ta[0m
+                                                    [90m[ 157s][0m [96mBash      [0m [2m# Check autoconsent for evalSnippets definition grep -rn "evalSnippets" D:/Agentic-BugBoun[0m
+                                                                                                                                                                                                          [90m[ 167s][0m [96mBash      [0m [2mgrep -n "evalSnippets" D:/Agentic-BugBounty/targets/duckduckgo/src/shared/js/background/co[0m
+                                                    [90m[ 168s][0m [96mBash      [0m [2m# Check autoconsent message flow - where does the 'eval' type message come from? grep -rn [0m
+                                                                                                                                                        [90m[ 179s][0m [96mRead      [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\src\shared\js\background\components\cookie-prompt-management.js[0m
+  [33m⏱[0m  [1m180s[0m | [2m15 tool call(s)...[0m                                                                                                                [90m[ 182s][0m [96mBash      [0m [2m# Check if msg.snippetId originates from content script (which could be influenced by page[0m
+                                                                                                      [90m[ 191s][0m [96mBash      [0m [2m# Check where autoconsent messages originate — the cpm content script find D:/Agentic-BugB[0m
+                                                                                                      [90m[ 199s][0m [96mBash      [0m [2m# Find where autoconsent messages are sent from grep -rn "messageType.*autoconsent\|autoco[0m
+                                                    [90m[ 201s][0m [96mBash      [0m [2m# Check if @duckduckgo/autoconsent is in node_modules and look at its message sending find[0m
+                                                                                                                                                        [90m[ 209s][0m [96mRead      [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\src\shared\js\cpm.js[0m
+                                                                                                                                                        [90m[ 224s][0m [96mBash      [0m [2m# Check autoconsent package — does it expose page-facing API that could accept eval type? [0m
+                                                    [90m[ 224s][0m [96mBash      [0m [2m# Check @duckduckgo/autofill for getUserData message handling grep -rn "getUserData\|getAl[0m
+                                                                                                                                                        [90m[ 237s][0m [96mBash      [0m [2mls D:/Agentic-BugBounty/targets/duckduckgo/src/node_modules/ 2>/dev/null | head -20 || ech[0m
+                                                            [2m[35m  » wake up, neo. the pipeline is still running.[0m
+  [33m⏱[0m  [1m240s[0m | [2m23 tool call(s)...[0m                                                                                                                [90m[ 246s][0m [96mBash      [0m [2mls D:/Agentic-BugBounty/targets/duckduckgo/src/ 2>/dev/null | head -20[0m
+                                                                                                      [90m[ 255s][0m [96mBash      [0m [2m# Check if autofill exposes getUserData via page-facing postMessage bridge grep -rn "getUs[0m
+                                                                                                      [90m[ 263s][0m [96mRead      [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\src\shared\js\background\components\message-router.js[0m
+                                                                                                      [90m[ 264s][0m [96mRead      [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\src\shared\js\background\components\email-autofill.js[0m
+                                                                                                                                                        [90m[ 273s][0m [96mBash      [0m [2m# Check integration tests for autofill/email page behavior grep -rn "getUserData\|email.*p[0m
+                                                    [90m[ 274s][0m [96mBash      [0m [2m# Check unit tests for email-autofill component grep -rn "getUserData\|isExpectedSender" D[0m
+                                                                                                                                                        [90m[ 283s][0m [96mBash      [0m [2mfind D:/Agentic-BugBounty/targets/duckduckgo/src/ -name "*.test.js" -o -name "*.spec.js" |[0m
+                                                                                                      [90m[ 291s][0m [96mBash      [0m [2m# Read package.json to check @duckduckgo/autofill version and understand the package grep [0m
+                                                    [90m[ 292s][0m [96mBash      [0m [2m# Look at the packages directory for local packages ls D:/Agentic-BugBounty/targets/duckdu[0m
+                                                                                                      [33m⏱[0m  [1m300s[0m | [2m32 tool call(s)...[0m                                                                                                                [33m»[0m [2m**PHASE 6 — Output** ↵ No live environment, no confirmed findings from static analysis alone. Merging all shards and writing final outputs.[0m
+                                                    [90m[ 339s][0m [96mBash      [0m [2mnode -e " const fs = require('fs'); const path = require('path'); const findingsDir = 'D:/[0m
+                                                    [33m⏱[0m  [1m360s[0m | [2m33 tool call(s)...[0m                                                              [90m[ 388s][0m [96mWrite     [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\findings\unconfirmed\candidates.json[0m
+                                                                                                      [90m[ 392s][0m [96mRead      [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\findings\unconfirmed\candidates.json[0m
+                                                    [33m⏱[0m  [1m420s[0m | [2m35 tool call(s)...[0m                                                              [90m[ 423s][0m [96mWrite     [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\findings\unconfirmed\candidates.json[0m
+                                                                                                                                                        [90m[ 429s][0m [96mEdit      [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\findings\confirmed\report_bundle.json[0m
+                                                                                                      [90m[ 432s][0m [96mBash      [0m [2mnode D:/Agentic-BugBounty/scripts/validate-bundle.js D:/Agentic-BugBounty/targets/duckduck[0m
+                                                                                                                                                        [33m»[0m [2m``` ↵ ═══════════════════════════════════════════════════════ ↵ RESEARCHER v2 — SESSION COMPLETE ↵ ═══════════════════════════════════════════════════════[0m
+                                                  
+  [92m[done][0m [1m450s[0m | [33m38 tool call(s)[0m | [2mtokens: 1848.0k (in: 31 | out: 19.8k | cache_read: 1755.3k | cache_write: 72.9k)[0m
+
+                                                  [36m[2026-04-08T09:10:37.573Z][0m ← researcher[webapp] agent done in 451s
+[2m[35m  » the name's researcher. findings researcher.[0m
+[36m[2026-04-08T09:10:37.583Z][0m Adaptive recon: 4 new signal(s) detected after researcher pass
+  [36m[adaptive][0m 4 new recon signal(s) — will focus next pass
+    [2m• New component discovered: shared/js/content-scripts/content-scope-messaging.js:3 (allowedMessages) and shared/js/background/message-handlers.js:165 (unblockClickToLoadContent)[0m
+    [2m• New component discovered: browsers/chrome/manifest.json:97 — web_accessible_resources /public/font/* with use_dynamic_url:false[0m
+    [2m• New component discovered: shared/js/content-scripts/content-scope-messaging.js:42 — window.addEventListener('message') without origin check[0m
+    [2m• New component discovered: shared/js/background/components/email-autofill.js:328[0m
+
+[36m──────────────────────────────────────────────────────────────────────[0m
+  [1m[36mSTAGE 2.5 — Chain Coordinator[0m  [2mcross-domain kill chain synthesis[0m
+[36m──────────────────────────────────────────────────────────────────────[0m
+
+[36m[2026-04-08T09:10:37.607Z][0m Stage 2.5 — Chain Coordinator: analyzing cross-agent chains...
+[36m[2026-04-08T09:10:37.618Z][0m Stage 2.5 — skipped: no chain_candidate entries found
+REPORT_BUNDLE valid: D:\Agentic-BugBounty\targets\duckduckgo\findings\confirmed\report_bundle.json
+[36m[2026-04-08T09:10:37.784Z][0m Report bundle redacted (credentials scrubbed)
+[92m[2026-04-08T09:10:37.797Z] All researcher passes complete with 0 confirmed finding(s)[0m
+
+────────────────────────────────────────────────────────────────────────
+Researcher done — 0 finding(s) confirmed.
+
+To run the triager now:
+  /triager --asset webapp
+
+Or run the full pipeline (researcher + triager) in one shot:
+  node scripts/run-pipeline.js --target duckduckgo --cli claude
+────────────────────────────────────────────────────────────────────────
+
+  poc  WEB-001-CANDIDATE_click_to_load_privacy_bypass_via_content.js
+  poc  WEB-002-CANDIDATE_extension_presence_fingerprinting_via_st.js
+  poc  WEB-003-CANDIDATE_debug_mode_cross_origin_window_postmessa.js
+  poc  WEB-004-CANDIDATE_email_token_exposure_isexpectedsender_us.js
+  md   summary.md
+4 PoC file(s) + summary written to: D:\Agentic-BugBounty\targets\duckduckgo\poc
+[36m[2026-04-08T09:10:37.918Z][0m PoC artifacts written to: D:\Agentic-BugBounty\targets\duckduckgo\poc
+[36m[2026-04-08T09:10:37.936Z][0m Starting triager round 1
+[36m[2026-04-08T09:10:37.943Z][0m → Starting triager[webapp] agent
+[2m[35m  » extraordinary claims require extraordinary evidence. show me the packet capture.[0m
+                                                                                                                                                                                                                                                            [90m[   6s][0m [96mSkill     [0m [2m{"skill":"shared:core"}[0m
+                                                                                                                                                        [90m[   6s][0m [96mRead      [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\findings\confirmed\report_bundle.json[0m
+                                                                                                                                                                                                          [90m[  11s][0m [96mSkill     [0m [2m{"skill":"shared:triager_base"}[0m
+                                                                                                                                                        [90m[  11s][0m [96mGlob      [0m [2m{"pattern":"D:\\Agentic-BugBounty\\targets\\duckduckgo\\intelligence\\*.json"}[0m
+                                                                                                                                                        [90m[  15s][0m [96mSkill     [0m [2m{"skill":"triager:calibration:webapp"}[0m
+                                                                                                                                                        [90m[  15s][0m [96mRead      [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\intelligence\h1_scope_snapshot.json[0m
+                                                                                                      [90m[  15s][0m [96mRead      [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\intelligence\h1_vulnerability_history.json[0m
+                                                    [33m⏱[0m  [1m60s[0m | [2m7 tool call(s)...[0m            [33m⏱[0m  [1m120s[0m | [2m7 tool call(s)...[0m                                                                                                                [33m»[0m [2mNow I have all the calibration modules loaded. Let me run calibration queries and verify the source code for key claims before writing triage verdicts.[0m
+                                                    [90m[ 140s][0m [96mBash      [0m [2mnode scripts/query-calibration.js --asset webapp --vuln business_logic --json 2>/dev/null [0m
+                                                    [90m[ 141s][0m [96mBash      [0m [2mnode scripts/query-calibration.js --asset webapp --vuln information_disclosure --json 2>/d[0m
+                                                                                                                                                                                                          [90m[ 162s][0m [96mBash      [0m [2mnode scripts/query-calibration.js --asset webapp --vuln auth_flaws --json 2>&1 | head -30[0m
+                                                    [90m[ 163s][0m [96mBash      [0m [2mnode scripts/query-calibration.js --all 2>&1 | head -20[0m
+                                                                                                                                                                                                          [33m»[0m [2mCalibration data unavailable — I'll note this in triage. Now let me verify the key source code claims directly.[0m
+                                                    [90m[ 178s][0m [96mBash      [0m [2mfind D:/Agentic-BugBounty/targets/duckduckgo/src -name "content-scope-messaging.js" 2>/dev[0m
+                                                    [90m[ 179s][0m [96mBash      [0m [2mfind D:/Agentic-BugBounty/targets/duckduckgo/src -name "manifest.json" 2>/dev/null | head [0m
+                                                    [90m[ 180s][0m [96mBash      [0m [2mfind D:/Agentic-BugBounty/targets/duckduckgo/src -name "email-autofill.js" 2>/dev/null | h[0m
+  [33m⏱[0m  [1m180s[0m | [2m14 tool call(s)...[0m                                                                                                                                                                                                                    [90m[ 187s][0m [96mRead      [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\src\shared\js\content-scripts\content-scope-messaging.js[0m
+                                                                                                      [90m[ 188s][0m [96mRead      [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\src\browsers\chrome\manifest.json[0m
+                                                                                                      [90m[ 189s][0m [96mRead      [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\src\shared\js\background\components\email-autofill.js[0m
+                                                                                                                                                        [33m»[0m [2mGood. Now let me verify the `getUserData` handler and check how the autofill library communicates.[0m
+                                                    [90m[ 194s][0m [96mBash      [0m [2mgrep -n "getUserData\|addUserData\|removeUserData" D:/Agentic-BugBounty/targets/duckduckgo[0m
+                                                    [90m[ 195s][0m [96mBash      [0m [2mgrep -rn "ddg-secret\|getSecret\|stopImmediatePropagation" D:/Agentic-BugBounty/targets/du[0m
+                                                                                                                                                        [90m[ 203s][0m [96mRead      [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\src\shared\js\background\components\email-autofill.js[0m
+                                                                                                      [90m[ 204s][0m [96mBash      [0m [2mfind D:/Agentic-BugBounty/targets/duckduckgo/src -path "*/content-scope-scripts*" -name "*[0m
+                                                                                                              [2m[35m  » follow the white rabbit... it leads to /admin.[0m
+  [33m⏱[0m  [1m240s[0m | [2m21 tool call(s)...[0m            [33m⏱[0m  [1m300s[0m | [2m21 tool call(s)...[0m                                                                                                                [90m[ 303s][0m [96mBash      [0m [2mls D:/Agentic-BugBounty/targets/duckduckgo/findings/h1_submission_ready/ 2>/dev/null || ec[0m
+                                                    [90m[ 304s][0m [96mRead      [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\src\shared\js\background\components\email-autofill.js[0m
+                                                                                                                                                                                                          [33m»[0m [2mAll source facts verified. Now writing the triage output. ↵ **Summary of analysis before writing:** ↵ | ID | Code Verified | PoC Mechanism | Verdict | ↵ |----|--------------|---------------|---------|[0m
+  [33m⏱[0m  [1m360s[0m | [2m23 tool call(s)...[0m                                                              [90m[ 411s][0m [96mWrite     [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\findings\triage_result.json[0m
+                                                                                                                                                        [90m[ 415s][0m [96mBash      [0m [2mls D:/Agentic-BugBounty/targets/duckduckgo/findings/ 2>/dev/null[0m
+                                                                                                      [33m⏱[0m  [1m420s[0m | [2m25 tool call(s)...[0m                                                              [90m[ 422s][0m [96mRead      [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\findings\triage_result.json[0m
+                                                                                                              [2m[35m  » Well, well, well... if it isn't the invisible c*ode. still processing.[0m
+  [33m⏱[0m  [1m480s[0m | [2m26 tool call(s)...[0m                                                              [90m[ 504s][0m [96mWrite     [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\findings\triage_result.json[0m
+                                                                                                                                                        [90m[ 507s][0m [96mBash      [0m [2mls D:/Agentic-BugBounty/targets/duckduckgo/findings/h1_submission_ready/ 2>/dev/null[0m
+                                                                                                                                                        [90m[ 539s][0m [96mWrite     [0m [2mD:\Agentic-BugBounty\targets\duckduckgo\findings\h1_submission_ready\WEB-002-CANDIDATE.md[0m
+                                                    [33m⏱[0m  [1m540s[0m | [2m29 tool call(s)...[0m                                                              [33m»[0m [2m--- ↵ **Triage complete.** ↵ ``` ↵ TRIAGED:          1  (WEB-002 — ready to submit to H1)[0m
+                                                  
+  [92m[done][0m [1m559s[0m | [33m29 tool call(s)[0m | [2mtokens: 902.8k (in: 403 | out: 27.2k | cache_read: 816.6k | cache_write: 58.6k)[0m
+
+                                                  [36m[2026-04-08T09:19:58.281Z][0m ← triager[webapp] agent done in 560s
+TRIAGE_RESULT valid: D:\Agentic-BugBounty\targets\duckduckgo\findings\triage_result.json
+No finding found for ready_to_submit result WEB-002-CANDIDATE
+node exited with status 1

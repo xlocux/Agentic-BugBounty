@@ -1,0 +1,75 @@
+[36m[2026-04-08T09:02:11.517Z][0m Resuming from checkpoint: phase=researcher assetIndex=0
+[2m[35m  » checkpoint loaded. resuming from last known position.[0m
+
+────────────────────────────────────────────────────────────────────────
+RESUME MODE — continuing from checkpoint
+  Phase      : researcher
+  Asset      : 1/1 (webapp)
+  Findings   : 0 confirmed so far
+────────────────────────────────────────────────────────────────────────
+
+[36m[2026-04-08T09:02:11.523Z][0m Starting pipeline assets=webapp mode=blackbox cli=claude
+
+[36m──────────────────────────────────────────────────────────────────────[0m
+  [1m[36mSTAGE 0 — File Triage[0m  [2mclassifying all source files[0m
+[36m──────────────────────────────────────────────────────────────────────[0m
+
+[36m[2026-04-08T09:02:11.537Z][0m Stage 0 — File Triage: classifying source files...
+[36m[2026-04-08T09:02:11.541Z][0m Stage 0 — already complete, using cached manifest
+
+[36m──────────────────────────────────────────────────────────────────────[0m
+  [1m[36mSTAGE 1 — Surface Mapping[0m  [2mbuilding attack surface from manifest[0m
+[36m──────────────────────────────────────────────────────────────────────[0m
+
+[36m[2026-04-08T09:02:11.546Z][0m Stage 1 — Surface Mapping: building attack surface...
+[36m[2026-04-08T09:02:11.550Z][0m Stage 1 — already complete, using cached surface
+
+[36m──────────────────────────────────────────────────────────────────────[0m
+  [1m[36mSTAGE 1.5 — Git Intelligence[0m  [2mmining commits + secret scan[0m
+[36m──────────────────────────────────────────────────────────────────────[0m
+
+[36m[2026-04-08T09:02:11.556Z][0m Stage 1.5 — Git Intelligence: mining commits + scanning secrets...
+[36m[2026-04-08T09:02:11.561Z][0m Stage 1.5 — already complete, using cached intel
+
+[36m──────────────────────────────────────────────────────────────────────[0m
+  [1m[36mSTAGE 2 — Domain Research[0m  [2m6 specialist agents: AUTH INJECT CLIENT ACCESS MEDIA INFRA[0m
+[36m──────────────────────────────────────────────────────────────────────[0m
+
+
+[35m══════════════════════════════════════════════════════════════════════[0m
+[1m[95mRESEARCHER v2[0m — target: [1mD:\Agentic-BugBounty\targets\duckduckgo\src[0m  |  phase: [36mdeep research[0m  |  elapsed: [33m0s[0m
+[35m══════════════════════════════════════════════════════════════════════[0m
+  [90m○[0m  [96m[AUTH][0m  
+  [90m○[0m  [91m[INJECT][0m  
+  [90m○[0m  [95m[CLIENT][0m  
+  [90m○[0m  [93m[ACCESS][0m  
+  [90m○[0m  [92m[MEDIA][0m  
+  [90m○[0m  [36m[INFRA][0m  
+[35m──────────────────────────────────────────────────────────────────────[0m
+  Candidates so far: [1m0[0m  |  Confirmed: [92m0[0m  |  Agents done: [36m0/6[0m
+[35m══════════════════════════════════════════════════════════════════════[0m
+
+[36m[2026-04-08T09:02:11.585Z][0m Starting researcher phase asset=webapp source=D:\Agentic-BugBounty\targets\duckduckgo\src
+[36m[2026-04-08T09:02:11.589Z][0m Running Explorer + Hybrid Recon in parallel (free LLM)...
+  [2m[explorer] starting deterministic surface analysis...[0m
+  [2m[hybrid-recon] starting hybrid recon for webapp at D:\Agentic-BugBounty\targets\duckduckgo\src[0m
+  [2m[hybrid-recon] phase 0: loading calibration briefing for webapp...[0m
+  [2m[hybrid-recon] phase 0: calibration script unavailable — skipping[0m
+  [2m[hybrid-recon] phase 1: walking source tree at D:\Agentic-BugBounty\targets\duckduckgo\src...[0m
+  [2m[hybrid-recon] phase 1: found 300 source files — sampling key files...[0m
+  [2m[hybrid-recon] phase 1: asking free LLM to map attack surface...[0m
+  [2m[llm] «Gemini, this is Mother. What do you see?» — opening the pod bay doors to the oracle.[0m
+  [2m[llm] gemini shrugged. trying openrouter. (ccw cli failed: spawnSync ccw ENOENT)[0m
+  [2m[llm]   6 api key(s) loaded. trying 22 free models...[0m
+  [2m[llm] «Do or do not. There is no try.» trying openai/gpt-oss-120b:free anyway.[0m
+  [2m[explorer] parser done in 2336ms — endpoints:0 secrets:0 tech:0[0m
+  [2m[explorer] total elapsed: 2336ms[0m
+  [2m[llm] «It's alive! It's alive!» — openai/gpt-oss-120b:free speaks.[0m
+  [2m[hybrid-recon] phase 1: recon map received[0m
+  [2m[hybrid-recon] hybrid recon complete — injecting context into Claude prompt[0m
+[92m[2026-04-08T09:02:16.882Z] Explorer surface analysis injected into researcher prompt[0m
+[92m[2026-04-08T09:02:16.892Z] Hybrid recon injected into researcher prompt[0m
+[36m[2026-04-08T09:02:16.900Z][0m → Starting researcher[webapp] agent
+[2m[35m  » the matrix is everywhere. it is all around us. even in this target.[0m
+                                                                                                                                                                                                                                                            [90m[  17s][0m [96mSkill     [0m [2m{"skill":"shared:core"}[0m
+                                                                                                                                                      

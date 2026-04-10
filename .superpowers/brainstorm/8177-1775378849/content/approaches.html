@@ -1,0 +1,83 @@
+<h2>3 approcci architetturali</h2>
+<p class="subtitle">Quale struttura porta meglio a una UI che guida il workflow con controllo granulare?</p>
+
+<div class="options">
+
+  <!-- Opzione A -->
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Event Protocol — canale strutturato agente → UI</h3>
+      <p style="color:#a0aec0;font-size:12px;margin:6px 0 10px;">Il pipeline emette eventi JSON su stdout oltre ai log. La UI legge questi eventi (non il testo) per guidare il workflow.</p>
+      <div style="font-size:11px;display:flex;flex-direction:column;gap:6px;">
+        <div style="background:#1a2744;border-radius:4px;padding:8px;font-family:monospace;color:#90cdf4;">
+          {"type":"plan","phase":"researcher","operations":[<br>
+          &nbsp;&nbsp;{"id":"auth","label":"AUTH domain","mandatory":true},<br>
+          &nbsp;&nbsp;{"id":"inject","label":"INJECT domain","mandatory":true},<br>
+          &nbsp;&nbsp;{"id":"media","label":"MEDIA domain","mandatory":false,"skip_reason":"no file upload in scope"}<br>
+          ]}
+        </div>
+        <div style="color:#68d391;font-size:11px;">✓ UI pausa, mostra il piano, aspetta approvazione → pipeline riprende</div>
+        <div style="color:#68d391;font-size:11px;">✓ Contratto formale: agente promette di emettere plan events prima di ogni fase</div>
+        <div style="color:#68d391;font-size:11px;">✓ Nessuna riscrittura del pipeline — solo aggiunge emit() in punti chiave</div>
+        <div style="color:#fc8181;font-size:11px;">⚠ Richiede modificare run-pipeline.js per emettere eventi strutturati</div>
+        <div style="color:#fc8181;font-size:11px;">⚠ IPC bidirezionale: UI deve anche inviare approvazioni al pipeline</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Opzione B -->
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Pipeline as API — il server orchestra le fasi direttamente</h3>
+      <p style="color:#a0aec0;font-size:12px;margin:6px 0 10px;">Ogni fase diventa una funzione Node.js chiamabile via API. Il server guida il workflow, non il pipeline monolite.</p>
+      <div style="font-size:11px;display:flex;flex-direction:column;gap:6px;">
+        <div style="background:#1a2744;border-radius:4px;padding:8px;font-family:monospace;color:#90cdf4;">
+          POST /api/phase/researcher/plan<br>
+          → {operations: [...], mandatory: [...]}<br><br>
+          POST /api/phase/researcher/run<br>
+          body: {approved_ops: ["auth","inject"]}<br>
+          → SSE stream con eventi strutturati
+        </div>
+        <div style="color:#68d391;font-size:11px;">✓ UI è il vero orchestratore — controllo totale sul flusso</div>
+        <div style="color:#68d391;font-size:11px;">✓ Ogni fase testabile indipendentemente via API</div>
+        <div style="color:#fc8181;font-size:11px;">⚠ Refactoring significativo: estrarre fasi da run-pipeline.js in moduli</div>
+        <div style="color:#fc8181;font-size:11px;">⚠ Agenti Claude Code devono ancora girare come subprocess</div>
+        <div style="color:#fc8181;font-size:11px;">⚠ Maggiore lavoro iniziale — 2-3 settimane di refactoring</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Opzione C (raccomandato) -->
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter" style="background:linear-gradient(135deg,#2b6cb0,#553c9a);">C</div>
+    <div class="content">
+      <h3>Session File + Checkpoint Protocol <span style="color:#68d391;font-size:11px;margin-left:8px;">★ raccomandato</span></h3>
+      <p style="color:#a0aec0;font-size:12px;margin:6px 0 10px;">Il pipeline scrive un "session state" JSON strutturato a ogni checkpoint. La UI lo legge, mostra il piano, scrive l'approvazione. Il pipeline riprende.</p>
+      <div style="font-size:11px;display:flex;flex-direction:column;gap:6px;">
+        <div style="background:#1a2744;border-radius:4px;padding:8px;font-family:monospace;color:#90cdf4;">
+          <span style="color:#68d391;">// pipeline scrive:</span><br>
+          session.json → {status:"awaiting_approval",<br>
+          &nbsp;&nbsp;phase:"researcher", plan:[...],<br>
+          &nbsp;&nbsp;selected_assets:[...]}<br><br>
+          <span style="color:#68d391;">// UI scrive:</span><br>
+          session.json → {status:"approved",<br>
+          &nbsp;&nbsp;approved_ops:["auth","inject"],<br>
+          &nbsp;&nbsp;assets:["*.duckduckgo.com"]}
+        </div>
+        <div style="color:#68d391;font-size:11px;">✓ Minimo refactoring: il checkpoint system esiste già</div>
+        <div style="color:#68d391;font-size:11px;">✓ UI polling su session.json → notifica quando c'è un piano da approvare</div>
+        <div style="color:#68d391;font-size:11px;">✓ Bidirezionale: pipeline pausa, aspetta file, riprende</div>
+        <div style="color:#68d391;font-size:11px;">✓ Scala a opzione B in futuro senza buttare il lavoro</div>
+        <div style="color:#fc8181;font-size:11px;">⚠ Latenza di polling (500ms max) — accettabile per workflow manuale</div>
+        <div style="color:#fc8181;font-size:11px;">⚠ Serve schema formale per session.json</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:16px;padding:12px;background:#1a2744;border-radius:6px;font-size:12px;color:#a0aec0;">
+  <strong style="color:#90cdf4;">Raccomandazione:</strong> Opzione C ora → scala verso B in futuro. Il session file protocol riutilizza il checkpoint system esistente, aggiunge struttura senza riscrivere tutto. La UI diventa il centro di controllo senza toccare gli agenti CLI.
+</div>

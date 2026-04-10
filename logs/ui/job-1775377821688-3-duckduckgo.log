@@ -1,0 +1,8 @@
+(node:10868) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+HackerOne intelligence synced for duckduckgo
+- scope snapshot: D:\Agentic-BugBounty\targets\duckduckgo\intelligence\h1_scope_snapshot.json
+- vulnerability history: D:\Agentic-BugBounty\targets\duckduckgo\intelligence\h1_vulnerability_history.json
+- skill suggestions: D:\Agentic-BugBounty\targets\duckduckgo\intelligence\h1_skill_suggestions.json
+- sqlite database: D:\Agentic-BugBounty\targets\duckduckgo\intelligence\agentic-bugbounty.db
+- counts: scopes=4, hacktivity=0, reports=0
